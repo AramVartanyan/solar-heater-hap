@@ -162,7 +162,7 @@ Datasheet: [`DS18B20.pdf`](DS18B20.pdf) (Maxim/Analog Devices, 19-7487 Rev 6, 7/
 - Използват се **2 цифри** (напр. индикатор 0.36" или 0.56", общ анод — според схемата на TM1637).
 - Изводи към ESP32-S3: **CLK → GP5, DIO → GP6**.
 - Библиотека: [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) (собствена; бележки за обновяване — в [firmware.md](firmware.md#5-локално-управление--дисплей-и-бутони)).
-- Datasheet: Titan Micro TM1637 V2.4 — [в хранилището на библиотеката](https://github.com/AramVartanyan/esp_tm1637/blob/master/pictures/Datasheet_TM1637.pdf).
+- Datasheet: Titan Micro TM1637 V2.4 — [в хранилището на библиотеката](https://github.com/AramVartanyan/esp_tm1637/blob/main/pictures/Datasheet_TM1637.pdf).
 
 Данни от datasheet-а:
 
