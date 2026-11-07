@@ -89,3 +89,56 @@ ESP32-S3 има 4 TX и 4 RX RMT канала. Светодиодът заема
 | Вграден RGB светодиод | GP21 |
 
 Подробности: [base-board.md](base-board.md#4-разпределение-на-изводите).
+
+## 3. HomeKit — прозорец за сдвояване
+
+Проверено в [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (`components/homekit/esp_hap_core`):
+
+| Елемент | Стойност / API | Бележка |
+|---|---|---|
+| Продължителност на прозореца | `HAP_PAIRING_MODE_TIMEOUT_IN_MINS = 10` (`src/esp_hap_pair_setup.c`) | по HAP Spec R16; вътрешен таймер `hap_pairing_mode_timer` |
+| Таймерът се стартира | при старт без сдвоени контролери; при премахване на последния контролер; при всяко Pair Setup M1 (рестарт); при `hap_pair_setup_re_enable()` | вътрешни извиквания на `hap_start_pairing_mode_timer()` |
+| Край на прозореца (изтекло време) | събитие `HAP_EVENT_PAIRING_MODE_TIMED_OUT` | SDK-то спира mDNS обявяването — аксесоарът вече не се вижда за сдвояване |
+| Успешно сдвояване | събитие `HAP_EVENT_CTRL_PAIRED` | |
+| Опит за сдвояване | `HAP_EVENT_PAIRING_STARTED` / `HAP_EVENT_PAIRING_ABORTED` | |
+| Премахнат контролер | `HAP_EVENT_CTRL_UNPAIRED` (+ проверка `hap_get_paired_controller_count() == 0`) | прозорецът се отваря отново |
+| Ново отваряне на прозореца | `hap_pair_setup_re_enable()` (публична функция в `hap.h`) | напр. от бутон, без рестарт |
+| Брой сдвоени контролери | `hap_get_paired_controller_count()` | |
+
+Няма публична функция „отворен ли е прозорецът“ — състоянието се поддържа във фърмуера от горните събития:
+
+```c
+static bool s_pair_window_open;
+
+static void hap_event_handler(hap_event_t event, void *data)
+{
+    switch (event) {
+    case HAP_EVENT_CTRL_PAIRED:
+    case HAP_EVENT_PAIRING_MODE_TIMED_OUT:
+        s_pair_window_open = false;           // спира дишането
+        break;
+    case HAP_EVENT_CTRL_UNPAIRED:
+        if (hap_get_paired_controller_count() == 0) {
+            s_pair_window_open = true;        // SDK-то стартира нов прозорец
+        }
+        break;
+    default:
+        break;
+    }
+    // → преизчисляване на индикацията и енергийния режим
+}
+// След hap_start(): s_pair_window_open = (hap_get_paired_controller_count() == 0);
+// При hap_pair_setup_re_enable():  s_pair_window_open = true;
+```
+
+## 4. Енергиен режим на Wi-Fi
+
+- Wi-Fi **не се изключва** — няма отделен режим за настройка с изключване на радиото.
+- **Намалена мощност** се прилага само в един случай: прозорецът за сдвояване с HomeKit е изтекъл
+  (`HAP_EVENT_PAIRING_MODE_TIMED_OUT`), **без да е имало опит за сдвояване** (не е получено `HAP_EVENT_PAIRING_STARTED`)
+  и аксесоарът е останал несдвоен.
+  - Мярка: по-ниска максимална мощност на предавателя — `esp_wifi_set_max_tx_power()` (стойността се уточнява на място;
+    напр. от ~20 dBm към ~11 – 13 dBm).
+  - Нормалната мощност се възстановява при ново отваряне на прозореца (`hap_pair_setup_re_enable()`) и при сдвояване.
+- Ако устройството вече е било свързано и **връзката с Wi-Fi се загуби** — енергийният режим на чипа **не се променя**
+  (само индикацията преминава в проблясък, а Wi-Fi стекът сам опитва повторно свързване).
