@@ -8,6 +8,7 @@
 ## [Unreleased]
 
 ### Added
+- `doc/base-board.md` — чернова на спецификацията на базовата платка: мрежов вход и защити, AC/DC модул 5 V, реле за помпата, входове за 3 датчика, предложение за GPIO, конструктивни изисквания.
 - `doc/hardware.md` — хардуерна спецификация: платка Waveshare ESP32-S3-Zero (извеждания, захранване, ADC изводи) и вграден RGB светодиод WS2812.
 - `doc/ESP32-S3-Zero-pinout.webp` — диаграма на извежданията на ESP32-S3-Zero.
 - `doc/XL-0807RGBC-WS2812B.pdf` — datasheet на RGB светодиода XINGLIGHT XL-0807RGBC-WS2812B.
