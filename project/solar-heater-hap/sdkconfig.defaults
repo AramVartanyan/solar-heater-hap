@@ -25,6 +25,10 @@ CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_ESP_TASK_WDT_INIT=y
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
 
+# FreeRTOS timer task (button callbacks run there): default 2048 B overflowed on one ESP_LOGI;
+# the callbacks now only queue events, the margin stays for other timer callbacks.
+CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3072
+
 # LWIP (HomeKit needs several concurrent controller sockets)
 CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_LWIP_SO_REUSE=y
