@@ -56,6 +56,8 @@
 - `doc/XL-0807RGBC-WS2812B.pdf`, `doc/DS18B20.pdf` — datasheet-и.
 
 ### Changed
+- Submodule `captive-wifi` обновен (след тестваната 0.2.1): поправка при избор на мрежа от портала, докато тече
+  опит на заден план (драйверът отказваше `esp_wifi_connect()` с „sta is connecting“).
 - Меню в Kconfig: „Device Settings“ (вместо „Solar heater“), подменю „GPIO pins“.
 - Submodule `esp_tm1637` обновен до 1.1.1: push-pull CLK/DIO (дисплеят работи с 3 µs вместо 40 µs) и
   нулиране на всички 6 адреса при старт (неизползваната 4-та цифра на 4-цифрен модул остава тъмна).
