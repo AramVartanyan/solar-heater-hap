@@ -12,7 +12,7 @@
   после температурата на колектора от задачата на управлението (`---` без датчик), обновяване само при промяна.
 - Скелет на фърмуера в `project/solar-heater-hap/` по модела на mppt-1k: CMake (`HOMEKIT_PATH`,
   `set(COMPONENTS main)`), `sdkconfig.defaults` за ESP32-S3 (4 MB, USB Serial/JTAG конзола, версия 0.1.0),
-  `partitions_hap.csv`, Kconfig „Solar heater“ (изводи, вътрешни pull-up, яркост, hostname),
+  `partitions_hap.csv`, Kconfig „Device Settings“ (подменю „GPIO pins“, вътрешни pull-up, яркост, hostname),
   модули `sh_state`, `sh_led` (WS2812), `sh_relay`, `sh_buttons` и празни `sh_sensors`, `sh_display`, `sh_control`.
   Компилира се с ESP-IDF 5.5.1 за esp32s3 без предупреждения (образ ~760 KB, 53 % свободно в OTA дяла);
   `dependencies.lock` фиксира версиите на управляваните компоненти (led_strip 3.1.1).
@@ -54,3 +54,16 @@
   настройваемо закъснение на TM1637.
 - `doc/img/` — изображения: диаграма на ESP32-S3-Zero, HLK-PM01.
 - `doc/XL-0807RGBC-WS2812B.pdf`, `doc/DS18B20.pdf` — datasheet-и.
+
+### Changed
+- Меню в Kconfig: „Device Settings“ (вместо „Solar heater“), подменю „GPIO pins“.
+- Submodule `esp_tm1637` обновен до 1.1.1: push-pull CLK/DIO (дисплеят работи с 3 µs вместо 40 µs) и
+  нулиране на всички 6 адреса при старт (неизползваната 4-та цифра на 4-цифрен модул остава тъмна).
+- Яркост на светодиода по подразбиране 20 % (вместо 25 %) — решено на хардуера.
+
+### Tested
+- Макет (ESP32-S3-Zero, ESP-IDF 5.5.4): стартиране, трите бутона, портал `SOLAR-XXXXXX` (captive-wifi 0.2.1)
+  и свързване към избрана мрежа без рестарт — работят; светодиодът свети синьо при връзка.
+- TM1637 на 3.3 V (външен регулатор): с `esp_tm1637` 1.1.0 (open-drain) отговаря едва при 40 µs на полубит
+  (не при 3, 20, 30 µs) — бавни фронтове от pull-up и кондензаторите на модула; решено с 1.1.1. Без отговор
+  приложението продължава да работи нормално.

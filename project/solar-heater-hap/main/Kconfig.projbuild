@@ -1,6 +1,6 @@
-menu "Solar heater"
+menu "Device Settings"
 
-    menu "Pins (Waveshare ESP32-S3-Zero, side header GP1 - GP13)"
+    menu "GPIO pins"
 
         config SH_PIN_T_COL
             int "DS18B20 collector (1-Wire)"
@@ -43,9 +43,9 @@ menu "Solar heater"
     config SH_LED_BRIGHTNESS
         int "Status LED brightness (%)"
         range 1 100
-        default 25
+        default 20
         help
-            Starting value 20 - 30 %, to be decided on the real hardware (doc/firmware.md).
+            20 % chosen on the hardware (25 % was already bright enough, doc/firmware.md).
 
     config SH_HOSTNAME
         string "Network hostname"
