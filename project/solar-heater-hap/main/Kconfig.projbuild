@@ -40,6 +40,14 @@ menu "Device Settings"
             so the internal ones (~45 kOhm) are enabled. Turn this off once the external
             4.7 kOhm (DS18B20) and 10 kOhm (TM1637) resistors are on the board.
 
+    config SH_NET_RESET_HOLD_S
+        int "Wi-Fi reset: hold the menu button (s)"
+        range 3 30
+        default 7
+        help
+            Holding the menu button this long erases the stored Wi-Fi network and restarts the
+            device into the setup portal (temporary until the menu is implemented).
+
     config SH_LED_BRIGHTNESS
         int "Status LED brightness (%)"
         range 1 100
