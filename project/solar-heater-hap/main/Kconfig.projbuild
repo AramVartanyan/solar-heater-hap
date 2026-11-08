@@ -42,11 +42,12 @@ menu "Device Settings"
 
     config SH_NET_RESET_HOLD_S
         int "Wi-Fi reset: hold the menu button (s)"
-        range 3 30
-        default 7
+        range 3 7
+        default 5
         help
             Holding the menu button this long erases the stored Wi-Fi network and restarts the
             device into the setup portal (temporary until the menu is implemented).
+            3 - 7 s; a longer hold (7 - 12 s) is kept for the HomeKit reset.
 
     config SH_LED_BRIGHTNESS
         int "Status LED brightness (%)"
