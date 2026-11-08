@@ -35,6 +35,7 @@ menu "Device Settings"
     config SH_INTERNAL_PULLUPS
         bool "Internal pull-ups on the 1-Wire and TM1637 lines (development prototype)"
         default y
+        select ONEWIRE_INTERNAL_PULLUP
         help
             On the development prototype the external pull-up resistors are not fitted yet,
             so the internal ones (~45 kOhm) are enabled. Turn this off once the external
