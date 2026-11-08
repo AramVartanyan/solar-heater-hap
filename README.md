@@ -56,6 +56,8 @@ idf.py build flash monitor
 | [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле помощни функции |
 | [button](https://github.com/AramVartanyan/button) | Бутони (подобрена версия на Espressif iot button) |
 | [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (предстои обновяване — виж [doc/firmware.md](doc/firmware.md)) |
+| [container_nvs](https://github.com/AramVartanyan/container_nvs) | Съхранение на настройките в NVS |
+| [general-ota](https://github.com/AramVartanyan/general-ota) | Обновяване на фърмуера по HTTPS (без зависимост от HomeKit) |
 
 Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстоят `onewire_bus`, `ds18b20`, `mdns`.
 
@@ -65,7 +67,6 @@ idf.py build flash monitor
 |---|---|
 | [mppt-1k](https://github.com/AramVartanyan/mppt-1k) | Референтен проект (ESP-IDF + HomeKit), модел за структурата |
 | [window-hap-sdk-8266](https://github.com/AramVartanyan/window-hap-sdk-8266) | Референтен проект (HomeKit, `app_wifi`) |
-| [fupdateota](https://github.com/AramVartanyan/fupdateota) | Помощник за OTA обновяване |
 | [esp-led-status](https://github.com/AramVartanyan/esp-led-status) | Индикация чрез LED шаблони (за обикновен светодиод) |
 
 ## Структура на хранилището
@@ -80,7 +81,9 @@ solar-heater-hap/
 │   │   ├── captive-wifi/
 │   │   ├── outputwrite/
 │   │   ├── button/
-│   │   └── esp_tm1637/
+│   │   ├── esp_tm1637/
+│   │   ├── container_nvs/
+│   │   └── general-ota/
 │   └── solar-heater-hap/     — фърмуерът
 │       ├── CMakeLists.txt, sdkconfig.defaults, partitions_hap.csv
 │       └── main/             — app_main.c и модулите sh_*.c/h, Kconfig.projbuild, idf_component.yml

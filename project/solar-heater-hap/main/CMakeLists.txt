@@ -13,6 +13,6 @@ idf_component_register(
         # ESP-IDF
         driver esp_timer nvs_flash esp_wifi esp_event esp_netif esp_app_format
         # project/common (git submodules)
-        button outputwrite captive-wifi
+        button outputwrite captive-wifi container_nvs general-ota
         # managed components (idf_component.yml)
         led_strip)

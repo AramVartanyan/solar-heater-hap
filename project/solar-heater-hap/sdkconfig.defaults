@@ -34,6 +34,13 @@ CONFIG_LWIP_UDP_RECVMBOX_SIZE=10
 CONFIG_LWIP_LOCAL_HOSTNAME="solar-heater"
 CONFIG_LWIP_DHCPS=y
 
+# OTA (general-ota); server certificates come from the mbedTLS bundle below
+CONFIG_GENERAL_OTA_URL="https://raw.githubusercontent.com/AramVartanyan/otafw/master/solar-heater-hap.bin"
+
+# mbedTLS (certificate bundle is required by general-ota)
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+
 # captive-wifi: setup SoftAP "SOLAR-XXXXXX"
 CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
 

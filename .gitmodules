@@ -10,3 +10,9 @@
 [submodule "project/common/button"]
 	path = project/common/button
 	url = https://github.com/AramVartanyan/button
+[submodule "project/common/general-ota"]
+	path = project/common/general-ota
+	url = https://github.com/AramVartanyan/general-ota
+[submodule "project/common/container_nvs"]
+	path = project/common/container_nvs
+	url = https://github.com/AramVartanyan/container_nvs
