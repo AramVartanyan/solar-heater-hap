@@ -16,9 +16,11 @@
   модули `sh_state`, `sh_led` (WS2812), `sh_relay`, `sh_buttons` и празни `sh_sensors`, `sh_display`, `sh_control`.
   Компилира се с ESP-IDF 5.5.1 за esp32s3 без предупреждения (образ ~760 KB, 53 % свободно в OTA дяла);
   `dependencies.lock` фиксира версиите на управляваните компоненти (led_strip 3.1.1).
-- Общи библиотеки като git submodules в `project/common/`: captive-wifi, outputwrite, button, esp_tm1637,
+- Общи библиотеки като git submodules в `project/common/`: captive-wifi, outputwrite, esp_tm1637,
   container_nvs, general-ota (OTA адрес `…/otafw/master/solar-heater-hap.bin`, mbedTLS certificate bundle).
-- `components/homekit/` — препратка към esp-homekit-sdk.
+- `components/homekit/` — препратка към esp-homekit-sdk; `components/button` — собствената поправена версия на
+  `button` от esp-homekit-sdk (git submodule); при външен `HOMEKIT_PATH` тя има предимство пред тази от SDK-то.
+- `CONFIG_MDNS_ENABLE_CONSOLE_CLI=n` — нужно, когато `HOMEKIT_PATH` сочи външно esp-homekit-sdk (mdns без console).
 - `README.md` — описание на проекта, референтни библиотеки, раздел „Хардуер“ и структура на хранилището.
 - `Changelog.md` — файл за проследяване на промените.
 - `doc/` — папка за спецификации, схеми, изображения и други документи; `doc/README.md` — списък на документите.

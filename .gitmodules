@@ -7,12 +7,12 @@
 [submodule "project/common/esp_tm1637"]
 	path = project/common/esp_tm1637
 	url = https://github.com/AramVartanyan/esp_tm1637
-[submodule "project/common/button"]
-	path = project/common/button
-	url = https://github.com/AramVartanyan/button
 [submodule "project/common/general-ota"]
 	path = project/common/general-ota
 	url = https://github.com/AramVartanyan/general-ota
 [submodule "project/common/container_nvs"]
 	path = project/common/container_nvs
 	url = https://github.com/AramVartanyan/container_nvs
+[submodule "components/button"]
+	path = components/button
+	url = https://github.com/AramVartanyan/button
