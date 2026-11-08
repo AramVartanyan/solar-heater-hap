@@ -45,9 +45,18 @@ menu "Device Settings"
         range 3 7
         default 5
         help
-            Holding the menu button this long erases the stored Wi-Fi network and restarts the
-            device into the setup portal (temporary until the menu is implemented).
-            3 - 7 s; a longer hold (7 - 12 s) is kept for the HomeKit reset.
+            Releasing the menu button after holding it at least this long (and less than the
+            factory reset time) erases the stored Wi-Fi network and restarts the device into
+            the setup portal. 3 - 7 s, so it never overlaps the factory reset (8 - 12 s).
+
+    config SH_FACTORY_RESET_HOLD_S
+        int "Factory reset: hold the menu button (s)"
+        range 8 12
+        default 9
+        help
+            Holding the menu button this long erases everything (HomeKit pairings, device
+            settings and the Wi-Fi network) and restarts the device; it starts while the
+            button is still held.
 
     config SH_LED_BRIGHTNESS
         int "Status LED brightness (%)"
