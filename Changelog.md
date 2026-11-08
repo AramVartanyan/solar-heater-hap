@@ -8,6 +8,8 @@
 ## [Unreleased]
 
 ### Added
+- Дисплей TM1637 в проекта: submodule `esp_tm1637` обновен до 1.1.0; `sh_display` — тест на сегментите при старт,
+  после температурата на колектора от задачата на управлението (`---` без датчик), обновяване само при промяна.
 - Скелет на фърмуера в `project/solar-heater-hap/` по модела на mppt-1k: CMake (`HOMEKIT_PATH`,
   `set(COMPONENTS main)`), `sdkconfig.defaults` за ESP32-S3 (4 MB, USB Serial/JTAG конзола, версия 0.1.0),
   `partitions_hap.csv`, Kconfig „Solar heater“ (изводи, вътрешни pull-up, яркост, hostname),

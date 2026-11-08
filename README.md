@@ -55,7 +55,7 @@ idf.py build flash monitor
 | [captive-wifi](https://github.com/AramVartanyan/captive-wifi) | Wi-Fi връзка с портал за настройка |
 | [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле помощни функции |
 | [button](https://github.com/AramVartanyan/button) | Бутони (подобрена версия на Espressif iot button) |
-| [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (предстои обновяване — виж [doc/firmware.md](doc/firmware.md)) |
+| [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (1.1.0: ESP-IDF 5, 1 – 6 цифри, таймаут на ACK, open-drain) |
 | [container_nvs](https://github.com/AramVartanyan/container_nvs) | Съхранение на настройките в NVS |
 | [general-ota](https://github.com/AramVartanyan/general-ota) | Обновяване на фърмуера по HTTPS (без зависимост от HomeKit) |
 
