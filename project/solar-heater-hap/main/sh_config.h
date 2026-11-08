@@ -1,4 +1,4 @@
-/* Solar heater controller — pins and fixed parameters (Kconfig "Solar heater"). */
+/* Solar heater controller — pins and fixed parameters (Kconfig "Device Settings"). */
 #pragma once
 
 #include "sdkconfig.h"

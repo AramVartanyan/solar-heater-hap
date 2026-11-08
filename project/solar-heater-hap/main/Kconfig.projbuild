@@ -1,6 +1,6 @@
-menu "Solar heater"
+menu "Device Settings"
 
-    menu "Pins (Waveshare ESP32-S3-Zero, side header GP1 - GP13)"
+    menu "GPIO pins"
 
         config SH_PIN_T_COL
             int "DS18B20 collector (1-Wire)"

@@ -211,7 +211,7 @@ static void hap_event_handler(hap_event_t event, void *data)
 | Модул | Роля | Статус |
 |---|---|---|
 | `app_main.c` | Ред на стартиране: реле изключено → NVS, споделено състояние → хардуер → управление → Wi-Fi | ✔ |
-| `sh_config.h` | Изводи от Kconfig („Solar heater“) | ✔ |
+| `sh_config.h` | Изводи от Kconfig („Device Settings“ → „GPIO pins“) | ✔ |
 | `sh_state.c/h` | Споделено състояние (температури, помпа, Wi-Fi, HomeKit, аварии) с mutex | ✔ |
 | `sh_led.c/h` | Вграден WS2812 (`led_strip`, RMT), цветове с яркост от Kconfig | ✔ цветове; шаблони — предстоят |
 | `sh_relay.c/h` | Реле на помпата (`outputwrite`), изключено при старт | ✔ |
