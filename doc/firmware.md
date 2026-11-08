@@ -184,7 +184,7 @@ static void hap_event_handler(hap_event_t event, void *data)
 
 | Действие | Време (Kconfig) | Какво се изтрива | Кога става |
 |---|---|---|---|
-| Нулиране на Wi-Fi | ≥ 5 s, до фабричното (`CONFIG_SH_NET_RESET_HOLD_S`, 3 – 7 s) | само запазената мрежа (`captive_wifi_clear_credentials()`) | при **пускане** на бутона |
+| Нулиране на Wi-Fi | ≥ 5 s, до фабричното (`CONFIG_SH_NET_RESET_HOLD_S`, 3 – 7 s) | само запазената мрежа (`captive_wifi_clear_credentials()` → `esp_wifi_restore()`) | при **пускане** на бутона |
 | Фабрично нулиране | 9 s (`CONFIG_SH_FACTORY_RESET_HOLD_S`, 8 – 12 s) | **всичко** в дял `nvs`: сдвояванията с HomeKit, настройките на устройството, Wi-Fi мрежата | още докато бутонът е **задържан** |
 
 - Двата диапазона не се застъпват; компилацията спира, ако фабричното време не е по-дълго.
@@ -193,6 +193,12 @@ static void hap_event_handler(hap_event_t event, void *data)
   в esp-homekit-sdk (`hap_keystore_erase_all_data()`). Дялът `factory_nvs` (кодът за сдвояване) е само за четене
   и остава. При добавянето на HomeKit извикването се заменя с `hap_reset_to_factory()` (затваря и сесиите,
   спира mDNS обявяването). Затова всички настройки на устройството се пазят в дял `nvs`.
+- Мрежата се пази от Wi-Fi драйвера (`captive-wifi` след 0.2.2: `WIFI_STORAGE_FLASH`, както `app_wifi` и
+  `wifi_provisioning` на Espressif). Затова HomeKit вижда същата мрежа (`hap_wifi_is_provisioned()` чете
+  `esp_wifi_get_config()`), а `hap_reset_network()` (`esp_wifi_restore()`) я изтрива — с HomeKit нулирането
+  на Wi-Fi може да вика `hap_reset_network()` (затваря сесиите, спира mDNS, рестартира).
+- HomeKit се стартира при първото свързване (както в mppt-1k): порталът вече е затворен, така уеб сървърът
+  на портала и този на HomeKit (порт 80) никога не работят едновременно.
 - Логът показва кога е достигнато времето за Wi-Fi („release now …“). Светлинна индикация — с шаблоните на светодиода.
 
 ## 6. Макет за разработка — вътрешни pull-up резистори
