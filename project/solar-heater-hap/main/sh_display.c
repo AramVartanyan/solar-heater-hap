@@ -19,13 +19,14 @@ static const char *TAG = "sh_display";
 
 typedef enum { PAGE_TANK, PAGE_COL } page_t;
 
-/* 3 digits: "Boil" does not fit, so the tank label is shortened */
+/* Labels as raw segments (XGFEDCBA). "Boil" on 3 digits: "i" (segment E) and "l" (segments B, C)
+ * share the last digit. */
 static const struct {
     page_t page;
-    const char *label;
+    uint8_t seg[DIGITS];
 } s_pages[] = {
-    { PAGE_TANK, "boi" },
-    { PAGE_COL,  "Col" },
+    { PAGE_TANK, { 0x7C /* b */, 0x5C /* o */, 0x16 /* il */ } },
+    { PAGE_COL,  { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ } },
 };
 
 static tm1637_led_t *s_disp;
@@ -54,7 +55,7 @@ static void display_task(void *arg)
     (void)arg;
     for (;;) {
         for (size_t i = 0; i < sizeof(s_pages) / sizeof(s_pages[0]); i++) {
-            tm1637_print_string(s_disp, s_pages[i].label);
+            tm1637_print_symbols(s_disp, s_pages[i].seg, DIGITS);
             vTaskDelay(pdMS_TO_TICKS(LABEL_MS));
 
             int16_t shown = INT16_MIN;
