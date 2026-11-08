@@ -1,0 +1,54 @@
+menu "Solar heater"
+
+    menu "Pins (Waveshare ESP32-S3-Zero, side header GP1 - GP13)"
+
+        config SH_PIN_T_COL
+            int "DS18B20 collector (1-Wire)"
+            default 1
+        config SH_PIN_T_TANK
+            int "DS18B20 tank (1-Wire)"
+            default 2
+        config SH_PIN_RELAY
+            int "Pump relay (active high, transistor driver)"
+            default 4
+        config SH_PIN_TM1637_CLK
+            int "TM1637 CLK"
+            default 5
+        config SH_PIN_TM1637_DIO
+            int "TM1637 DIO"
+            default 6
+        config SH_PIN_BTN_MENU
+            int "Button 1 (menu)"
+            default 7
+        config SH_PIN_BTN_MINUS
+            int "Button 2 (-)"
+            default 8
+        config SH_PIN_BTN_PLUS
+            int "Button 3 (+)"
+            default 9
+        config SH_PIN_LED
+            int "Onboard WS2812 RGB LED"
+            default 21
+
+    endmenu
+
+    config SH_INTERNAL_PULLUPS
+        bool "Internal pull-ups on the 1-Wire and TM1637 lines (development prototype)"
+        default y
+        help
+            On the development prototype the external pull-up resistors are not fitted yet,
+            so the internal ones (~45 kOhm) are enabled. Turn this off once the external
+            4.7 kOhm (DS18B20) and 10 kOhm (TM1637) resistors are on the board.
+
+    config SH_LED_BRIGHTNESS
+        int "Status LED brightness (%)"
+        range 1 100
+        default 25
+        help
+            Starting value 20 - 30 %, to be decided on the real hardware (doc/firmware.md).
+
+    config SH_HOSTNAME
+        string "Network hostname"
+        default "solar-heater"
+
+endmenu

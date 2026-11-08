@@ -8,6 +8,15 @@
 ## [Unreleased]
 
 ### Added
+- Скелет на фърмуера в `project/solar-heater-hap/` по модела на mppt-1k: CMake (`HOMEKIT_PATH`,
+  `set(COMPONENTS main)`), `sdkconfig.defaults` за ESP32-S3 (4 MB, USB Serial/JTAG конзола, версия 0.1.0),
+  `partitions_hap.csv`, Kconfig „Solar heater“ (изводи, вътрешни pull-up, яркост, hostname),
+  модули `sh_state`, `sh_led` (WS2812), `sh_relay`, `sh_buttons` и празни `sh_sensors`, `sh_display`, `sh_control`.
+  Компилира се с ESP-IDF 5.5.1 за esp32s3 без предупреждения (образ ~760 KB, 53 % свободно в OTA дяла);
+  `dependencies.lock` фиксира версиите на управляваните компоненти (led_strip 3.1.1).
+- Общи библиотеки като git submodules в `project/common/`: captive-wifi, outputwrite, button, esp_tm1637,
+  container_nvs, general-ota (OTA адрес `…/otafw/master/solar-heater-hap.bin`, mbedTLS certificate bundle).
+- `components/homekit/` — препратка към esp-homekit-sdk.
 - `README.md` — описание на проекта, референтни библиотеки, раздел „Хардуер“ и структура на хранилището.
 - `Changelog.md` — файл за проследяване на промените.
 - `doc/` — папка за спецификации, схеми, изображения и други документи; `doc/README.md` — списък на документите.

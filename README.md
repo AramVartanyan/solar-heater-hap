@@ -31,32 +31,65 @@ _Тази секция се попълва постепенно, докато с
 
 ## Софтуер
 
-- Платформа, SDK, версия — предстои
+- **Платформа:** ESP-IDF **5.5.x**, target `esp32s3`; HomeKit — [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (в следваща фаза)
+- **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `solar-heater-hap.bin`, hostname `solar-heater`,
+  точка за достъп за настройка на Wi-Fi `SOLAR-XXXXXX`
 - Драйвер за WS2812 светодиода: `espressif/led_strip` (RMT, минимална конфигурация) — виж [doc/firmware.md](doc/firmware.md)
 - Изводи: T_COL → GP1, T_TANK → GP2, реле → GP4, TM1637 → GP5/GP6, бутони → GP7/GP8/GP9, светодиод → GP21
 
-### Използвани библиотеки / референции
+### Компилиране
+
+```sh
+git clone --recursive https://github.com/AramVartanyan/solar-heater-hap.git
+# (или след обикновен clone: git submodule update --init)
+export HOMEKIT_PATH=/path/to/esp-homekit-sdk      # нужно от фазата с HomeKit нататък
+cd solar-heater-hap/project/solar-heater-hap
+idf.py set-target esp32s3
+idf.py build flash monitor
+```
+
+### Общи библиотеки (git submodules в `project/common/`)
 
 | Хранилище | Роля |
 |---|---|
-| [button](https://github.com/AramVartanyan/button) | Библиотека за бутони (подобрена версия на Espressif iot button) |
-| [esp-led-status](https://github.com/AramVartanyan/esp-led-status) | Индикация на състоянието чрез LED шаблони |
-| [fupdateota](https://github.com/AramVartanyan/fupdateota) | Помощник за OTA обновяване |
-| [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле / ADC помощни функции и LED индикатор |
-| [mppt-1k](https://github.com/AramVartanyan/mppt-1k) | Референтен проект (ESP-IDF + HomeKit) |
+| [captive-wifi](https://github.com/AramVartanyan/captive-wifi) | Wi-Fi връзка с портал за настройка |
+| [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле помощни функции |
+| [button](https://github.com/AramVartanyan/button) | Бутони (подобрена версия на Espressif iot button) |
+| [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (предстои обновяване — виж [doc/firmware.md](doc/firmware.md)) |
+| [container_nvs](https://github.com/AramVartanyan/container_nvs) | Съхранение на настройките в NVS |
+| [general-ota](https://github.com/AramVartanyan/general-ota) | Обновяване на фърмуера по HTTPS (без зависимост от HomeKit) |
+
+Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстоят `onewire_bus`, `ds18b20`, `mdns`.
+
+### Референции
+
+| Хранилище | Роля |
+|---|---|
+| [mppt-1k](https://github.com/AramVartanyan/mppt-1k) | Референтен проект (ESP-IDF + HomeKit), модел за структурата |
+| [window-hap-sdk-8266](https://github.com/AramVartanyan/window-hap-sdk-8266) | Референтен проект (HomeKit, `app_wifi`) |
+| [esp-led-status](https://github.com/AramVartanyan/esp-led-status) | Индикация чрез LED шаблони (за обикновен светодиод) |
 
 ## Структура на хранилището
 
 ```
 solar-heater-hap/
-├── README.md       — описание на проекта
-├── Changelog.md    — история на промените
-├── doc/            — спецификации, схеми, изображения и др. документи
-│   ├── hardware.md   — хардуерна спецификация (компоненти)
-│   ├── firmware.md   — бележки и решения за фърмуера
-│   ├── led-indication.md — логика на светлинната индикация
-│   └── base-board.md — спецификация на базовата платка
-└── LICENSE
+├── README.md, Changelog.md, LICENSE
+├── components/
+│   └── homekit/              — препратка към esp-homekit-sdk (HOMEKIT_PATH)
+├── project/
+│   ├── common/               — общи библиотеки (git submodules)
+│   │   ├── captive-wifi/
+│   │   ├── outputwrite/
+│   │   ├── button/
+│   │   ├── esp_tm1637/
+│   │   ├── container_nvs/
+│   │   └── general-ota/
+│   └── solar-heater-hap/     — фърмуерът
+│       ├── CMakeLists.txt, sdkconfig.defaults, partitions_hap.csv
+│       └── main/             — app_main.c и модулите sh_*.c/h, Kconfig.projbuild, idf_component.yml
+└── doc/                      — спецификации, схеми, изображения
+    ├── hardware.md, base-board.md, firmware.md, led-indication.md
+    └── img/
 ```
 
 ## Документация
