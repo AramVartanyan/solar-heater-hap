@@ -99,7 +99,7 @@ solar-heater-hap/
 │       ├── CMakeLists.txt, sdkconfig.defaults, partitions_hap.csv
 │       └── main/             — app_main.c и модулите sh_*.c/h, Kconfig.projbuild, idf_component.yml
 └── doc/                      — спецификации, схеми, изображения
-    ├── hardware.md, base-board.md, firmware.md, led-indication.md, operating-modes.md
+    ├── hardware.md, base-board.md, firmware.md, led-indication.md, operating-modes.md, controllers-research.md
     └── img/
 ```
 
