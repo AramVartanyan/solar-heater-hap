@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -12,8 +13,63 @@ static const char *TAG = "sh_display";
 #define BRIGHTNESS      4               /* 0..7 */
 #define SEG_MINUS       0x40
 
+#define LABEL_MS        1000            /* label shown */
+#define VALUE_MS        5000            /* temperature shown */
+#define REFRESH_MS      250             /* a new reading appears within this time */
+
+typedef enum { PAGE_TANK, PAGE_COL } page_t;
+
+/* Labels as raw segments (XGFEDCBA). "Boil" on 3 digits: "i" (segment E) and "l" (segments B, C)
+ * share the last digit. */
+static const struct {
+    page_t page;
+    uint8_t seg[DIGITS];
+} s_pages[] = {
+    { PAGE_TANK, { 0x7C /* b */, 0x5C /* o */, 0x16 /* il */ } },
+    { PAGE_COL,  { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ } },
+};
+
 static tm1637_led_t *s_disp;
-static int16_t s_shown = INT16_MIN;     /* nothing shown yet */
+
+static int16_t page_temp(page_t page)
+{
+    sh_state_t st;
+    sh_state_get(&st);
+    return page == PAGE_TANK ? st.t_tank : st.t_col;
+}
+
+static void show_temp(int16_t t_tenths)
+{
+    if (t_tenths == SH_TEMP_INVALID) {
+        const uint8_t dashes[DIGITS] = { SEG_MINUS, SEG_MINUS, SEG_MINUS };
+        tm1637_print_symbols(s_disp, dashes, DIGITS);
+    } else {
+        tm1637_print_temp(s_disp, t_tenths);
+    }
+}
+
+/* Owns the display (esp_tm1637: one task per display). A display that does not answer is
+ * retried by the library every 5 s; the writes meanwhile return at once. */
+static void display_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        for (size_t i = 0; i < sizeof(s_pages) / sizeof(s_pages[0]); i++) {
+            tm1637_print_symbols(s_disp, s_pages[i].seg, DIGITS);
+            vTaskDelay(pdMS_TO_TICKS(LABEL_MS));
+
+            int16_t shown = INT16_MIN;
+            for (int ms = 0; ms < VALUE_MS; ms += REFRESH_MS) {
+                int16_t t = page_temp(s_pages[i].page);
+                if (t != shown) {               /* a new reading during the 5 s is shown too */
+                    show_temp(t);
+                    shown = t;
+                }
+                vTaskDelay(pdMS_TO_TICKS(REFRESH_MS));
+            }
+        }
+    }
+}
 
 esp_err_t sh_display_init(void)
 {
@@ -29,24 +85,9 @@ esp_err_t sh_display_init(void)
     ESP_LOGI(TAG, "TM1637 (esp_tm1637 %s): CLK GPIO%d, DIO GPIO%d, %s", ESP_TM1637_VERSION,
              SH_PIN_TM1637_CLK, SH_PIN_TM1637_DIO,
              tm1637_is_online(s_disp) ? "answers" : "no answer");
+    if (xTaskCreate(display_task, "sh_display", 3072, NULL, 4, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "display task not created");
+        return ESP_ERR_NO_MEM;
+    }
     return ESP_OK;
-}
-
-/* The display is written from the control task only (esp_tm1637: one task per display). */
-void sh_display_temp(int16_t t_tenths)
-{
-    if (!s_disp) {
-        return;
-    }
-    bool offline = !tm1637_is_online(s_disp);
-    if (t_tenths == s_shown && !offline) {
-        return;                         /* unchanged; an offline display is retried */
-    }
-    if (t_tenths == SH_TEMP_INVALID) {
-        const uint8_t dashes[DIGITS] = { SEG_MINUS, SEG_MINUS, SEG_MINUS };
-        tm1637_print_symbols(s_disp, dashes, DIGITS);
-    } else {
-        tm1637_print_temp(s_disp, t_tenths);
-    }
-    s_shown = t_tenths;
 }

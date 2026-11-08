@@ -16,3 +16,6 @@
 [submodule "components/button"]
 	path = components/button
 	url = https://github.com/AramVartanyan/button
+[submodule "project/common/ds18b20"]
+	path = project/common/ds18b20
+	url = https://github.com/AramVartanyan/ds18b20

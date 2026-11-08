@@ -56,6 +56,7 @@ idf.py build flash monitor
 | [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле помощни функции |
 | [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (1.1.1: ESP-IDF 5, 1 – 6 цифри, таймаут на ACK, push-pull, нулиране на неизползваните цифри) |
 | [container_nvs](https://github.com/AramVartanyan/container_nvs) | Съхранение на настройките в NVS |
+| [ds18b20](https://github.com/AramVartanyan/ds18b20) | 1-Wire и датчици DS18B20 (собствен драйвер: ESP8266_RTOS_SDK, ESP-IDF 4.x / 5.x) |
 | [general-ota](https://github.com/AramVartanyan/general-ota) | Обновяване на фърмуера по HTTPS (без зависимост от HomeKit) |
 
 ### Компоненти от esp-homekit-sdk (`components/`)
@@ -68,7 +69,7 @@ idf.py build flash monitor
 При външен `HOMEKIT_PATH` папката `components/` на това хранилище се добавя последна, така че собственият `button`
 има предимство пред този от SDK-то.
 
-Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстоят `onewire_bus`, `ds18b20`, `mdns`.
+Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстои `mdns`.
 
 ### Референции
 
@@ -92,6 +93,7 @@ solar-heater-hap/
 │   │   ├── outputwrite/
 │   │   ├── esp_tm1637/
 │   │   ├── container_nvs/
+│   │   ├── ds18b20/
 │   │   └── general-ota/
 │   └── solar-heater-hap/     — фърмуерът
 │       ├── CMakeLists.txt, sdkconfig.defaults, partitions_hap.csv
