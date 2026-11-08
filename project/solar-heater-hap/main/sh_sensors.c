@@ -23,7 +23,7 @@ esp_err_t sh_sensors_init(void)
 {
     for (int i = 0; i < 2; i++) {
         bool parasite = ds18b20_is_parasite(s_sensor[i].pin);
-        ESP_LOGI(TAG, "DS18B20 %s: GPIO%d%s", s_sensor[i].name, s_sensor[i].pin,
+        ESP_LOGI(TAG, "DS18B20 (ds18b20 %s) %s: GPIO%d%s", DS18B20_VERSION, s_sensor[i].name, s_sensor[i].pin,
                  parasite ? " (parasite power or no sensor)" : ", external power");
     }
     return ESP_OK;
