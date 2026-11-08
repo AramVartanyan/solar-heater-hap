@@ -37,5 +37,6 @@ CONFIG_LWIP_DHCPS=y
 # captive-wifi: setup SoftAP "SOLAR-XXXXXX"
 CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
 
-# HomeKit SDK: room for application web page handlers next to the 8 HAP URIs
-CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
+# HomeKit SDK (enabled together with HomeKit in a later phase):
+# room for application web page handlers next to the 8 HAP URIs
+# CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20

@@ -11,7 +11,7 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES
         # ESP-IDF
-        driver esp_timer nvs_flash esp_wifi esp_event esp_netif
+        driver esp_timer nvs_flash esp_wifi esp_event esp_netif esp_app_format
         # project/common (git submodules)
         button outputwrite captive-wifi
         # managed components (idf_component.yml)
