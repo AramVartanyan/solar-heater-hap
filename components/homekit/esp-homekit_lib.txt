@@ -1,0 +1,3 @@
+esp-hap library (not part of this repository)
+https://github.com/espressif/esp-homekit-sdk
+Point HOMEKIT_PATH to the SDK root (its components/ and components/homekit/ are added to the build).

@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "sh_state.c"
+        "sh_led.c"
+        "sh_relay.c"
+        "sh_sensors.c"
+        "sh_display.c"
+        "sh_buttons.c"
+        "sh_control.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        # ESP-IDF
+        driver esp_timer nvs_flash esp_wifi esp_event esp_netif
+        # project/common (git submodules)
+        button outputwrite captive-wifi
+        # managed components (idf_component.yml)
+        led_strip)

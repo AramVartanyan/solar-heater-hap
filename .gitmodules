@@ -1,0 +1,12 @@
+[submodule "project/common/captive-wifi"]
+	path = project/common/captive-wifi
+	url = https://github.com/AramVartanyan/captive-wifi
+[submodule "project/common/outputwrite"]
+	path = project/common/outputwrite
+	url = https://github.com/AramVartanyan/outputwrite
+[submodule "project/common/esp_tm1637"]
+	path = project/common/esp_tm1637
+	url = https://github.com/AramVartanyan/esp_tm1637
+[submodule "project/common/button"]
+	path = project/common/button
+	url = https://github.com/AramVartanyan/button

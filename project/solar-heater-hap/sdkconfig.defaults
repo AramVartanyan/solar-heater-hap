@@ -1,0 +1,41 @@
+CONFIG_IDF_TARGET="esp32s3"
+
+# Firmware version: single source of truth (app descriptor, HomeKit Firmware
+# Revision and the OTA version check all read this value).
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="0.1.0"
+
+# Waveshare ESP32-S3-Zero: ESP32-S3FH4R2, 4 MB flash (QIO), 2 MB PSRAM (not used yet)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# Partitions (4 MB, two 1600 KB OTA slots, HomeKit factory_nvs / nvs_keys)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_hap.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# Console on the USB-C port (built-in USB Serial/JTAG): log and `idf.py flash monitor`
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# CPU / compiler
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Task watchdog stays enabled: the control task must never stall silently.
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+
+# LWIP (HomeKit needs several concurrent controller sockets)
+CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_LWIP_SO_REUSE=y
+CONFIG_LWIP_MAX_ACTIVE_TCP=12
+CONFIG_LWIP_MAX_LISTENING_TCP=12
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=10
+CONFIG_LWIP_LOCAL_HOSTNAME="solar-heater"
+CONFIG_LWIP_DHCPS=y
+
+# captive-wifi: setup SoftAP "SOLAR-XXXXXX"
+CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
+
+# HomeKit SDK: room for application web page handlers next to the 8 HAP URIs
+CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
