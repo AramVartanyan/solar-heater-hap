@@ -47,3 +47,6 @@ CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
 # HomeKit SDK (enabled together with HomeKit in a later phase):
 # room for application web page handlers next to the 8 HAP URIs
 # CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
+
+# mDNS (pulled in by esp-homekit-sdk): no console CLI, the console component is not built
+CONFIG_MDNS_ENABLE_CONSOLE_CLI=n

@@ -54,10 +54,19 @@ idf.py build flash monitor
 |---|---|
 | [captive-wifi](https://github.com/AramVartanyan/captive-wifi) | Wi-Fi връзка с портал за настройка |
 | [outputwrite](https://github.com/AramVartanyan/outputwrite) | GPIO / реле помощни функции |
-| [button](https://github.com/AramVartanyan/button) | Бутони (подобрена версия на Espressif iot button) |
-| [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (предстои обновяване — виж [doc/firmware.md](doc/firmware.md)) |
+| [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) | Дисплей TM1637 (1.1.0: ESP-IDF 5, 1 – 6 цифри, таймаут на ACK, open-drain) |
 | [container_nvs](https://github.com/AramVartanyan/container_nvs) | Съхранение на настройките в NVS |
 | [general-ota](https://github.com/AramVartanyan/general-ota) | Обновяване на фърмуера по HTTPS (без зависимост от HomeKit) |
+
+### Компоненти от esp-homekit-sdk (`components/`)
+
+| Хранилище | Роля |
+|---|---|
+| [button](https://github.com/AramVartanyan/button) | Бутони — собствена поправена версия, която замества `button` от esp-homekit-sdk (git submodule в `components/button`) |
+| esp-homekit-sdk (`components/homekit`) | HomeKit — препратка, задава се с `HOMEKIT_PATH` |
+
+При външен `HOMEKIT_PATH` папката `components/` на това хранилище се добавя последна, така че собственият `button`
+има предимство пред този от SDK-то.
 
 Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстоят `onewire_bus`, `ds18b20`, `mdns`.
 
@@ -74,13 +83,13 @@ idf.py build flash monitor
 ```
 solar-heater-hap/
 ├── README.md, Changelog.md, LICENSE
-├── components/
+├── components/               — компоненти от esp-homekit-sdk
+│   ├── button/               — собствена поправена версия (git submodule)
 │   └── homekit/              — препратка към esp-homekit-sdk (HOMEKIT_PATH)
 ├── project/
 │   ├── common/               — общи библиотеки (git submodules)
 │   │   ├── captive-wifi/
 │   │   ├── outputwrite/
-│   │   ├── button/
 │   │   ├── esp_tm1637/
 │   │   ├── container_nvs/
 │   │   └── general-ota/
