@@ -507,7 +507,8 @@ HomeKit — накрая.
   | Heating Threshold Temperature | да | Tmax, 30 – 85 °C, стъпка 1 |
   | Name | да | `Solar-XXXXXX` |
   | **Temperature Display Units** | да | задава се **само от HomeKit**; определя единиците на **нашия дисплей** (°C / °F); стойностите към HomeKit са **винаги в °C** (по спецификацията на HAP — Home сам ги преобразува за телефона; ако пратим °F, ще се преобразуват двойно) |
-  | Cooling Threshold, Rotation Speed, Swing Mode, Lock Physical Controls | не | — (Lock Physical Controls не се показва в Apple Home, а заключване не е нужно — контролерът е в табло) |
+  | **Lock Physical Controls** | да | **детска защита** — заключва бутоните на контролера (появява се в Apple Home); подробности — за уточняване |
+  | Cooling Threshold, Rotation Speed, Swing Mode | не | — |
 
 - Граници на датчиците: `Tank` 0 – 100 °C; `Collector` **-40 … 200 °C** (по подразбиране HAP допуска 0 – 100 °C).
 - **Без собствени характеристики** (напр. за обновяване на фърмуера, както при Shelly / mppt-1k) — всичко
