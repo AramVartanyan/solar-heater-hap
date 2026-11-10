@@ -9,6 +9,7 @@
 | [`hardware.md`](hardware.md) | Хардуерна спецификация (микроконтролер, светодиод, DS18B20, реле, захранване) | — |
 | [`led-indication.md`](led-indication.md) | Логика на светлинната индикация с един RGB светодиод | — |
 | [`operating-modes.md`](operating-modes.md) | Режими на работа (нормален, ваканция, охладителна система) — изходни положения и открити въпроси | — |
+| [`web-interface.md`](web-interface.md) | Уеб интерфейс — 5 раздела, макет [`web/mockup.html`](web/mockup.html) | — |
 | [`controllers-research.md`](controllers-research.md) | Проучване на контролери на пазара (tSOL DELTA, RESOL DeltaSol BS/4, Steca, Sorel) — параметри и идеи | — |
 | [`firmware.md`](firmware.md) | Бележки и решения за фърмуера (драйвер за WS2812, GPIO, ресурси) | — |
 | [`base-board.md`](base-board.md) | Спецификация на базовата платка (DIN кутия, клеми, HLK-PM01, реле, входове за датчици, GPIO) | — |
