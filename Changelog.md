@@ -8,6 +8,10 @@
 ## [Unreleased]
 
 ### Added
+- `doc/operating-modes.md`, раздел HomeKit: Heater Cooler (основна услуга; Active изкл. = Ваканция; Idle / Heating /
+  Cooling; Tmax; единиците само за нашия дисплей; детска защита), датчици `Collector` и `Tank` (Status Fault при
+  E1 / E5 и E2 / E4), без услуга за аварии; данни на аксесоара (`Solar-XXXXXX`, Armo Ltd., Solar Heater); код за
+  сдвояване — уникален за устройството (фиксиран в Kconfig само за разработката).
 - `doc/web-interface.md` и макет `doc/web/mockup.html` — уеб интерфейсът: 5 раздела (Състояние, Управление,
   Настройки, Сервизни, Система), стил като страницата за Wi-Fi, вградени SVG иконки.
 - `doc/controllers-research.md` — проучване: tSOL DELTA (ориентир; причината за прегряването във „Ваканция“),
