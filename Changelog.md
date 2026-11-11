@@ -8,6 +8,15 @@
 ## [Unreleased]
 
 ### Added
+- **Основен цикъл на управлението на помпата** (стъпка 1, [doc/tasks/step1-control-loop.md](doc/tasks/step1-control-loop.md)):
+  `sh_pump_logic` — решението за помпата в нормален режим като чиста C функция (разлики 6 / 4 K, минимални
+  времена 3 / 2 min, минимална температура на колектора 25 °C, Tmax 70 °C, авариен таван 95 °C, защита на
+  колектора 110 °C с таван 115 °C, забрана при колектор ≥ 127 °C — спира и работеща помпа; всяка граница се
+  отменя под стойността − 2 K; невалидна температура → помпата спира), с причина за всяко решение; тест на
+  компютъра `make -C project/solar-heater-hap/test`. `sh_sensors` — първо измерване при старта, после собствена
+  задача на всеки 10 s; `sh_control` — цикъл 1 s, лог при промяна на помпата или на причината; `sh_state` —
+  причина за състоянието на помпата; параметрите — Kconfig „Device Settings“ → „Control“. Вариантът е избран
+  след експеримента с два модела ([doc/tasks/step1-control-loop.md](doc/tasks/step1-control-loop.md)).
 - `doc/operating-modes.md`, раздел HomeKit: Heater Cooler (основна услуга; Active изкл. = Ваканция; Idle / Heating /
   Cooling; Tmax; единиците само за нашия дисплей; детска защита), датчици `Collector` и `Tank` (Status Fault при
   E1 / E5 и E2 / E4), без услуга за аварии; данни на аксесоара (`Solar-XXXXXX`, Armo Ltd., Solar Heater); код за

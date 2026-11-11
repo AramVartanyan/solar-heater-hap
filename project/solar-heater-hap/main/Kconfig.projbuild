@@ -32,6 +32,77 @@ menu "Device Settings"
 
     endmenu
 
+    menu "Control"
+
+        config SH_MEASURE_PERIOD_S
+            int "Temperature measurement period (s)"
+            range 5 60
+            default 10
+            help
+                Both sensors are measured this often, in their own task, independently of the
+                1 s control loop. No averaging.
+
+        config SH_DIFF_ON_K
+            int "Switch-on difference, collector - tank (K)"
+            range 3 20
+            default 6
+            help
+                The pump starts when the collector is at least this much warmer than the tank.
+
+        config SH_DIFF_OFF_K
+            int "Switch-off difference, collector - tank (K)"
+            range 1 15
+            default 4
+            help
+                The pump stops when the difference falls to this value (after the minimum run
+                time). Must be lower than the switch-on difference (checked at compile time).
+
+        config SH_MIN_RUN_MIN
+            int "Minimum run time (min)"
+            range 1 10
+            default 3
+            help
+                The difference can stop the pump only after it has run this long. The
+                protections ignore it.
+
+        config SH_MIN_OFF_MIN
+            int "Minimum off time (min)"
+            range 0 10
+            default 2
+            help
+                The difference can start the pump only after it has been off this long
+                (0 = no minimum). The collector protection ignores it.
+
+        config SH_TANK_MAX_C
+            int "Tank Tmax (degC)"
+            range 30 85
+            default 70
+            help
+                Normal charging stops at this tank temperature and is allowed again below
+                Tmax - 2 K. The collector protection may charge above it, up to the fixed
+                95 degC emergency ceiling.
+
+        config SH_COL_MIN_C
+            int "Minimum collector temperature (degC)"
+            range 10 80
+            default 25
+            help
+                The difference does not start the pump while the collector is below this
+                temperature. A running pump is not stopped by it.
+
+        config SH_COL_PROTECT_C
+            int "Collector protection (degC)"
+            range 70 160
+            default 110
+            help
+                The pump starts at once at this collector temperature, also above Tmax, and
+                stops below it - 2 K after the minimum run time. Values above 115 degC are
+                limited to 115 degC and a warning is logged at boot (fixed in this version:
+                min(collector maximum 120 - 5, boiling point 127 - 10), the defaults of
+                doc/operating-modes.md).
+
+    endmenu
+
     config SH_INTERNAL_PULLUPS
         bool "Internal pull-ups on the 1-Wire and TM1637 lines (development prototype)"
         default y
