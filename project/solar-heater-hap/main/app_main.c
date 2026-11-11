@@ -4,7 +4,7 @@
  *   1. pump relay forced off (before anything that can take time)
  *   2. NVS, shared state
  *   3. hardware: status LED, sensors, display, buttons
- *   4. control task
+ *   4. measurement task, control task
  *   5. Wi-Fi (captive-wifi); HomeKit follows in a later phase
  */
 
@@ -68,7 +68,8 @@ void app_main(void)
     sh_display_init();
     sh_buttons_init();
 
-    sh_control_start();                             /* 4. control */
+    sh_sensors_start();                             /* 4. measurement, control */
+    sh_control_start();
 
     ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi */
     ESP_ERROR_CHECK(captive_wifi_start());
