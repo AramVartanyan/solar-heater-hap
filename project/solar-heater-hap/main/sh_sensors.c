@@ -1,4 +1,6 @@
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "ds18b20.h"
 #include "sh_config.h"
@@ -57,4 +59,24 @@ void sh_sensors_read(void)
     int16_t t_col = read_one(&s_sensor[0]);
     int16_t t_tank = read_one(&s_sensor[1]);
     sh_state_set_temps(t_col, t_tank);
+}
+
+/* Measures on its own period, independent of the control loop (doc/operating-modes.md 1.3). */
+static void sensors_task(void *arg)
+{
+    (void)arg;
+    TickType_t last = xTaskGetTickCount();
+    for (;;) {
+        sh_sensors_read();
+        vTaskDelayUntil(&last, pdMS_TO_TICKS(SH_MEASURE_PERIOD_S * 1000));
+    }
+}
+
+esp_err_t sh_sensors_start(void)
+{
+    if (xTaskCreate(sensors_task, "sh_sensors", 3072, NULL, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "sensors task not created");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
 }

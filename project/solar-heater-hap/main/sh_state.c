@@ -29,10 +29,11 @@ void sh_state_set_temps(int16_t t_col, int16_t t_tank)
     xSemaphoreGive(s_lock);
 }
 
-void sh_state_set_pump(bool on)
+void sh_state_set_pump(bool on, sh_pump_reason_t reason)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_state.pump_on = on;
+    s_state.pump_reason = reason;
     xSemaphoreGive(s_lock);
 }
 

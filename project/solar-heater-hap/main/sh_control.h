@@ -1,5 +1,5 @@
-/* Control loop: reads sensors, decides the pump, updates the indication.
- * Phase 1: periodic task that only reads (stub) sensors and keeps the pump off. */
+/* Control loop (1 s): reads the latest temperatures from sh_state, decides the pump
+ * (sh_pump_logic), drives the relay, publishes pump state and reason; logs only on a switch. */
 #pragma once
 
 #include "esp_err.h"

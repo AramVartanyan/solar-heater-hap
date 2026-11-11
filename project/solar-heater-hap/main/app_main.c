@@ -3,7 +3,7 @@
  * Boot order:
  *   1. pump relay forced off (before anything that can take time)
  *   2. NVS, shared state
- *   3. hardware: status LED, sensors, display, buttons
+ *   3. hardware: status LED, sensors (measuring task), display, buttons
  *   4. control task
  *   5. Wi-Fi (captive-wifi); HomeKit follows in a later phase
  */
@@ -65,6 +65,7 @@ void app_main(void)
 
     sh_led_init();                                  /* 3. hardware */
     sh_sensors_init();
+    sh_sensors_start();
     sh_display_init();
     sh_buttons_init();
 

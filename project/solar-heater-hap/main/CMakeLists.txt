@@ -8,6 +8,7 @@ idf_component_register(
         "sh_display.c"
         "sh_buttons.c"
         "sh_control.c"
+        "sh_pump_logic.c"
     INCLUDE_DIRS "."
     REQUIRES
         # ESP-IDF
