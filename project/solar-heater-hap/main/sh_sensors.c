@@ -1,4 +1,6 @@
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "ds18b20.h"
 #include "sh_config.h"
@@ -48,7 +50,8 @@ static int16_t read_one(sensor_t *s)
     return ok ? ds18b20_raw_to_tenths(raw) : SH_TEMP_INVALID;
 }
 
-void sh_sensors_read(void)
+/* One measurement of both sensors (blocks up to ~0.8 s); publishes to sh_state. */
+static void sensors_read(void)
 {
     /* both start first, so the two conversions run in parallel */
     for (int i = 0; i < 2; i++) {
@@ -57,4 +60,23 @@ void sh_sensors_read(void)
     int16_t t_col = read_one(&s_sensor[0]);
     int16_t t_tank = read_one(&s_sensor[1]);
     sh_state_set_temps(t_col, t_tank);
+}
+
+static void sensors_task(void *arg)
+{
+    (void)arg;
+    TickType_t wake = xTaskGetTickCount();
+    for (;;) {
+        sensors_read();
+        vTaskDelayUntil(&wake, pdMS_TO_TICKS(CONFIG_SH_MEASURE_PERIOD_S * 1000));
+    }
+}
+
+esp_err_t sh_sensors_start(void)
+{
+    if (xTaskCreate(sensors_task, "sh_sensors", 4096, NULL, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "sensors task not created");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
 }
