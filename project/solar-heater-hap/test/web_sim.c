@@ -288,7 +288,7 @@ static void reply_state(int fd)
         .pump_on = s_pump.on, .reason = s_pump.reason, .alarms = s_alarm.active,
         .test_on = s_pump.test, .test_left_s = sh_pump_ctl_test_left(&s_pump, now),
         .cfg = s_cfg, .col_protect = 1100,
-        .name = "solar-heater", .version = "0.1.0 (sim)", .ssid = "A16blue", .ip = "192.168.1.57",
+        .name = "solar-heater", .version = "0.1.0 (sim)", .serial = "E8F60A810841", .ssid = "A16blue", .ip = "192.168.1.57",
         .rssi = -41,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
