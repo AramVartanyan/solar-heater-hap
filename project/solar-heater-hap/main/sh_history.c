@@ -96,6 +96,7 @@ static void day_over(const sh_day_sum_t *d, const sh_clock_info_t *ci, int16_t c
     r.run_min[1] = minutes(d->run_s[SH_RUN_PROTECT]);
     r.run_min[2] = minutes(d->run_s[SH_RUN_OTHER]);
     r.cool_min = minutes(d->run_s[SH_RUN_COOL]);
+    r.heater_min = minutes(d->heater_s);
     /* the learned values: the sunrise and sunset detected that day, the cooling target (whole °C) */
     r.sunrise = d->sunrise >= 0 ? (uint16_t)d->sunrise : SH_HIST_NO_TIME;
     r.sunset = d->sunset >= 0 ? (uint16_t)d->sunset : SH_HIST_NO_TIME;
@@ -112,8 +113,9 @@ static void day_over(const sh_day_sum_t *d, const sh_clock_info_t *ci, int16_t c
         int y, m, md;
         sh_day_date(d->day, &y, &m, &md);
         if (ok) {
-            ESP_LOGI(TAG, "day %04d-%02d-%02d saved%s: pump %u / %u / %u min, cooling %u min", y, m, md,
-                     r.partial ? " (partial)" : "", r.run_min[0], r.run_min[1], r.run_min[2], r.cool_min);
+            ESP_LOGI(TAG, "day %04d-%02d-%02d saved%s: pump %u / %u / %u min, cooling %u min, heater %u min", y, m,
+                     md, r.partial ? " (partial)" : "", r.run_min[0], r.run_min[1], r.run_min[2], r.cool_min,
+                     r.heater_min);
         } else {
             ESP_LOGE(TAG, "day %04d-%02d-%02d: flash write error", y, m, md);
         }
@@ -133,7 +135,7 @@ static void history_task(void *arg)
         const sh_day_in_t in = {
             .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
             .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
-            .sunrises = st.modes.sunrises, .sunsets = st.modes.sunsets,
+            .sunrises = st.modes.sunrises, .sunsets = st.modes.sunsets, .heater = st.modes.heater_on,
         };
         const uint32_t now = (uint32_t)(esp_timer_get_time() / 1000000);
         sh_day_sum_t done;

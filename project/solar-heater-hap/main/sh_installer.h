@@ -42,6 +42,7 @@ typedef enum {
     SH_INST_COL_TYPE,           /* sh_col_type_t */
     SH_INST_COL_AREA,           /* collector area, 5 - 200 = 0.5 - 20.0 m² */
     SH_INST_TANK_VOL,           /* tank volume, 50 - 1000 l, step 10 */
+    SH_INST_HEATER,             /* heater in the tank, 0 = none, 5 - 120 = 0.5 - 12.0 kW, step 0.5 */
     SH_INST_COUNT
 } sh_inst_t;
 

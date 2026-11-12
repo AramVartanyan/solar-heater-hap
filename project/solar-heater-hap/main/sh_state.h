@@ -20,6 +20,15 @@ typedef struct {
     bool    air_on;             /* air venting running */
     uint32_t air_start_s;       /* its start, monotonic s */
     uint32_t air_pause_s;       /* the pause of its cycles, s */
+    /* group D: the heater, its leak, E8 */
+    bool    heater_on;          /* the heater sign is active now */
+    bool    heater_det;         /* the heater was detected with "0 kW" */
+    uint8_t leak;               /* sh_leak_phase_t: 0 none, 1 check, 2 stopped */
+    uint32_t leak_start_s;      /* the start of the running check, monotonic s */
+    bool    leak_last;          /* a check has been made since boot ... */
+    bool    leak_last_stop;     /* ... its result: stopped */
+    int16_t leak_last_drop;     /* ... the collector fell by, 0.1 K */
+    int16_t e8_normal;          /* learned normal night cooling of the tank, 0.1 K/h, INT16_MIN: none */
 } sh_modes_t;
 
 typedef struct {

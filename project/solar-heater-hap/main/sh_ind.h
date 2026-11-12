@@ -45,7 +45,7 @@ typedef enum {
     SH_IND_STEADY = 0,  /* Wi-Fi connected */
     SH_IND_HEARTBEAT,   /* no Wi-Fi / setup portal */
     SH_IND_FAST,        /* E4, E5 */
-    SH_IND_DOUBLE,      /* E1, E2, E6 */
+    SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
 } sh_ind_pattern_t;
 
 typedef struct {

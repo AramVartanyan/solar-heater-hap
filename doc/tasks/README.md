@@ -12,7 +12,7 @@
 | 6 (A) | [step6-installer-web.md](step6-installer-web.md) — данни на монтажника, точка на кипене, защита от замръзване, основа на уеб интерфейса | след #31 / #32 |
 | 9 (B) | [step9-clock-history.md](step9-clock-history.md) — часовник, история | след #35 / #36 |
 | 10 (C) | [step10-cooling-vacation-seasons.md](step10-cooling-vacation-seasons.md) — нощно охлаждане, ваканция, сезони, обезвъздушаване | след #41 / #42 |
-| 12 (D) | [step12-heater-leak-e8.md](step12-heater-leak-e8.md) — нагревател, теч от нагревателя, обратен термосифон (`E8`) | — |
+| 12 (D) | [step12-heater-leak-e8.md](step12-heater-leak-e8.md) — нагревател, теч от нагревателя, обратен термосифон (`E8`) | след #48 / #49 |
 
 ## Групи на оставащите стъпки (прието)
 

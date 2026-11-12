@@ -1264,7 +1264,7 @@ static void test_indication(void)
     /* "HoL" follows the codes on the display: its place is the number of the active codes */
     CHECK_EQ(sh_alarm_count(0), 0);
     CHECK_EQ(sh_alarm_count(SH_ALARM_BIT(SH_ALARM_E4) | SH_ALARM_BIT(SH_ALARM_HOT)), 2);
-    CHECK_EQ(sh_alarm_count(0x7F), SH_ALARM_COUNT);
+    CHECK_EQ(sh_alarm_count(0xFF), SH_ALARM_COUNT);
     const uint8_t two = SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_FRO);
     CHECK_EQ(sh_alarm_code_at(two, 1 * SH_ALARM_CODE_MS), SH_ALARM_FRO);
     CHECK_EQ(sh_alarm_code_at(two, sh_alarm_count(two) * SH_ALARM_CODE_MS), SH_ALARM_COUNT);

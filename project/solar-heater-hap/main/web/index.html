@@ -57,7 +57,7 @@ td select,.v select{font:inherit}
 .chart text{font-size:9px;fill:var(--sub)}.chart .ax{stroke:var(--sep);stroke-width:.5}
 .lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub);padding:2px 8px 4px}
 .lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-.days td,.days th{padding:8px 6px;font-size:14px}.days td:first-child,.days th:first-child{text-align:left}
+.days td,.days th{padding:8px 4px;font-size:14px}.days td:first-child,.days th:first-child{text-align:left}
 .v a{color:var(--blue);text-decoration:none}
 .hide{display:none!important}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:.5px solid var(--sep);display:flex;justify-content:center}
@@ -99,6 +99,7 @@ section{display:none}section.on{display:block}
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
   <div class="row" data-f="run_today"><span data-t="today"></span><span class="v" id="run-today">—</span></div>
   <div class="row hide" data-f="night_cool" id="cool-row"><span data-t="night_s"></span><span class="v" id="cool-v" style="white-space:normal">—</span></div>
+  <div class="row hide" data-f="heater" id="leak-row"><span data-t="leak"></span><span class="v" id="leak-v" style="white-space:normal">—</span></div>
  </div>
  <h2 data-t="chart" data-f="chart"></h2>
  <div class="grp chart" data-f="chart"><svg id="chart" viewBox="0 0 320 170"></svg>
@@ -109,12 +110,12 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v" id="mode-v">—</span></div>
   <div class="row" data-f="season"><span data-t="season"></span><span class="v" id="season-v">—</span></div>
-  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
+  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v" id="heat-v" style="white-space:normal">—</span></div>
   <div class="row" data-f="clock"><span data-t="clock"></span><span class="v" id="clock-v">—</span></div>
  </div>
  <h2 data-t="last7" data-f="history"></h2>
  <div class="grp" style="padding:4px 6px" data-f="history">
-  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th></tr></thead><tbody id="days"></tbody></table>
+  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th><th data-f="heater" data-t="heat_h"></th></tr></thead><tbody id="days"></tbody></table>
  </div>
  <p class="note" data-f="history" data-t="days_note"></p>
 </section>
@@ -136,7 +137,7 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="air" data-f="deaerate"></h2>
  <div data-f="deaerate">
-  <div class="grp"><div class="row"><span id="air-d">—</span><span class="v" id="air-v"></span></div></div>
+  <div class="grp"><div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;font-size:15px"><span id="air-d">—</span><span class="v hide" id="air-v" style="text-align:left;white-space:normal"></span></div></div>
   <button class="btn o" id="b-air" data-t="air_start"></button>
   <button class="btn r hide" id="b-air-stop" data-t="test_stop"></button>
   <p class="note" id="air-note"></p>
@@ -182,7 +183,7 @@ section{display:none}section.on{display:block}
   <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
-  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
   <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
  </div>
  <h2 data-t="calc"></h2>
@@ -221,6 +222,8 @@ section{display:none}section.on{display:block}
   <div class="row"><span data-t="l_rise"></span><span class="v" id="l-rise">—</span></div>
   <div class="row"><span data-t="l_set"></span><span class="v" id="l-set">—</span></div>
   <div class="row"><span data-t="l_target"></span><span class="v" id="l-target">—</span></div>
+  <div class="row" data-f="heater"><span data-t="l_heater"></span><span class="v" id="l-heater">—</span></div>
+  <div class="row" data-f="heater"><span data-t="l_e8"></span><span class="v" id="l-e8">—</span></div>
  </div>
  <p class="note" data-f="night_cool" data-t="learned_note"></p>
  <h2 data-t="fw"></h2>
@@ -263,7 +266,7 @@ k_charge:'зареждане',k_prot:'защита / охлаждане',k_other
 chart_24:'Температурите през последните 24 часа (часовникът не е сверен).\nЦветната лента отдолу показва кога е работила помпата.',
 c_unset:'не е сверен',c_tz:'зоната не е потвърдена',c_bad:'ненадежден',c_ok:'надежден',
 last7:'Последните 7 дни',date:'Дата',no_days:'Още няма записан ден.',
-cool_h:'Охл.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
+cool_h:'Охл.',heat_h:'Нагр.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\nНагр.: минутите, в които е работил нагревателят (бойлерът се топли при спряна помпа).\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора ({vac} °C) и не зарежда бойлера, нощем охлажда бойлера. Изключва се само ръчно.',
 m_normal:'Нормален',m_vac:'Ваканция',s_auto:'Автоматичен',s_is_auto:'автоматично',s_hand:'ръчно',
@@ -272,12 +275,13 @@ cool_until:'до {h}',cool_rise:'до изгрев',
 a_heat:'Нощното охлаждане е спряно',d_heat:'Бойлерът се топли, докато помпата го охлажда — работи нагревателят. Охлаждането е спряно до следващата нощ.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
 test_note:'Тестът спира сам, когато времето изтече; „Спри“ действа не по-рано от 1 min след пускането.',
-air:'Обезвъздушаване',air_d:'{n} цикъла · работа {w} min · престой {p} min',air_start:'Започни обезвъздушаване',
+air:'Обезвъздушаване',air_d:'{n} цикъла · работа {w} min · престой {p} min',air_start:'Започни обезвъздушаване',
 air_water:'Престоят е изчислен за вода. Общо {tot} min.',air_pg:'Престоят е изчислен за пропилен-гликол {g} %. Общо {tot} min.',
 air_run:'цикъл {c} от {n} — работа',air_pause:'цикъл {c} от {n} — престой',on:'вкл.',off:'изкл.',
 col_kind:'Вид на колектора',col_area:'Площ на колектора',flat:'Плосък',tubes:'Вакуумни тръби',
 learned:'Научени стойности',l_rise:'Изгрев',l_set:'Залез',l_target:'Цел на нощното охлаждане',
-learned_note:'Изгрев и залез: средното от последните 7 засечени по колектора (местно време).\nЦелта: изчислена от колектора и бойлера, с научената поправка.',
+learned_note:'Изгрев и залез: средното от последните 7 засечени по колектора (местно време).\nЦелта: изчислена от колектора и бойлера, с научената поправка.\nНагревател: засечен ли е при „0 kW“.\nНормално нощно охлаждане: средният темп на изстиване на бойлера в последните 7 нормални нощи (за E8).',
+l_heater:'Нагревател при „0 kW“',l_e8:'Нормално нощно охлаждане',det:'засечен',not_det:'не е засечен',
 common:'Общи',tmax:'Максимум на бойлера (Tmax)',night:'Нощно охлаждане над Tmax',frost:'Защита от замръзване',
 test_time:'Време за тест на помпата',by_season:'По сезони',param:'Параметър',summer:'Лято',winter:'Зима',
 col_min:'Мин. температура на колектора',d_on:'Разлика за включване',d_off:'Разлика за изключване',
@@ -299,7 +303,7 @@ q_wifi:'Изтриване на запазената Wi-Fi мрежа? Конт�
 q_defaults:'Връщане на всички параметри (потребителски и сервизни) към стойностите по подразбиране?',
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
 q_history:'Изтриване на историята (всички дневни обобщения)?',
-q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона)?',
+q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона, засеченият нагревател, нормалното нощно охлаждане)?',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
 a_E1:'Повреден датчик на колектора',d_E1:'Датчикът не отговаря. Помпата работи на проби. Проверете кабела и датчика.',
 a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът не отговаря. Помпата работи само по температурата на колектора. Проверете кабела и датчика.',
@@ -308,6 +312,12 @@ a_E5:'Колекторът е над точката на кипене',d_E5:'К�
 a_E6:'Повреда на помпата / няма поток',d_E6:'Помпата работи, колекторът се загрява бързо, а бойлерът — не. Проверете помпата и дали няма въздух в системата.',
 a_Hot:'Защита на колектора',d_Hot:'Колекторът е над {prot} °C — помпата пренася топлина към бойлера.',
 a_Fro:'Защита от замръзване',d_Fro:'Колекторът е под {frost} °C — помпата го топли с течност от бойлера.',
+a_E8:'Повреден гравитационен спирачен клапан',d_E8:'Три поредни нощи при спряна помпа колекторът се топли, а бойлерът изстива по-бързо от нормалното — обратен термосифон. Проверете спирачния клапан.',
+a_leak:'Течът от нагревателя е спрян',d_leak:'При проверката колекторът падна с {d} K за 5 min — топлината идва от бойлера (нагревателя). Помпата не тръгва по разликата, докато колекторът не се затопли сам или до изгрева.',
+a_det:'Засечен нагревател',d_det:'В данните на монтажника нагревателят е „0 kW“, но бойлерът се топли при спряна помпа. Контролерът приема, че има нагревател; въведете мощността му в „Сервизни“.',
+leak:'Теч от нагревателя',leak_chk:'проверка — помпата е спряна, остават {s} s',leak_last:'последна проверка: колекторът {dir} с {d} K — {res}',
+fell:'падна',rose:'се покачи',res_go:'помпата продължи',res_stop:'спряно',
+heater_kw:'Нагревател (0 = няма)',h_none:'няма',h_on:'работи',h_off:'не работи',h_det:'засечен (0 kW)',
 r_none:'—',r_diff_on:'зареждане',r_diff_off:'малка темп. разлика',r_min_run:'минимално време на работа',r_min_off:'минимален престой',
 r_col_min:'колекторът е под минималната си температура',r_tmax:'бойлерът е на Tmax',r_protect:'защита на колектора',
 r_frost:'защита от замръзване',r_test:'тест',r_seize:'защита от блокиране',r_boiling:'колекторът е над точката на кипене',
@@ -316,7 +326,8 @@ r_tf_run:'зареждане по колектора (повреден датч�
 r_tf_hot:'колекторът е горещ (повреден датчик на бойлера)',r_tf_probe:'проба при горещ колектор (повреден датчик на бойлера)',
 r_cf_probe:'проба (повреден датчик на колектора)',r_cf_run:'бойлерът се топли (повреден датчик на колектора)',
 r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена',
-r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой'
+r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой',
+r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян'
 },en:{
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
@@ -326,7 +337,7 @@ k_charge:'charging',k_prot:'protection / cooling',k_other:'other',chart_day:'Tod
 chart_24:'The temperatures of the last 24 hours (the clock is not set).\nThe coloured band below shows when the pump ran.',
 c_unset:'not set',c_tz:'time zone not confirmed',c_bad:'not reliable',c_ok:'reliable',
 last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
-cool_h:'Cool.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
+cool_h:'Cool.',heat_h:'Heat.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\nHeat.: minutes the heater worked (the tank warmed with the pump stopped).\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'By day protects the collector ({vac} °C) and does not charge the tank, at night cools the tank. Switched off by hand only.',
 m_normal:'Normal',m_vac:'Vacation',s_auto:'Automatic',s_is_auto:'automatic',s_hand:'by hand',
@@ -335,12 +346,13 @@ cool_until:'until {h}',cool_rise:'until sunrise',
 a_heat:'Night cooling stopped',d_heat:'The tank warms up while the pump cools it — the heater is on. The cooling is stopped until the next night.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
 test_note:'The test stops by itself when the time is over; "Stop" acts not earlier than 1 min after the start.',
-air:'Air venting',air_d:'{n} cycles · run {w} min · pause {p} min',air_start:'Start venting',
+air:'Air venting',air_d:'{n} cycles · run {w} min · pause {p} min',air_start:'Start venting',
 air_water:'The pause is computed for water. {tot} min in all.',air_pg:'The pause is computed for propylene glycol {g} %. {tot} min in all.',
 air_run:'cycle {c} of {n} — run',air_pause:'cycle {c} of {n} — pause',on:'on',off:'off',
 col_kind:'Collector kind',col_area:'Collector area',flat:'Flat',tubes:'Evacuated tubes',
 learned:'Learned values',l_rise:'Sunrise',l_set:'Sunset',l_target:'Night cooling target',
-learned_note:'Sunrise and sunset: the average of the last 7 detected by the collector (local time).\nThe target: computed from the collector and the tank, with the learned correction.',
+learned_note:'Sunrise and sunset: the average of the last 7 detected by the collector (local time).\nThe target: computed from the collector and the tank, with the learned correction.\nHeater: whether one was detected with "0 kW".\nNormal night cooling: the average cooling rate of the tank in the last 7 normal nights (for E8).',
+l_heater:'Heater with "0 kW"',l_e8:'Normal night cooling',det:'detected',not_det:'not detected',
 common:'Common',tmax:'Tank maximum (Tmax)',night:'Night cooling above Tmax',frost:'Frost protection',
 test_time:'Pump test time',by_season:'By season',param:'Parameter',summer:'Summer',winter:'Winter',
 col_min:'Min. collector temperature',d_on:'Switch-on difference',d_off:'Switch-off difference',
@@ -362,7 +374,7 @@ q_wifi:'Erase the stored Wi-Fi network? The controller will restart and open its
 q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
 q_history:'Erase the history (all daily summaries)?',
-q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check)?',
+q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check, the detected heater, the normal night cooling)?',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
 a_E1:'Collector sensor fault',d_E1:'The sensor does not answer. The pump runs on probes. Check the cable and the sensor.',
 a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the collector temperature only. Check the cable and the sensor.',
@@ -371,6 +383,12 @@ a_E5:'Collector above the boiling point',d_E5:'The collector reached {boil} °C 
 a_E6:'Pump failure / no flow',d_E6:'The pump runs, the collector heats up quickly, the tank does not. Check the pump and for air in the system.',
 a_Hot:'Collector protection',d_Hot:'The collector is above {prot} °C — the pump carries heat to the tank.',
 a_Fro:'Frost protection',d_Fro:'The collector is below {frost} °C — the pump warms it with liquid from the tank.',
+a_E8:'Gravity check valve broken',d_E8:'Three nights in a row the collector warmed with the pump stopped while the tank cooled faster than normal — reverse thermosiphon. Check the check valve.',
+a_leak:'Heater leak stopped',d_leak:'During the check the collector fell by {d} K in 5 min — the heat comes from the tank (the heater). The pump does not start by the difference until the collector warms by itself or until the sunrise.',
+a_det:'Heater detected',d_det:'The installer data say the heater is "0 kW", but the tank warms with the pump stopped. The controller takes it that there is a heater; enter its power in "Service".',
+leak:'Heater leak',leak_chk:'check — the pump is stopped, {s} s left',leak_last:'last check: the collector {dir} by {d} K — {res}',
+fell:'fell',rose:'rose',res_go:'the pump went on',res_stop:'stopped',
+heater_kw:'Heater (0 = none)',h_none:'none',h_on:'on',h_off:'off',h_det:'detected (0 kW)',
 r_none:'—',r_diff_on:'charging',r_diff_off:'difference too small',r_min_run:'minimum run time',r_min_off:'minimum off time',
 r_col_min:'collector below its minimum temperature',r_tmax:'tank at Tmax',r_protect:'collector protection',
 r_frost:'frost protection',r_test:'test',r_seize:'anti-seize run',r_boiling:'collector above the boiling point',
@@ -379,7 +397,8 @@ r_tf_run:'charging by the collector (tank sensor fault)',r_tf_cold:'collector co
 r_tf_hot:'collector hot (tank sensor fault)',r_tf_probe:'probe at a hot collector (tank sensor fault)',
 r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector sensor fault)',
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed',
-r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause'
+r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause',
+r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
@@ -432,7 +451,7 @@ function testText(){
  const gone=Math.round((Date.now()-leftAt)/1000),left=Math.max(0,S.left-gone);
  $('#test-v').textContent=S.test?t('left')+' '+left+' s':S.set.t_st.v+' s';
  const a=S.air;
- $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+' min':'';
+ $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+'\u00a0min':'';$('#air-v').classList.toggle('hide',!a.on);
 }
 function render(){
  if(!S)return;
@@ -444,6 +463,15 @@ function render(){
   d.className='alarm'+cls;b.textContent=head;p.textContent=text;d.append(b,p);al.append(d)};
  S.alarms.forEach(c=>card(info.includes(c)?' info':'',c+' — '+t('a_'+c),fill('d_'+c,sub)));
  if(co.heater)card(' info',t('a_heat'),t('d_heat'));     /* information, after the alarms */
+ const h=S.heat,kw=S.inst.heater.v,k1=x=>(Math.abs(x)/10).toFixed(1);
+ if(h.leak==2)card(' info',t('a_leak'),fill('d_leak',{d:h.last?k1(h.last.drop):'2.0'}));
+ if(h.det&&!kw)card(' info',t('a_det'),t('d_det'));
+ $('#heat-v').textContent=kw?(kw/10).toFixed(1)+' kW · '+t(h.on?'h_on':'h_off'):h.det?t('h_det')+' · '+t(h.on?'h_on':'h_off'):t('h_none');
+ $('#leak-row').classList.toggle('hide',!h.leak&&!h.last);
+ $('#leak-v').textContent=h.leak==1?fill('leak_chk',{s:Math.max(0,h.left-Math.round((Date.now()-leftAt)/1000))}):
+  h.last?fill('leak_last',{dir:t(h.last.drop>=0?'fell':'rose'),d:k1(h.last.drop),res:t(h.last.stop?'res_stop':'res_go')}):'';
+ $('#l-heater').textContent=t(h.det?'det':'not_det');
+ $('#l-e8').textContent=h.e8n==null?'—':(h.e8n/10).toFixed(1)+' K/h';
  const ssn=t(S.winter?'winter':'summer');
  $('#hd-season').textContent=ssn;
  $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
@@ -521,10 +549,10 @@ function drawChart(){
 }
 function drawDays(){
  const b=$('#days');if(!D)return;b.textContent='';
- if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=5;c.textContent=t('no_days');return}
+ if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=6;c.textContent=t('no_days');return}
  const tv=v=>v==null?'—':deg(v)+'°';
  D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool?d.cool+' min':'—'].forEach(x=>r.insertCell().textContent=x)});
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}

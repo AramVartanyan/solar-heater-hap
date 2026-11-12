@@ -58,7 +58,8 @@ bool sh_pump_ctl_heater(const sh_pump_ctl_t *c)
     /* full ring: hist_head is the oldest sample (10 min ago), the one before it the newest */
     const int16_t oldest = c->hist[c->hist_head];
     const int16_t newest = c->hist[(c->hist_head + SH_CF_HISTORY - 1) % SH_CF_HISTORY];
-    return newest - oldest >= SH_CF_RISE;
+    const int16_t rise = c->heater_rise > SH_CF_RISE ? c->heater_rise : SH_CF_RISE;
+    return newest - oldest >= rise;
 }
 
 static sh_pump_mode_t mode_of(const sh_pump_temps_t *t)
@@ -278,6 +279,7 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     const int16_t tank = t->tank_fault ? SH_TEMP_INVALID : t->t_tank;
 
     sh_pump_track_limits(p, &c->norm, col, tank);
+    c->heater_rise = p->heater_rise;
     if (col != SH_TEMP_INVALID) {
         c->tf_hot = sh_pump_latch(c->tf_hot, col, SH_TF_HOT);
     }
