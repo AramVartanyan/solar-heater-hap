@@ -137,7 +137,7 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="air" data-f="deaerate"></h2>
  <div data-f="deaerate">
-  <div class="grp"><div class="row"><span id="air-d">—</span><span class="v" id="air-v"></span></div></div>
+  <div class="grp"><div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;font-size:15px"><span id="air-d">—</span><span class="v hide" id="air-v" style="text-align:left;white-space:normal"></span></div></div>
   <button class="btn o" id="b-air" data-t="air_start"></button>
   <button class="btn r hide" id="b-air-stop" data-t="test_stop"></button>
   <p class="note" id="air-note"></p>
@@ -275,7 +275,7 @@ cool_until:'до {h}',cool_rise:'до изгрев',
 a_heat:'Нощното охлаждане е спряно',d_heat:'Бойлерът се топли, докато помпата го охлажда — работи нагревателят. Охлаждането е спряно до следващата нощ.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
 test_note:'Тестът спира сам, когато времето изтече; „Спри“ действа не по-рано от 1 min след пускането.',
-air:'Обезвъздушаване',air_d:'{n} цикъла · работа {w} min · престой {p} min',air_start:'Започни обезвъздушаване',
+air:'Обезвъздушаване',air_d:'{n} цикъла · работа {w} min · престой {p} min',air_start:'Започни обезвъздушаване',
 air_water:'Престоят е изчислен за вода. Общо {tot} min.',air_pg:'Престоят е изчислен за пропилен-гликол {g} %. Общо {tot} min.',
 air_run:'цикъл {c} от {n} — работа',air_pause:'цикъл {c} от {n} — престой',on:'вкл.',off:'изкл.',
 col_kind:'Вид на колектора',col_area:'Площ на колектора',flat:'Плосък',tubes:'Вакуумни тръби',
@@ -346,7 +346,7 @@ cool_until:'until {h}',cool_rise:'until sunrise',
 a_heat:'Night cooling stopped',d_heat:'The tank warms up while the pump cools it — the heater is on. The cooling is stopped until the next night.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
 test_note:'The test stops by itself when the time is over; "Stop" acts not earlier than 1 min after the start.',
-air:'Air venting',air_d:'{n} cycles · run {w} min · pause {p} min',air_start:'Start venting',
+air:'Air venting',air_d:'{n} cycles · run {w} min · pause {p} min',air_start:'Start venting',
 air_water:'The pause is computed for water. {tot} min in all.',air_pg:'The pause is computed for propylene glycol {g} %. {tot} min in all.',
 air_run:'cycle {c} of {n} — run',air_pause:'cycle {c} of {n} — pause',on:'on',off:'off',
 col_kind:'Collector kind',col_area:'Collector area',flat:'Flat',tubes:'Evacuated tubes',
@@ -451,7 +451,7 @@ function testText(){
  const gone=Math.round((Date.now()-leftAt)/1000),left=Math.max(0,S.left-gone);
  $('#test-v').textContent=S.test?t('left')+' '+left+' s':S.set.t_st.v+' s';
  const a=S.air;
- $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+' min':'';
+ $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+'\u00a0min':'';$('#air-v').classList.toggle('hide',!a.on);
 }
 function render(){
  if(!S)return;
