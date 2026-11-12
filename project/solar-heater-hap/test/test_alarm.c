@@ -15,6 +15,7 @@
 static const sh_pump_params_t P = {
     .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
     .tank_max = 700, .col_min = 250, .col_protect = 1100,
+    .col_protect_cap = 1150, .col_boiling = 1270, .frost_on = true, .frost = 40,
 };
 static const sh_alarm_params_t A = {
     .e6_time_s = 600, .e6_col_rise = 100, .e6_tank_rise = 5, .e6_diff = 200, .e6_clear_diff = 100,
@@ -424,10 +425,48 @@ static void test_e6_window_param(void)
     CHECK_EQ(first, 1 + 10 * MIN);      /* the run started at 1 s */
 }
 
+static void test_fro(void)
+{
+    sim_t s;
+    /* collector below the frost threshold (4.0 °C), tank warm: the pump runs by the frost protection */
+    sim_init(&s, 40, 300);
+    CHECK_EQ(step(&s), 0);
+    CHECK_EQ(at(&s, 39, 300), BIT(SH_ALARM_FRO));
+    CHECK(s.c.on);
+    CHECK_EQ(s.c.reason, SH_PUMP_REASON_FROST);
+    for (int i = 0; i < 300; i++) {
+        CHECK_EQ(at(&s, 59, 300), BIT(SH_ALARM_FRO));   /* below the threshold + 2 K */
+    }
+    CHECK_EQ(at(&s, 60, 300), 0);                       /* the protection ended: cleared */
+    CHECK(!s.c.on);
+
+    /* tank below 5 °C: the protection does not run, no code */
+    sim_init(&s, 20, 49);
+    CHECK_EQ(step(&s), 0);
+
+    /* only while the pump runs by it: not during the pump test */
+    sim_init(&s, 20, 300);
+    CHECK_EQ(step(&s), BIT(SH_ALARM_FRO));
+    sh_pump_ctl_plus(&s.c, 300, s.now);
+    CHECK_EQ(step(&s), 0);
+    CHECK_EQ(s.c.reason, SH_PUMP_REASON_TEST);
+
+    /* a faulty sensor: not checked, only its own code */
+    sim_init(&s, 20, 300);
+    s.t.tank_fault = true;
+    CHECK_EQ(step(&s), BIT(SH_ALARM_E2));
+
+    /* E6 is not checked during the frost protection (not the normal control) */
+    sim_init(&s, 20, 300);
+    for (int i = 0; i < 30 * 60; i++) {
+        CHECK_EQ(step(&s), BIT(SH_ALARM_FRO));
+    }
+}
+
 static void test_display_order(void)
 {
     const uint8_t all = BIT(SH_ALARM_E1) | BIT(SH_ALARM_E2) | BIT(SH_ALARM_E4) | BIT(SH_ALARM_E5) |
-                        BIT(SH_ALARM_E6) | BIT(SH_ALARM_HOT);
+                        BIT(SH_ALARM_E6) | BIT(SH_ALARM_HOT) | BIT(SH_ALARM_FRO);
     CHECK_EQ(sh_alarm_code_at(all, 0), SH_ALARM_E1);
     CHECK_EQ(sh_alarm_code_at(all, 999), SH_ALARM_E1);
     CHECK_EQ(sh_alarm_code_at(all, 1000), SH_ALARM_E2);
@@ -435,7 +474,10 @@ static void test_display_order(void)
     CHECK_EQ(sh_alarm_code_at(all, 3000), SH_ALARM_E5);
     CHECK_EQ(sh_alarm_code_at(all, 4000), SH_ALARM_E6);
     CHECK_EQ(sh_alarm_code_at(all, 5999), SH_ALARM_HOT);
-    CHECK_EQ(sh_alarm_code_at(all, 6000), SH_ALARM_COUNT);
+    CHECK_EQ(sh_alarm_code_at(all, 6000), SH_ALARM_FRO);     /* Fro after Hot */
+    CHECK_EQ(sh_alarm_code_at(all, 6999), SH_ALARM_FRO);
+    CHECK_EQ(sh_alarm_code_at(all, 7000), SH_ALARM_COUNT);
+    CHECK_EQ(sh_alarm_code_at(BIT(SH_ALARM_E1) | BIT(SH_ALARM_FRO), 1000), SH_ALARM_FRO);
 
     /* the information after the alarms, the alarms by number */
     const uint8_t some = BIT(SH_ALARM_HOT) | BIT(SH_ALARM_E6) | BIT(SH_ALARM_E2);
@@ -449,6 +491,7 @@ static void test_display_order(void)
 
     CHECK(strcmp(sh_alarm_name(SH_ALARM_E1), "E1") == 0);
     CHECK(strcmp(sh_alarm_name(SH_ALARM_HOT), "Hot") == 0);
+    CHECK(strcmp(sh_alarm_name(SH_ALARM_FRO), "Fro") == 0);
     CHECK(strcmp(sh_alarm_name(SH_ALARM_COUNT), "?") == 0);
 }
 
@@ -458,6 +501,7 @@ int main(void)
     test_e4();
     test_e5();
     test_hot();
+    test_fro();
     test_e6_declare();
     test_e6_first_minutes();
     test_e6_exceptions();

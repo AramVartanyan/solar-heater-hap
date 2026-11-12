@@ -32,7 +32,7 @@ static const uint8_t s_boil[DIGITS] = { 0x7C /* b */, 0x5C /* o */, 0x16 /* il *
 static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ };
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
 
-/* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot" */
+/* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot", "Fro" */
 static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
     [SH_ALARM_E1]  = { 0, 0x79 /* E */, 0x06 /* 1 */ },
     [SH_ALARM_E2]  = { 0, 0x79 /* E */, 0x5B /* 2 */ },
@@ -40,6 +40,7 @@ static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
     [SH_ALARM_E5]  = { 0, 0x79 /* E */, 0x6D /* 5 */ },
     [SH_ALARM_E6]  = { 0, 0x79 /* E */, 0x7D /* 6 */ },
     [SH_ALARM_HOT] = { 0x76 /* H */, 0x5C /* o */, 0x78 /* t */ },
+    [SH_ALARM_FRO] = { 0x71 /* F */, 0x50 /* r */, 0x5C /* o */ },
 };
 
 /* Menu items, in the order of sh_setting_t, then End */

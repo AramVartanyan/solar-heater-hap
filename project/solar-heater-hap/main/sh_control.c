@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@
 #include "sh_alarm.h"
 #include "sh_ind.h"
 #include "sh_settings_store.h"
+#include "sh_installer_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -50,8 +52,8 @@ static bool s_ind_done;
 
 static QueueHandle_t s_cmds;
 
-/* The menu settings (whole K / °C) and Kconfig "Control" (minutes, °C) -> tenths and seconds.
- * Read on every cycle: a changed setting applies at once. */
+/* The menu settings (whole K / °C), Kconfig "Control" (minutes, °C) -> tenths and seconds, and
+ * the limits computed from the installer data. Read on every cycle: a change applies at once. */
 static void get_params(sh_pump_params_t *p, uint32_t *test_s)
 {
     sh_settings_t s;
@@ -62,7 +64,13 @@ static void get_params(sh_pump_params_t *p, uint32_t *test_s)
     p->min_off_s = CONFIG_SH_MIN_OFF_MIN * 60;
     p->tank_max = (int16_t)(s.v[SH_SET_TANK_MAX] * 10);
     p->col_min = (int16_t)(s.v[SH_SET_COL_MIN] * 10);
-    p->col_protect = CONFIG_SH_COL_PROTECT_C * 10;
+    p->col_protect = SH_CONTROL_COL_PROTECT;
+    sh_limits_t lim;
+    sh_installer_get(NULL, &lim);
+    p->col_protect_cap = lim.protect_cap;
+    p->col_boiling = lim.boiling;
+    p->frost_on = sh_settings_frost();
+    p->frost = lim.frost;
     *test_s = (uint32_t)s.v[SH_SET_TEST_S];
 }
 
@@ -91,6 +99,21 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     uint32_t test_s;
     get_params(&params, &test_s);
     const uint32_t now = now_s();
+
+    /* the computed limits: at boot and whenever the installer data change them */
+    static sh_pump_params_t s_logged = { .col_boiling = INT16_MIN };
+    if (params.col_boiling != s_logged.col_boiling || params.col_protect_cap != s_logged.col_protect_cap ||
+        params.frost != s_logged.frost) {
+        s_logged = params;
+        char boil[12], cap[12], frost[12];
+        ESP_LOGI(TAG, "boiling point (no start) %s °C, collector protection ceiling %s °C, "
+                 "frost threshold %s °C", temp_str(boil, sizeof(boil), params.col_boiling, false),
+                 temp_str(cap, sizeof(cap), params.col_protect_cap, false),
+                 temp_str(frost, sizeof(frost), params.frost, false));
+        if (params.col_protect > params.col_protect_cap) {
+            ESP_LOGW(TAG, "collector protection %d °C is limited to %s °C", CONFIG_SH_COL_PROTECT_C, cap);
+        }
+    }
 
     const bool was_on = pump->on;
     const sh_pump_reason_t was_reason = pump->reason;
@@ -219,10 +242,6 @@ void sh_control_cmd(sh_control_cmd_t cmd)
 
 esp_err_t sh_control_start(void)
 {
-#if CONFIG_SH_COL_PROTECT_C * 10 > SH_PUMP_COL_PROTECT_CAP
-    ESP_LOGW(TAG, "collector protection %d °C is limited to %d °C", CONFIG_SH_COL_PROTECT_C,
-             SH_PUMP_COL_PROTECT_CAP / 10);
-#endif
     s_cmds = xQueueCreate(4, sizeof(sh_control_cmd_t));
     if (!s_cmds || xTaskCreate(control_task, "sh_control", 4096, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "control task not created");

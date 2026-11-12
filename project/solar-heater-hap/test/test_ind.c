@@ -80,6 +80,14 @@ static void test_priority(void)
     CHECK_EQ(color(&in), SH_COLOR_ORANGE);
     in.vacation = false;
     CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.alarms = BIT(SH_ALARM_FRO);                      /* the frost protection: orange too */
+    CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.t_col = 20;                                      /* over white (cold collector) */
+    CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.vacation = true;
+    CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.alarms = BIT(SH_ALARM_FRO) | BIT(SH_ALARM_E6);   /* red over it */
+    CHECK_EQ(color(&in), SH_COLOR_RED);
 
     const sh_alarm_t alarms[] = { SH_ALARM_E1, SH_ALARM_E2, SH_ALARM_E4, SH_ALARM_E5, SH_ALARM_E6 };
     for (unsigned i = 0; i < sizeof(alarms) / sizeof(alarms[0]); i++) {
