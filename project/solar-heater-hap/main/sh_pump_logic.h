@@ -21,7 +21,11 @@
  *                                    thresholds, the other direction, with the minimum times
  *   7. vacation                   -> normal charging off
  *   8. tank Tmax                  -> normal charging off at once
- *   9. difference                 -> on / off, with the minimum times
+ *   9. heater leak (sh_heater)    -> during a leak check and while the leak is stopped: normal
+ *                                    charging off at once (no minimum run time)
+ *  10. difference                 -> on / off, with the minimum times; after a passed leak check
+ *                                    the pump goes on at once as a running pump (on while the
+ *                                    difference is above the switch-off one)
  * The boiling point, the ceiling of the collector protection and the frost threshold are computed
  * from the installer data (sh_installer) and come in with the parameters.
  */
@@ -65,6 +69,9 @@ typedef enum {
     SH_PUMP_REASON_VACATION,        /* off: vacation, no normal charging */
     SH_PUMP_REASON_AIR_RUN,         /* on:  air venting, run phase */
     SH_PUMP_REASON_AIR_PAUSE,       /* off: air venting, pause phase */
+    /* group D: the heater */
+    SH_PUMP_REASON_LEAK_CHECK,      /* off: leak check of the heater (5 min) */
+    SH_PUMP_REASON_LEAK_STOP,       /* off: the leak of the heater stopped, no start by the difference */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -82,6 +89,11 @@ typedef struct {
     int16_t  frost;                 /* frost threshold, 0.1 °C: on below it, off at >= it + 2 K */
     bool     cool;                  /* night cooling allowed now (sh_cool) */
     bool     charge_off;            /* vacation: no normal charging (col_protect is the vacation limit) */
+    /* group D: the heater (sh_heater) */
+    int16_t  heater_rise;           /* tank rise in 10 min with the pump off = heater, 0.1 K (at least 0.5 K) */
+    bool     leak_check;            /* a leak check runs: normal charging off at once */
+    bool     leak_stop;             /* the leak is stopped: no charging by the difference */
+    bool     leak_resume;           /* the check passed: the pump goes on at once (this step) */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).

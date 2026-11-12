@@ -289,9 +289,10 @@ int sh_hist_csv_line(char *buf, size_t size, const sh_hist_rec_t *r)
     add_temp(&l, r->tank_min);
     add(&l, ";%u;%u;%u;%u;%u;", r->run_min[0], r->run_min[1], r->run_min[2], r->cool_min, r->heater_min);
     bool first = true;
-    for (int a = 0; a < SH_ALARM_COUNT; a++) {
+    for (int i = 0; i < SH_ALARM_COUNT; i++) {
+        const sh_alarm_t a = sh_alarm_order[i];
         if (r->alarms & SH_ALARM_BIT(a)) {
-            add(&l, "%s%s", first ? "" : " ", sh_alarm_name((sh_alarm_t)a));
+            add(&l, "%s%s", first ? "" : " ", sh_alarm_name(a));
             first = false;
         }
     }

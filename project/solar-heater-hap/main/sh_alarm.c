@@ -6,6 +6,10 @@
 
 #define SAMPLE_S        60u
 
+const sh_alarm_t sh_alarm_order[SH_ALARM_COUNT] = {
+    SH_ALARM_E1, SH_ALARM_E2, SH_ALARM_E4, SH_ALARM_E5, SH_ALARM_E6, SH_ALARM_E8, SH_ALARM_HOT, SH_ALARM_FRO,
+};
+
 /* The pump runs by the normal control: the reasons of sh_pump_decide() with the pump on. */
 static bool normal_run(const sh_alarm_in_t *in)
 {
@@ -85,6 +89,9 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
     if (st->e6) {
         a |= SH_ALARM_BIT(SH_ALARM_E6);
     }
+    if (in->e8) {
+        a |= SH_ALARM_BIT(SH_ALARM_E8);
+    }
     if (in->pump_on &&
         (in->reason == SH_PUMP_REASON_COL_PROTECT || in->reason == SH_PUMP_REASON_TF_PROBE)) {
         a |= SH_ALARM_BIT(SH_ALARM_HOT);
@@ -99,10 +106,11 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
 sh_alarm_t sh_alarm_code_at(uint8_t active, uint32_t ms)
 {
     uint32_t idx = ms / SH_ALARM_CODE_MS;
-    for (int a = 0; a < SH_ALARM_COUNT; a++) {
+    for (int i = 0; i < SH_ALARM_COUNT; i++) {
+        const sh_alarm_t a = sh_alarm_order[i];
         if (active & SH_ALARM_BIT(a)) {
             if (idx == 0) {
-                return (sh_alarm_t)a;
+                return a;
             }
             idx--;
         }
@@ -124,7 +132,7 @@ const char *sh_alarm_name(sh_alarm_t a)
     static const char *const names[SH_ALARM_COUNT] = {
         [SH_ALARM_E1] = "E1", [SH_ALARM_E2] = "E2", [SH_ALARM_E4] = "E4",
         [SH_ALARM_E5] = "E5", [SH_ALARM_E6] = "E6", [SH_ALARM_HOT] = "Hot",
-        [SH_ALARM_FRO] = "Fro",
+        [SH_ALARM_FRO] = "Fro", [SH_ALARM_E8] = "E8",
     };
     return (unsigned)a < SH_ALARM_COUNT ? names[a] : "?";
 }

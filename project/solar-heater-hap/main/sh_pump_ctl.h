@@ -17,7 +17,8 @@
  *                             not checked while a sensor is faulty)
  *        tank faulty       -> by the collector: on at >= 60 °C, off below 58 °C, off at >= 95 °C
  *                             (until below 93 °C), probe at the collector emergency temperature
- *        collector faulty  -> probes of 10 min: does the tank rise >= 0.5 K?
+ *        collector faulty  -> probes of 10 min: does the tank rise >= 0.5 K? (postponed while the
+ *                             heater sign is active — the threshold of sh_heater)
  *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
  * The end of the test and of the anti-seize run is handled like a stopped pump whose minimum off
@@ -123,6 +124,7 @@ typedef struct {
     uint8_t hist_n;             /* samples since the pump stopped, up to SH_CF_HISTORY */
     uint8_t hist_head;          /* next slot */
     uint32_t hist_next_s;       /* next sample */
+    int16_t heater_rise;        /* the threshold of the heater sign (parameters of the last step) */
 } sh_pump_ctl_t;
 
 /* One step: decides `ctl->on` / `ctl->reason` at `now_s`. `p` are the current parameters. */
@@ -157,5 +159,6 @@ void sh_pump_ctl_air(const sh_pump_ctl_t *ctl, uint32_t now_s, sh_air_view_t *ou
 /* Length of the whole venting with the given pause, s. */
 uint32_t sh_air_total_s(uint32_t pause_s);
 
-/* The tank rose >= 0.5 K during the last 10 min with the pump off (heater running). */
+/* The heater sign: the tank rose during the last 10 min with the pump off by at least the threshold
+ * of the last step (`heater_rise` of the parameters, at least 0.5 K — sh_heater_rise()). */
 bool sh_pump_ctl_heater(const sh_pump_ctl_t *ctl);
