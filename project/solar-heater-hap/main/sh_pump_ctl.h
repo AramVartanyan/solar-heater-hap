@@ -7,6 +7,8 @@
  * Order, first match wins:
  *   1. pump test           -> on; only the boiling point and the tank ceiling stop it (and end it;
  *                             a test asked for while one of them is active ends at once)
+ *   1a. air venting        -> 3 cycles of 5 min run + pause (10 min x the viscosity coefficient of
+ *                             the fluid); the same two limits stop and end it (like the test)
  *   2. anti-seize run      -> on for 60 s; the same two limits stop and end it
  *   3. the mode chosen by the sensor faults:
  *        both faulty       -> off
@@ -30,6 +32,10 @@
 #define SH_PUMP_TEST_STEP_S         60          /* "+" / "-" during the test */
 #define SH_PUMP_TEST_MAX_S          900         /* the remaining time at most */
 #define SH_PUMP_TEST_MIN_S          60          /* the test never ends earlier after its start */
+
+/* Air venting (started from the web interface) */
+#define SH_AIR_CYCLES               3u
+#define SH_AIR_RUN_S                300u        /* run phase of a cycle; the pause comes from the fluid */
 
 /* Anti-seize */
 #define SH_SEIZE_IDLE_S             (24u * 3600u)   /* off this long -> run when collector >= tank */
@@ -70,6 +76,8 @@ typedef enum {
 #define SH_PUMP_EVT_TEST_END        0x02
 #define SH_PUMP_EVT_SEIZE_START     0x04
 #define SH_PUMP_EVT_SEIZE_END       0x08
+#define SH_PUMP_EVT_AIR_START       0x10
+#define SH_PUMP_EVT_AIR_END         0x20
 
 /* Everything the control keeps between the steps; all zeros at boot (pump off since 0 s). */
 typedef struct {
@@ -84,6 +92,11 @@ typedef struct {
     bool test;
     uint32_t test_start_s;
     uint32_t test_end_s;
+
+    /* air venting */
+    bool air;
+    uint32_t air_start_s;
+    uint32_t air_pause_s;       /* pause phase of a cycle */
 
     /* anti-seize */
     bool seize;
@@ -125,6 +138,23 @@ void sh_pump_ctl_stop(sh_pump_ctl_t *ctl, uint32_t now_s);
 
 /* Seconds left of the test (0 without a test). */
 uint32_t sh_pump_ctl_test_left(const sh_pump_ctl_t *ctl, uint32_t now_s);
+
+/* Air venting: starts it with the given pause (ignored while it or the pump test runs; the test is
+ * not started while it runs); stop ends it at once. The caller runs a step right after. */
+void sh_pump_ctl_air_start(sh_pump_ctl_t *ctl, uint32_t pause_s, uint32_t now_s);
+void sh_pump_ctl_air_stop(sh_pump_ctl_t *ctl);
+
+/* Air venting now. */
+typedef struct {
+    bool on;
+    bool run;                   /* run phase (pump on), otherwise the pause */
+    uint8_t cycle;              /* 1 ... SH_AIR_CYCLES */
+    uint32_t left_s;            /* of the whole venting */
+} sh_air_view_t;
+void sh_pump_ctl_air(const sh_pump_ctl_t *ctl, uint32_t now_s, sh_air_view_t *out);
+
+/* Length of the whole venting with the given pause, s. */
+uint32_t sh_air_total_s(uint32_t pause_s);
 
 /* The tank rose >= 0.5 K during the last 10 min with the pump off (heater running). */
 bool sh_pump_ctl_heater(const sh_pump_ctl_t *ctl);

@@ -8,6 +8,7 @@
  *   GET  /api/state   status (sh_web_api: JSON)
  *   POST /api/set     settings; the installer data only with the access code
  *   POST /api/test    pump test: start, +60 s, -60 s, stop (as the buttons)
+ *   POST /api/air     air venting: start, stop
  *   POST /api/reset   Wi-Fi, default settings, factory, history, learned values — with the code
  *   POST /api/auth    checks the access code (the page asks once and keeps it)
  *   GET  /api/chart   the chart of the day (sh_history, RAM)

@@ -9,6 +9,7 @@
 static const sh_installer_t DEF = { .v = {
     [SH_INST_FLUID] = SH_FLUID_WATER, [SH_INST_GLYCOL] = 0, [SH_INST_PRESSURE] = 15,
     [SH_INST_COL_MAX] = 120,
+    [SH_INST_COL_TYPE] = SH_COL_FLAT, [SH_INST_COL_AREA] = 20, [SH_INST_TANK_VOL] = 150,
 } };
 
 static sh_limits_t calc(int fluid, int glycol, int press, int col_max)
@@ -16,6 +17,7 @@ static sh_limits_t calc(int fluid, int glycol, int press, int col_max)
     const sh_installer_t d = { .v = {
         [SH_INST_FLUID] = (int16_t)fluid, [SH_INST_GLYCOL] = (int16_t)glycol,
         [SH_INST_PRESSURE] = (int16_t)press, [SH_INST_COL_MAX] = (int16_t)col_max,
+        [SH_INST_COL_TYPE] = SH_COL_FLAT, [SH_INST_COL_AREA] = 20, [SH_INST_TANK_VOL] = 150,
     } };
     sh_limits_t lim;
     sh_limits_calc(&d, &lim);
@@ -67,25 +69,25 @@ static void test_sanitize(void)
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 0);
 
     /* each value out of range -> its default, the others stay */
-    d = (sh_installer_t){ .v = { PG, 61, 22, 150 } };
+    d = (sh_installer_t){ .v = { PG, 61, 22, 150, SH_COL_FLAT, 20, 150 } };
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 1u << SH_INST_GLYCOL);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
     CHECK_EQ(d.v[SH_INST_FLUID], PG);
     CHECK_EQ(d.v[SH_INST_PRESSURE], 22);
     CHECK_EQ(d.v[SH_INST_COL_MAX], 150);
 
-    d = (sh_installer_t){ .v = { PG, 30, 4, 251 } };
+    d = (sh_installer_t){ .v = { PG, 30, 4, 251, SH_COL_FLAT, 20, 150 } };
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), (1u << SH_INST_PRESSURE) | (1u << SH_INST_COL_MAX));
     CHECK_EQ(d.v[SH_INST_PRESSURE], 15);
     CHECK_EQ(d.v[SH_INST_COL_MAX], 120);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 30);
 
-    d = (sh_installer_t){ .v = { 7, 30, 22, 150 } };    /* unknown fluid -> water, so no glycol */
+    d = (sh_installer_t){ .v = { 7, 30, 22, 150, SH_COL_FLAT, 20, 150 } };    /* unknown fluid -> water, so no glycol */
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), (1u << SH_INST_FLUID) | (1u << SH_INST_GLYCOL));
     CHECK_EQ(d.v[SH_INST_FLUID], WATER);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
 
-    d = (sh_installer_t){ .v = { WATER, 30, 22, 150 } };    /* glycol stored with water -> 0 */
+    d = (sh_installer_t){ .v = { WATER, 30, 22, 150, SH_COL_FLAT, 20, 150 } };    /* glycol stored with water -> 0 */
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 1u << SH_INST_GLYCOL);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
     CHECK(sh_installer_ok(&d));

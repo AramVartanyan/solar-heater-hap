@@ -86,5 +86,8 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
  * sh_alarm_t); SH_ALARM_COUNT when the codes are over. */
 sh_alarm_t sh_alarm_code_at(uint8_t active, uint32_t ms);
 
+/* How many codes are active (the vacation label "HoL" follows them on the display). */
+unsigned sh_alarm_count(uint8_t active);
+
 /* "E1" ... "Hot", "Fro", for the log. */
 const char *sh_alarm_name(sh_alarm_t a);

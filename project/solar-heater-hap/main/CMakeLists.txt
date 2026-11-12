@@ -27,6 +27,10 @@ idf_component_register(
         "sh_day.c"
         "sh_hist.c"
         "sh_history.c"
+        "sh_sun.c"
+        "sh_season.c"
+        "sh_cool.c"
+        "sh_learn_store.c"
     INCLUDE_DIRS "."
     # the page of the web interface (sh_web), served as it is
     EMBED_FILES "web/index.html" "web/favicon.svg"

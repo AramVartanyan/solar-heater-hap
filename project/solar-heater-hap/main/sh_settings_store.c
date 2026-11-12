@@ -9,6 +9,7 @@ static const char *TAG = "sh_settings";
 
 #define NVS_NAMESPACE   "sh_settings"
 #define KEY_FROST       "fro"
+#define KEY_WINTER      "ssn_now"
 
 #ifdef CONFIG_SH_FROST_PROTECT
 #define FROST_DEFAULT   true
@@ -17,6 +18,8 @@ static const char *TAG = "sh_settings";
 #endif
 
 _Static_assert(CONFIG_SH_PUMP_TEST_S % 30 == 0, "Control: the pump test time must be a multiple of 30 s");
+_Static_assert(CONFIG_SH_DIFF_OFF_WINTER_K < CONFIG_SH_DIFF_ON_WINTER_K,
+               "Control: the winter switch-off difference must be lower than the winter switch-on difference");
 
 /* Kconfig "Control": only the defaults of the menu values */
 static const sh_settings_t s_defaults = { .v = {
@@ -25,10 +28,18 @@ static const sh_settings_t s_defaults = { .v = {
     [SH_SET_DIFF_ON]  = CONFIG_SH_DIFF_ON_K,
     [SH_SET_DIFF_OFF] = CONFIG_SH_DIFF_OFF_K,
     [SH_SET_TEST_S]   = CONFIG_SH_PUMP_TEST_S,
+    [SH_SET_COL_MIN_W]  = CONFIG_SH_COL_MIN_WINTER_C,
+    [SH_SET_DIFF_ON_W]  = CONFIG_SH_DIFF_ON_WINTER_K,
+    [SH_SET_DIFF_OFF_W] = CONFIG_SH_DIFF_OFF_WINTER_K,
+    [SH_SET_SEASON]   = SH_SEASON_AUTO,
+    [SH_SET_VACATION] = 0,
+    [SH_SET_NCOOL]    = 1,      /* night cooling above Tmax: summer on, winter off */
+    [SH_SET_NCOOL_W]  = 0,
 } };
 
 static sh_settings_t s_settings;
 static bool s_frost;
+static bool s_winter;           /* the current season; in the automatic mode it starts as summer */
 static SemaphoreHandle_t s_lock;
 
 esp_err_t sh_settings_init(void)
@@ -39,6 +50,7 @@ esp_err_t sh_settings_init(void)
     }
     s_settings = s_defaults;
     s_frost = FROST_DEFAULT;
+    s_winter = false;
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
@@ -53,6 +65,10 @@ esp_err_t sh_settings_init(void)
         if (nvs_get_u8(h, KEY_FROST, &frost) == ESP_OK && frost <= 1) {
             s_frost = frost;
         }
+        uint8_t winter;
+        if (nvs_get_u8(h, KEY_WINTER, &winter) == ESP_OK && winter <= 1) {
+            s_winter = winter;
+        }
         nvs_close(h);
     } else if (err != ESP_ERR_NVS_NOT_FOUND) {      /* not found: nothing stored yet */
         ESP_LOGE(TAG, "NVS open: %s, defaults used", esp_err_to_name(err));
@@ -64,9 +80,16 @@ esp_err_t sh_settings_init(void)
             ESP_LOGW(TAG, "%s: stored value invalid, default used", sh_setting_info[id].key);
         }
     }
-    ESP_LOGI(TAG, "tbo %d degC, C.Lo %d degC, d.on %d K, d.oF %d K, tSt %d s, frost protection %s",
-             s_settings.v[SH_SET_TANK_MAX], s_settings.v[SH_SET_COL_MIN], s_settings.v[SH_SET_DIFF_ON],
-             s_settings.v[SH_SET_DIFF_OFF], s_settings.v[SH_SET_TEST_S], s_frost ? "on" : "off");
+    ESP_LOGI(TAG, "tbo %d degC, tSt %d s, frost protection %s; summer: C.Lo %d degC, d.on %d K, d.oF %d K, "
+             "night cooling %s; winter: %d degC, %d K, %d K, %s",
+             s_settings.v[SH_SET_TANK_MAX], s_settings.v[SH_SET_TEST_S], s_frost ? "on" : "off",
+             s_settings.v[SH_SET_COL_MIN], s_settings.v[SH_SET_DIFF_ON], s_settings.v[SH_SET_DIFF_OFF],
+             s_settings.v[SH_SET_NCOOL] ? "on" : "off",
+             s_settings.v[SH_SET_COL_MIN_W], s_settings.v[SH_SET_DIFF_ON_W], s_settings.v[SH_SET_DIFF_OFF_W],
+             s_settings.v[SH_SET_NCOOL_W] ? "on" : "off");
+    static const char *const modes[SH_SEASON_MODES] = { "summer", "winter", "automatic" };
+    ESP_LOGI(TAG, "season: %s (now %s), vacation %s", modes[s_settings.v[SH_SET_SEASON]],
+             s_winter ? "winter" : "summer", s_settings.v[SH_SET_VACATION] ? "on" : "off");
     return ESP_OK;
 }
 
@@ -180,6 +203,37 @@ esp_err_t sh_settings_set_frost(bool on)
     return err;
 }
 
+bool sh_settings_winter(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const bool winter = s_winter;
+    xSemaphoreGive(s_lock);
+    return winter;
+}
+
+esp_err_t sh_settings_set_winter(bool winter)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    if (winter != s_winter) {
+        nvs_handle_t h;
+        err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+        if (err == ESP_OK) {
+            err = nvs_set_u8(h, KEY_WINTER, winter);
+            if (err == ESP_OK) {
+                err = nvs_commit(h);
+            }
+            nvs_close(h);
+        }
+        s_winter = winter;
+    }
+    xSemaphoreGive(s_lock);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "season not saved: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
 esp_err_t sh_settings_reset(void)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -194,6 +248,7 @@ esp_err_t sh_settings_reset(void)
     }
     s_settings = s_defaults;
     s_frost = FROST_DEFAULT;
+    s_winter = false;
     xSemaphoreGive(s_lock);
 
     if (err == ESP_OK) {

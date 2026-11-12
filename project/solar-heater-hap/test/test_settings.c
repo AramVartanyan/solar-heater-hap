@@ -5,7 +5,7 @@
 #include "test_util.h"
 #include "sh_settings.h"
 
-static const sh_settings_t DEF = { .v = { 70, 25, 6, 4, 300 } };
+static const sh_settings_t DEF = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };
 
 static void test_table(void)
 {
@@ -100,44 +100,110 @@ static void test_sanitize(void)
     sh_settings_t s = DEF;
     CHECK_EQ(sh_settings_sanitize(&s, &DEF), 0);
 
-    s = (sh_settings_t){ .v = { 85, 10, 20, 15, 900 } };    /* all at the limits: kept */
+    s = (sh_settings_t){ .v = { 85, 10, 20, 15, 900, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };    /* all at the limits: kept */
     CHECK_EQ(sh_settings_sanitize(&s, &DEF), 0);
     CHECK_EQ(s.v[SH_SET_TANK_MAX], 85);
 
-    s = (sh_settings_t){ .v = { 86, 9, 6, 4, 75 } };
+    s = (sh_settings_t){ .v = { 86, 9, 6, 4, 75, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };
     CHECK_EQ(sh_settings_sanitize(&s, &DEF),
              (1u << SH_SET_TANK_MAX) | (1u << SH_SET_COL_MIN) | (1u << SH_SET_TEST_S));
     CHECK_EQ(s.v[SH_SET_TANK_MAX], 70);
     CHECK_EQ(s.v[SH_SET_COL_MIN], 25);
     CHECK_EQ(s.v[SH_SET_TEST_S], 300);
 
-    s = (sh_settings_t){ .v = { 60, 30, 8, 8, 300 } };      /* d.oF not below d.on: both */
+    s = (sh_settings_t){ .v = { 60, 30, 8, 8, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };      /* d.oF not below d.on: both */
     CHECK_EQ(sh_settings_sanitize(&s, &DEF), (1u << SH_SET_DIFF_ON) | (1u << SH_SET_DIFF_OFF));
     CHECK_EQ(s.v[SH_SET_DIFF_ON], 6);
     CHECK_EQ(s.v[SH_SET_DIFF_OFF], 4);
     CHECK_EQ(s.v[SH_SET_TANK_MAX], 60);                      /* the others kept */
 
-    s = (sh_settings_t){ .v = { 60, 30, 5, 9, 300 } };
+    s = (sh_settings_t){ .v = { 60, 30, 5, 9, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };
     sh_settings_sanitize(&s, &DEF);
     CHECK_EQ(s.v[SH_SET_DIFF_ON], 6);
     CHECK_EQ(s.v[SH_SET_DIFF_OFF], 4);
 
-    s = (sh_settings_t){ .v = { 60, 30, 9, 8, 300 } };      /* 8 < 9: kept */
+    s = (sh_settings_t){ .v = { 60, 30, 9, 8, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };      /* 8 < 9: kept */
     CHECK_EQ(sh_settings_sanitize(&s, &DEF), 0);
 
-    s = (sh_settings_t){ .v = { 60, 30, 2, 1, 300 } };      /* d.on out of range: default 6, 1 < 6 */
+    s = (sh_settings_t){ .v = { 60, 30, 2, 1, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };      /* d.on out of range: default 6, 1 < 6 */
     CHECK_EQ(sh_settings_sanitize(&s, &DEF), 1u << SH_SET_DIFF_ON);
     CHECK_EQ(s.v[SH_SET_DIFF_ON], 6);
     CHECK_EQ(s.v[SH_SET_DIFF_OFF], 1);
 
-    s = (sh_settings_t){ .v = { 60, 30, 5, 16, 300 } };     /* d.oF out of range: default 4 < 5 */
+    s = (sh_settings_t){ .v = { 60, 30, 5, 16, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };     /* d.oF out of range: default 4 < 5 */
     sh_settings_sanitize(&s, &DEF);
     CHECK_EQ(s.v[SH_SET_DIFF_ON], 5);
     CHECK_EQ(s.v[SH_SET_DIFF_OFF], 4);
 }
 
+/* The winter set, the season, the vacation and the night cooling switches (step 10, 3.3, 3.4). */
+static void test_seasons(void)
+{
+    CHECK_EQ(DEF.v[SH_SET_COL_MIN_W], 15);          /* winter 15 / 5 / 3, summer 25 / 6 / 4 */
+    CHECK_EQ(DEF.v[SH_SET_DIFF_ON_W], 5);
+    CHECK_EQ(DEF.v[SH_SET_DIFF_OFF_W], 3);
+    CHECK_EQ(sh_setting_info[SH_SET_COL_MIN_W].min, 10);
+    CHECK_EQ(sh_setting_info[SH_SET_COL_MIN_W].max, 80);
+    CHECK_EQ(sh_setting_info[SH_SET_DIFF_ON_W].min, 3);
+    CHECK_EQ(sh_setting_info[SH_SET_DIFF_ON_W].max, 20);
+    CHECK_EQ(sh_setting_info[SH_SET_DIFF_OFF_W].min, 1);
+    CHECK_EQ(sh_setting_info[SH_SET_DIFF_OFF_W].max, 15);
+    CHECK(sh_settings_value_ok(SH_SET_SEASON, SH_SEASON_SUMMER));
+    CHECK(sh_settings_value_ok(SH_SET_SEASON, SH_SEASON_AUTO));
+    CHECK(!sh_settings_value_ok(SH_SET_SEASON, 3));
+    CHECK(!sh_settings_value_ok(SH_SET_SEASON, -1));
+    CHECK(sh_settings_value_ok(SH_SET_VACATION, 1));
+    CHECK(!sh_settings_value_ok(SH_SET_VACATION, 2));
+    CHECK(!sh_settings_value_ok(SH_SET_NCOOL, 2));
+    CHECK(!sh_settings_value_ok(SH_SET_NCOOL_W, -1));
+
+    /* the seasonal values and their winter twins */
+    CHECK_EQ(sh_settings_seasonal(SH_SET_COL_MIN, false), SH_SET_COL_MIN);
+    CHECK_EQ(sh_settings_seasonal(SH_SET_COL_MIN, true), SH_SET_COL_MIN_W);
+    CHECK_EQ(sh_settings_seasonal(SH_SET_DIFF_ON, true), SH_SET_DIFF_ON_W);
+    CHECK_EQ(sh_settings_seasonal(SH_SET_DIFF_OFF, true), SH_SET_DIFF_OFF_W);
+    CHECK_EQ(sh_settings_seasonal(SH_SET_NCOOL, true), SH_SET_NCOOL_W);
+    CHECK_EQ(sh_settings_seasonal(SH_SET_TANK_MAX, true), SH_SET_TANK_MAX);     /* common */
+    CHECK_EQ(sh_settings_seasonal(SH_SET_TEST_S, true), SH_SET_TEST_S);
+
+    /* each season couples its own pair */
+    sh_settings_t s = DEF;                          /* summer 6 / 4, winter 5 / 3 */
+    int16_t min, max;
+    sh_settings_range(&s, SH_SET_DIFF_ON_W, &min, &max);
+    CHECK_EQ(min, 4);
+    CHECK_EQ(max, 20);
+    sh_settings_range(&s, SH_SET_DIFF_OFF_W, &min, &max);
+    CHECK_EQ(min, 1);
+    CHECK_EQ(max, 4);
+    sh_settings_range(&s, SH_SET_DIFF_ON, &min, &max);
+    CHECK_EQ(min, 5);
+    CHECK_EQ(sh_settings_step(&s, SH_SET_DIFF_OFF_W, 4, 1), 4);
+    CHECK_EQ(sh_settings_step(&s, SH_SET_SEASON, SH_SEASON_AUTO, 1), SH_SEASON_AUTO);
+    CHECK_EQ(sh_settings_step(&s, SH_SET_VACATION, 0, 1), 1);
+
+    /* stored values: a broken winter pair -> its defaults, the summer pair kept */
+    s = DEF;
+    s.v[SH_SET_DIFF_ON] = 9;
+    s.v[SH_SET_DIFF_OFF] = 8;
+    s.v[SH_SET_DIFF_ON_W] = 4;
+    s.v[SH_SET_DIFF_OFF_W] = 4;
+    CHECK_EQ(sh_settings_sanitize(&s, &DEF), (1u << SH_SET_DIFF_ON_W) | (1u << SH_SET_DIFF_OFF_W));
+    CHECK_EQ(s.v[SH_SET_DIFF_ON_W], 5);
+    CHECK_EQ(s.v[SH_SET_DIFF_OFF_W], 3);
+    CHECK_EQ(s.v[SH_SET_DIFF_ON], 9);
+    s = DEF;
+    s.v[SH_SET_SEASON] = 7;
+    s.v[SH_SET_VACATION] = 1;
+    s.v[SH_SET_NCOOL] = 0;
+    CHECK_EQ(sh_settings_sanitize(&s, &DEF), 1u << SH_SET_SEASON);
+    CHECK_EQ(s.v[SH_SET_SEASON], SH_SEASON_AUTO);
+    CHECK_EQ(s.v[SH_SET_VACATION], 1);
+    CHECK_EQ(s.v[SH_SET_NCOOL], 0);
+}
+
 int main(void)
 {
+    test_seasons();
     test_table();
     test_value_ok();
     test_range_coupling();

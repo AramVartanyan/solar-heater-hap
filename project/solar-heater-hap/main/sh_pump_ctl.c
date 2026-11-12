@@ -87,6 +87,7 @@ static void enter_mode(sh_pump_ctl_t *c, sh_pump_mode_t mode, uint32_t now_s)
     c->cf_next_s = now_s;           /* the first probe at once (the minimum off time applies) */
     c->norm.col_protect = false;
     c->norm.frost = false;
+    c->norm.cool = false;
 }
 
 static bool normal_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t col, int16_t tank,
@@ -96,6 +97,7 @@ static bool normal_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t col
     if (!was_on) {
         c->norm.col_protect = false;    /* set only while the pump runs by them */
         c->norm.frost = false;
+        c->norm.cool = false;
     }
     sh_pump_decide(p, &c->norm, col, tank, elapsed_s);
     *reason = c->norm.reason;
@@ -288,7 +290,7 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     sh_pump_reason_t reason;
     bool restart = false;               /* the test or the anti-seize run just ended */
 
-    /* The test and the anti-seize run end when their time is over or when the boiling point or the
+    /* The test, the air venting and the anti-seize run end when their time is over or when the boiling point or the
      * tank ceiling stops them; they do not start again by themselves. A test asked for while such a
      * limit is active ends in the same step (refused). */
     if (c->test) {
@@ -298,6 +300,17 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
         }
         c->test = false;
         c->events |= SH_PUMP_EVT_TEST_END;
+        restart = true;
+    }
+    if (c->air) {
+        const uint32_t t = now_s - c->air_start_s;
+        if (t < sh_air_total_s(c->air_pause_s) && !emergency(c, col, tank, &reason)) {
+            const bool run = t % (SH_AIR_RUN_S + c->air_pause_s) < SH_AIR_RUN_S;
+            set(c, run, run ? SH_PUMP_REASON_AIR_RUN : SH_PUMP_REASON_AIR_PAUSE, now_s);
+            return;
+        }
+        c->air = false;
+        c->events |= SH_PUMP_EVT_AIR_END;
         restart = true;
     }
     if (c->seize) {
@@ -356,8 +369,55 @@ uint32_t sh_pump_ctl_test_left(const sh_pump_ctl_t *c, uint32_t now_s)
     return c->test && c->test_end_s > now_s ? c->test_end_s - now_s : 0;
 }
 
+uint32_t sh_air_total_s(uint32_t pause_s)
+{
+    return SH_AIR_CYCLES * (SH_AIR_RUN_S + pause_s);
+}
+
+void sh_pump_ctl_air_start(sh_pump_ctl_t *c, uint32_t pause_s, uint32_t now_s)
+{
+    if (c->air || c->test) {
+        return;
+    }
+    /* at once, no minimum off time; replaces an anti-seize run or a probe (like the test) */
+    c->air = true;
+    c->air_start_s = now_s;
+    c->air_pause_s = pause_s;
+    c->seize = false;
+    c->tf_probe = false;
+    c->cf_probe = false;
+    c->events |= SH_PUMP_EVT_AIR_START;
+}
+
+void sh_pump_ctl_air_stop(sh_pump_ctl_t *c)
+{
+    if (c->air) {
+        c->air_pause_s = 0;
+        c->air_start_s -= sh_air_total_s(0);    /* its time is over: the next step ends it */
+    }
+}
+
+void sh_pump_ctl_air(const sh_pump_ctl_t *c, uint32_t now_s, sh_air_view_t *out)
+{
+    const uint32_t total = sh_air_total_s(c->air_pause_s);
+    const uint32_t t = now_s - c->air_start_s;
+    out->on = c->air && t < total;
+    out->run = false;
+    out->cycle = 0;
+    out->left_s = 0;
+    if (out->on) {
+        const uint32_t period = SH_AIR_RUN_S + c->air_pause_s;
+        out->run = t % period < SH_AIR_RUN_S;
+        out->cycle = (uint8_t)(t / period + 1);
+        out->left_s = total - t;
+    }
+}
+
 void sh_pump_ctl_plus(sh_pump_ctl_t *c, uint32_t test_s, uint32_t now_s)
 {
+    if (c->air) {
+        return;                         /* no test during the air venting */
+    }
     if (!c->test) {
         /* start: at once, no minimum off time; replaces an anti-seize run or a probe */
         c->test = true;

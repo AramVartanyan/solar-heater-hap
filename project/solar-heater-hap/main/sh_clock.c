@@ -169,9 +169,12 @@ void sh_clock_get(sh_clock_info_t *out)
     out->lt.set = false;
     out->lt.day = SH_DAY_NONE;
     out->lt.min = 0;
+    out->tz_dst = strchr(s_rule, ',') != NULL;      /* a POSIX TZ rule with the dates of the change */
+    out->dst = false;
     if (out->set) {
         struct tm tm;
         localtime_r(&out->epoch, &tm);
+        out->dst = tm.tm_isdst > 0;
         out->lt.day = sh_day_number(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
         out->lt.min = (uint16_t)(tm.tm_hour * 60 + tm.tm_min);
         out->lt.set = out->lt.day != SH_DAY_NONE;

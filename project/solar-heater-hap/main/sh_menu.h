@@ -3,8 +3,10 @@
  * host test too. sh_buttons feeds the keys, sh_display shows the view.
  *
  *   normal screen   "+" pump test (during the test +60 s), "-" during the test -60 s,
- *                   "menu" -> the list at tbo (during the test: stops the test)
- *   list            "+" / "-" next / previous item, round (after End -> tbo);
+ *                   "menu" -> the list at SSn (during the test: stops the test; during the air
+ *                   venting: stops it, and "+" does not start a test)
+ *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, End; "+" / "-" next / previous item,
+ *                   round (after End -> SSn); C.Lo, d.on and d.oF are those of the current season;
  *                   "menu" on a setting -> its value blinks; on End -> normal screen
  *   value (blinks)  "+" / "-" one step within the range (no wrap), held > 1 s: repeated;
  *                   "menu" confirms: saved only if different, the value shown steady for 1 s,
@@ -17,8 +19,21 @@
 #include <stdint.h>
 #include "sh_settings.h"
 
-#define SH_MENU_END             SH_SET_COUNT        /* the item after the settings */
-#define SH_MENU_ITEMS           (SH_SET_COUNT + 1)
+/* The items of the list, in their order. */
+typedef enum {
+    SH_MENU_SSN = 0,            /* season: Sun / Cld / Aut */
+    SH_MENU_HOL,                /* vacation: on / oFF */
+    SH_MENU_TBO,
+    SH_MENU_CLO,
+    SH_MENU_DON,
+    SH_MENU_DOF,
+    SH_MENU_TST,
+    SH_MENU_END,                /* the item after the settings */
+    SH_MENU_ITEMS
+} sh_menu_item_t;
+
+/* The setting behind an item (not for SH_MENU_END); `winter`: the current season. */
+sh_setting_t sh_menu_setting(uint8_t pos, bool winter);
 #define SH_MENU_TIMEOUT_MS      10000u
 #define SH_MENU_SAVED_MS        1000u
 #define SH_MENU_BLINK_MS        500u                /* on 0.5 s, off 0.5 s */
@@ -26,6 +41,15 @@
 /* Pump test screen: "tSt" for 3 s, then the seconds left, "tSt" again for 1 s every 7 s. */
 #define SH_MENU_TEST_LABEL_S    3u
 #define SH_MENU_TEST_PERIOD_S   7u
+
+/* Air venting screen: "AIr" for 3 s, then periods of 7 s: the phase ("run" / "PAu") 1 s, the minutes
+ * left of the whole venting 5 s, "AIr" 1 s. */
+typedef enum {
+    SH_MENU_AIR_LABEL = 0,      /* "AIr" */
+    SH_MENU_AIR_PHASE,          /* "run" / "PAu" */
+    SH_MENU_AIR_LEFT,           /* minutes left */
+} sh_menu_air_t;
+sh_menu_air_t sh_menu_air_screen(uint32_t elapsed_s);
 
 typedef enum {
     SH_MENU_NORMAL = 0,         /* normal screen (temperatures or the pump test) */
@@ -47,12 +71,14 @@ typedef enum {
     SH_MENU_ACT_PLUS,           /* pump test: start, or +60 s */
     SH_MENU_ACT_MINUS,          /* pump test: -60 s */
     SH_MENU_ACT_STOP,           /* pump test: stop */
-    SH_MENU_ACT_SAVE,           /* store `value` as setting `pos` */
+    SH_MENU_ACT_SAVE,           /* store `value` as setting `id` */
+    SH_MENU_ACT_AIR_STOP,       /* air venting: stop */
 } sh_menu_act_t;
 
 typedef struct {
     sh_menu_mode_t mode;
-    uint8_t pos;                /* item: sh_setting_t or SH_MENU_END */
+    uint8_t pos;                /* item: sh_menu_item_t */
+    uint8_t id;                 /* the setting being edited / just saved (sh_setting_t) */
     int16_t value;              /* value being edited / just saved */
     uint32_t key_ms;            /* last key (the 10 s timeout) */
     uint32_t mark_ms;           /* start of the blinking / of the 1 s steady value */
@@ -68,8 +94,15 @@ typedef struct {
 /* The timeouts up to `now_ms` (1 s steady value -> list, 10 s without a key -> normal screen). */
 void sh_menu_update(sh_menu_t *m, uint32_t now_ms);
 
-/* One key. `test_running`: the pump test is on; `s`: the current settings. */
-sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, bool test_running,
+/* What runs on the normal screen and which season it is. */
+typedef struct {
+    bool test_running;          /* the pump test is on */
+    bool air_running;           /* the air venting is on */
+    bool winter;                /* the current season */
+} sh_menu_ctx_t;
+
+/* One key. `s`: the current settings. */
+sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_menu_ctx_t *ctx,
                           const sh_settings_t *s);
 
 /* What the display shows (call sh_menu_update() first). */

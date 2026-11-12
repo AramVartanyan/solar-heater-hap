@@ -18,6 +18,8 @@
 #include "sh_reset.h"
 #include "sh_clock.h"
 #include "sh_history.h"
+#include "sh_pump_ctl.h"
+#include "sh_cool.h"
 #include "sh_web_api.h"
 #include "sh_web.h"
 
@@ -107,7 +109,22 @@ static esp_err_t state_get(httpd_req_t *req)
             .tz = ci.tz, .tz_confirmed = ci.tz_confirmed, .peak = ci.peak.peak,
         },
         .history = sh_history_on(),
+        .winter = st.modes.winter,
+        .cool = st.modes.cool, .cool_target = st.modes.cool_target,
+        .cool_until = st.modes.cool_clock ? SH_COOL_TO_MIN : -1, .cool_heater = st.modes.cool_heater,
+        .cool_learned = st.modes.cool_learned, .sunrise = st.modes.sunrise, .sunset = st.modes.sunset,
     };
+    if (st.modes.air_on) {
+        /* the phase from the published start and pause, as the control task computes it */
+        const sh_pump_ctl_t air = { .air = true, .air_start_s = st.modes.air_start_s,
+                                    .air_pause_s = st.modes.air_pause_s };
+        sh_air_view_t v;
+        sh_pump_ctl_air(&air, now_s, &v);
+        s.air_on = v.on;
+        s.air_run = v.run;
+        s.air_cycle = v.cycle;
+        s.air_left_s = v.left_s;
+    }
     get_config(&s.cfg);
     sh_day_run_today(sh_history_day_lock(), &ci.lt, now_s, s.run_s);
     sh_history_day_unlock();
@@ -321,6 +338,24 @@ static esp_err_t test_post(httpd_req_t *req)
     return answer(req, res);
 }
 
+static esp_err_t air_post(httpd_req_t *req)
+{
+    char body[BODY_MAX];
+    if (!read_body(req, body)) {
+        return ESP_FAIL;
+    }
+    sh_state_t st;
+    sh_state_get(&st);
+    sh_web_air_t cmd = SH_WEB_AIR_NONE;
+    const sh_web_res_t res = sh_web_air(body, st.modes.air_on, st.test_on, &cmd);
+    if (res == SH_WEB_OK && cmd == SH_WEB_AIR_START) {
+        sh_control_cmd(SH_CONTROL_AIR_START);
+    } else if (res == SH_WEB_OK && cmd == SH_WEB_AIR_STOP) {
+        sh_control_cmd(SH_CONTROL_AIR_STOP);
+    }
+    return answer(req, res);
+}
+
 static esp_err_t reset_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -353,6 +388,7 @@ static esp_err_t reset_post(httpd_req_t *req)
         case SH_WEB_RESET_LEARNED:
             ESP_LOGW(TAG, "web: learned values reset");
             sh_clock_reset_learned();
+            sh_control_cmd(SH_CONTROL_RESET_LEARNED);   /* sunrise / sunset, the cooling target */
             break;
         }
     }
@@ -421,6 +457,7 @@ static void server_start(void)
         { .uri = "/api/state", .method = HTTP_GET,  .handler = state_get },
         { .uri = "/api/set",   .method = HTTP_POST, .handler = set_post },
         { .uri = "/api/test",  .method = HTTP_POST, .handler = test_post },
+        { .uri = "/api/air",   .method = HTTP_POST, .handler = air_post },
         { .uri = "/api/reset", .method = HTTP_POST, .handler = reset_post },
         { .uri = "/api/auth",  .method = HTTP_POST, .handler = auth_post },
         { .uri = "/api/chart", .method = HTTP_GET,  .handler = chart_get },
