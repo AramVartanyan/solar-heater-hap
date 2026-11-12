@@ -1,10 +1,12 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_app_desc.h"
+#include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_http_server.h"
 #include "captive_wifi.h"
@@ -84,13 +86,21 @@ static esp_err_t state_get(httpd_req_t *req)
     sh_clock_info_t ci;
     sh_clock_get(&ci);
 
+    /* serial number: the MAC of the setup network (as its name and the access code), as in HomeKit */
+    static char serial[13];
+    if (!serial[0]) {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+        snprintf(serial, sizeof(serial), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
+                 mac[5]);
+    }
     sh_web_status_t s = {
         .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
         .test_on = st.test_on,
         .test_left_s = st.test_on && st.test_end_s > now_s ? st.test_end_s - now_s : 0,
         .col_protect = SH_CONTROL_COL_PROTECT,
-        .name = SH_HOSTNAME, .version = esp_app_get_description()->version,
+        .name = SH_HOSTNAME, .version = esp_app_get_description()->version, .serial = serial,
         .ssid = ssid, .ip = ip, .rssi = captive_wifi_rssi(),
         .clock = {
             .trust = ci.trust, .sntp = ci.sntp, .min = ci.lt.set ? (int16_t)ci.lt.min : -1,

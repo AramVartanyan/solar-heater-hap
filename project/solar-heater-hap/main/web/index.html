@@ -48,7 +48,8 @@ td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
 td.cur{white-space:nowrap}
 td input{font:inherit;color:var(--blue);background:none;border:0;text-align:right;width:2.4em;padding:2px 0}
 .cur{background:rgba(63,136,242,.12)}
-.note{color:var(--sub);font-size:13px;margin:6px 18px 0}
+.note{color:var(--sub);font-size:13px;margin:6px 18px 0;white-space:pre-line}
+.act{color:var(--blue)}.act.red{color:var(--red)}
 .calc{color:var(--blue)}
 .na{opacity:.38;pointer-events:none}
 .chart{padding:10px 8px 6px}.chart svg{display:block;width:100%;height:auto}
@@ -78,7 +79,7 @@ section{display:none}section.on{display:block}
 <div class="warn hide" id="offline" data-t="offline"></div>
 <div class="top">
  <div><h1 data-t="title"></h1>
- <p class="dev"><span id="dev"></span><span data-f="season"> · <span data-t="season"></span> —</span><span data-f="clock"> · <span id="hd-time">--:--</span></span></p></div>
+ <p class="dev"><span data-f="season"><span data-t="season"></span> — · </span><span data-f="clock"><span id="hd-time">--:--</span></span></p></div>
  <div class="lang">
   <button id="l-bg" title="Български"><svg viewBox="0 0 5 3"><path fill="#fff" d="M0 0h5v3H0z"/><path fill="#00966E" d="M0 1h5v1H0z"/><path fill="#D62612" d="M0 2h5v1H0z"/></svg></button>
   <button id="l-en" title="English"><svg viewBox="0 0 60 36"><path fill="#012169" d="M0 0h60v36H0z"/><path d="M0 0l60 36M60 0L0 36" stroke="#fff" stroke-width="7"/><path d="M0 0l60 36M60 0L0 36" stroke="#C8102E" stroke-width="3"/><path d="M30 0v36M0 18h60" stroke="#fff" stroke-width="12"/><path d="M30 0v36M0 18h60" stroke="#C8102E" stroke-width="7"/></svg></button>
@@ -213,20 +214,21 @@ section{display:none}section.on{display:block}
  <h2 data-t="fw"></h2>
  <div class="grp">
   <div class="row" data-f="fw"><span data-t="ver"></span><span class="v" id="fw-v">—</span></div>
+  <div class="row" data-f="fw"><span data-t="sn"></span><span class="v" id="fw-sn">—</span></div>
   <div class="row" data-f="ota"><span data-t="ota"></span><span class="v">›</span></div>
  </div>
  <h2 data-f="homekit">HomeKit</h2>
  <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
  <h2 data-t="hist" data-f="history"></h2>
- <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl"></span><span class="v">›</span></a></div>
+ <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl" class="act"></span></a></div>
  <h2 data-t="reset"></h2>
  <div class="grp">
-  <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi"></span><span class="v">›</span></button>
-  <button class="row" data-f="homekit"><span data-t="rs_hk"></span><span class="v">›</span></button>
-  <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn"></span><span class="v">›</span></button>
-  <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist"></span><span class="v">›</span></button>
-  <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def"></span><span class="v">›</span></button>
-  <button class="row" data-f="reset" data-p data-r="factory"><span data-t="rs_fact"></span><span class="v">›</span></button>
+  <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi" class="act"></span></button>
+  <button class="row" data-f="homekit"><span data-t="rs_hk" class="act"></span></button>
+  <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn" class="act"></span></button>
+  <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist" class="act"></span></button>
+  <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def" class="act"></span></button>
+  <button class="row" data-f="reset" data-p data-r="factory"><span data-t="rs_fact" class="act red"></span></button>
  </div>
 </section>
 </div>
@@ -244,12 +246,12 @@ const T={bg:{
 title:'Соларен контролер',offline:'Няма връзка с контролера.',
 tab1:'Състояние',tab2:'Управление',tab3:'Настройки',tab4:'Сервизни',tab5:'Система',
 temps:'Температури',tank:'Бойлер',col:'Колектор',no_sensor:'датчикът не отговаря',
-pump:'Помпа',runs:'Работи',idle:'Стои',today:'Днес',chart:'Графика',
-k_charge:'зареждане',k_prot:'защита',k_other:'друго',chart_day:'Днес от полунощ, местно време; лентата — кога е работила помпата.',
-chart_24:'Последните 24 h (часовникът не е сверен); лентата — кога е работила помпата.',
+pump:'Помпа',runs:'Работи',idle:'Спряна',today:'Днес',chart:'Графика',
+k_charge:'зареждане',k_prot:'защита',k_other:'друго',chart_day:'Температурите днес, от полунощ (местно време).\nЦветната лента отдолу показва кога е работила помпата.',
+chart_24:'Температурите през последните 24 часа (часовникът не е сверен).\nЦветната лента отдолу показва кога е работила помпата.',
 c_unset:'не е сверен',c_tz:'зоната не е потвърдена',c_bad:'ненадежден',c_ok:'надежден',
 last7:'Последните 7 дни',date:'Дата',no_days:'Още няма записан ден.',
-days_note:'Колекторът — максимум; бойлерът — минимум – максимум; помпата — общо време на работа. * — непълен ден (часовникът е сверен след полунощ).',
+days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора, нощем охлажда бойлера. Изключва се само ръчно.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
@@ -268,7 +270,7 @@ calc:'Изчислено',boil:'Точка на кипене',cap:'Защита 
 no_start:'Забрана за пускане над',vac_limit:'Праг във ваканция',frost_below:'Защита от замръзване под',
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
 net:'Мрежа',ip:'IP адрес',time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
-fw:'Фърмуер',ver:'Версия',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
+fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
 confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
@@ -285,7 +287,7 @@ a_E5:'Колекторът е над точката на кипене',d_E5:'К�
 a_E6:'Повреда на помпата / няма поток',d_E6:'Помпата работи, колекторът се загрява бързо, а бойлерът — не. Проверете помпата и дали няма въздух в системата.',
 a_Hot:'Защита на колектора',d_Hot:'Колекторът е над {prot} °C — помпата пренася топлина към бойлера.',
 a_Fro:'Защита от замръзване',d_Fro:'Колекторът е под {frost} °C — помпата го топли с течност от бойлера.',
-r_none:'—',r_diff_on:'зареждане',r_diff_off:'разликата е малка',r_min_run:'минимално време на работа',r_min_off:'минимален престой',
+r_none:'—',r_diff_on:'зареждане',r_diff_off:'малка темп. разлика',r_min_run:'минимално време на работа',r_min_off:'минимален престой',
 r_col_min:'колекторът е под минималната си температура',r_tmax:'бойлерът е на Tmax',r_protect:'защита на колектора',
 r_frost:'защита от замръзване',r_test:'тест',r_seize:'защита от блокиране',r_boiling:'колекторът е над точката на кипене',
 r_ceiling:'бойлерът е на аварийния таван',r_sensor:'няма измерване',r_both_fault:'двата датчика са повредени',
@@ -298,11 +300,11 @@ title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
 temps:'Temperatures',tank:'Tank',col:'Collector',no_sensor:'sensor not answering',
 pump:'Pump',runs:'Running',idle:'Stopped',today:'Today',chart:'Chart',
-k_charge:'charging',k_prot:'protection',k_other:'other',chart_day:'Today from midnight, local time; the band shows when the pump ran.',
-chart_24:'The last 24 h (the clock is not set); the band shows when the pump ran.',
+k_charge:'charging',k_prot:'protection',k_other:'other',chart_day:'Today\'s temperatures, from midnight (local time).\nThe coloured band below shows when the pump ran.',
+chart_24:'The temperatures of the last 24 hours (the clock is not set).\nThe coloured band below shows when the pump ran.',
 c_unset:'not set',c_tz:'time zone not confirmed',c_bad:'not reliable',c_ok:'reliable',
 last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
-days_note:'Collector — maximum; tank — minimum – maximum; pump — total run time. * — partial day (the clock was set after midnight).',
+days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'Protects the collector by day, cools the tank at night. Switched off by hand only.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
@@ -321,7 +323,7 @@ calc:'Computed',boil:'Boiling point',cap:'Collector protection (ceiling)',prot:'
 no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost protection below',
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
 net:'Network',ip:'IP address',time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
-fw:'Firmware',ver:'Version',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
+fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
 confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
@@ -400,7 +402,6 @@ function testText(){
 function render(){
  if(!S)return;
  gray(S.feat);
- $('#dev').textContent=S.name;
  const info=['Hot','Fro'],sub={boil:deg(S.calc.boil),prot:deg(S.calc.prot),frost:deg(S.calc.frost)};
  const al=$('#alarms');al.textContent='';
  S.alarms.forEach(c=>{const d=document.createElement('div'),b=document.createElement('b'),p=document.createElement('div');
@@ -427,7 +428,7 @@ function render(){
  const n=$('#n-prot'),lim=S.calc.prot<S.calc.prot_set;n.classList.toggle('hide',!lim);
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
  $('#n-wifi').textContent=S.net.ssid?S.net.ssid+' · '+String(S.net.rssi).replace('-','−')+' dBm':'—';
- $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;
+ $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;$('#fw-sn').textContent=S.sn||'—';
  const c=S.clock;
  $('#hd-time').textContent=(c.min==null?'--:--':hm(c.min))+(c.st=='ok'?'':' ('+t('c_'+c.st)+')');
  $('#clock-v').textContent=t('c_'+c.st);

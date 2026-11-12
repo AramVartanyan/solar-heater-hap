@@ -88,6 +88,8 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->name);
     put(&o, ",\"fw\":");
     put_str(&o, s->version);
+    put(&o, ",\"sn\":");
+    put_str(&o, s->serial ? s->serial : "");
     put(&o, ",\"feat\":[");
     for (size_t i = 0; i < sizeof(FEATURES) / sizeof(FEATURES[0]); i++) {
         put(&o, "%s\"%s\"", i ? "," : "", FEATURES[i]);

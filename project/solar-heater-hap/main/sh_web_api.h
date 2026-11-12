@@ -63,6 +63,7 @@ typedef struct {
     int16_t col_protect;        /* collector protection setting, 0.1 °C (limited by the cap here) */
     const char *name;           /* device name */
     const char *version;        /* firmware version */
+    const char *serial;         /* serial number: the MAC of the setup network, 12 hex digits (its last 6 are the access code) */
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;

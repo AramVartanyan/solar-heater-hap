@@ -29,7 +29,7 @@ static sh_web_status_t status(void)
     const sh_web_status_t s = {
         .t_col = 523, .t_tank = 418, .pump_on = true, .reason = SH_PUMP_REASON_DIFF,
         .cfg = config(), .col_protect = 1100,
-        .name = "solar-heater", .version = "0.1.0", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
+        .name = "solar-heater", .version = "0.1.0", .serial = "E8F60A810841", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
     };
     return s;
@@ -52,7 +52,7 @@ static void test_status(void)
 {
     sh_web_status_t s = status();
     CHECK(strcmp(json(&s),
-        "{\"name\":\"solar-heater\",\"fw\":\"0.1.0\","
+        "{\"name\":\"solar-heater\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810841\","
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\"],"
