@@ -8,7 +8,7 @@
  *   kinds    charging (difference, minimum run time, charging with a faulty sensor) / protection
  *            (collector protection, frost protection, the probe at the collector emergency
  *            temperature with a faulty tank sensor — Hot) / other (pump test, anti-seize run, the
- *            probe with a faulty collector sensor)
+ *            probe with a faulty collector sensor, air venting) / cooling (night cooling)
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
  *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
  *            day, the minute of the collector maximum (the first one). At the first step of the
@@ -35,6 +35,7 @@ typedef enum {
     SH_RUN_CHARGE = 0,
     SH_RUN_PROTECT,
     SH_RUN_OTHER,
+    SH_RUN_COOL,                /* night cooling (its own column in the daily record) */
     SH_RUN_KINDS
 } sh_run_kind_t;
 
@@ -55,6 +56,7 @@ typedef struct {
     bool pump_on;
     sh_pump_reason_t reason;
     uint16_t alarms;            /* SH_ALARM_BIT() of the active codes */
+    uint16_t sunrises, sunsets; /* how many were detected since boot (sh_sun, counted by sh_control) */
 } sh_day_in_t;
 
 /* One finished interval. */
@@ -77,6 +79,7 @@ typedef struct {
     bool col_fault;             /* the collector sensor was faulty at some time */
     uint32_t run_s[SH_RUN_KINDS];
     uint16_t alarms;
+    int16_t sunrise, sunset;    /* local minutes of the detected ones (the last sunset), -1: none */
 } sh_day_sum_t;
 
 typedef struct {
@@ -92,6 +95,7 @@ typedef struct {
     bool last_set;              /* the clock was set at the previous step */
     int32_t last_local;         /* its local time, minutes since 2020-01-01 */
     int last_kind;              /* the pump kind since the previous step, -1 off */
+    uint16_t sunrises, sunsets; /* the counters at the previous step */
     sh_day_sum_t sum;           /* today */
 } sh_day_t;
 

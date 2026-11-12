@@ -93,6 +93,27 @@ menu "Device Settings"
                 the pump while the collector is below this temperature. A running pump is not
                 stopped by it.
 
+        config SH_COL_MIN_WINTER_C
+            int "Winter: minimum collector temperature (degC)"
+            range 10 80
+            default 15
+            help
+                Defaults of the winter set of the seasonal values (C.Lo, d.on, d.oF; stored in
+                NVS). The values above are the summer set. The menu shows the set of the current
+                season, the web interface both.
+
+        config SH_DIFF_ON_WINTER_K
+            int "Winter: switch-on difference (K)"
+            range 3 20
+            default 5
+
+        config SH_DIFF_OFF_WINTER_K
+            int "Winter: switch-off difference (K)"
+            range 1 15
+            default 3
+            help
+                Must be lower than the winter switch-on difference (checked at compile time).
+
         config SH_COL_PROTECT_C
             int "Collector protection (degC)"
             range 70 160
@@ -194,6 +215,27 @@ menu "Device Settings"
             help
                 What the collector withstands (manufacturer data). The collector protection is
                 kept at least 5 K below it.
+
+        config SH_INST_COL_TUBES
+            bool "Collector: evacuated tubes (off: flat)"
+            default n
+            help
+                With the area and the tank volume: the target of the night cooling (how much a
+                clear summer day can heat the tank: flat 2.5 kWh/m2, tubes 3.0 kWh/m2).
+
+        config SH_INST_COL_AREA_DM2
+            int "Collector area (0.1 m2)"
+            range 5 200
+            default 20
+            help
+                Tenths of a square metre: 20 = 2.0 m2.
+
+        config SH_INST_TANK_L
+            int "Tank volume (l)"
+            range 50 1000
+            default 150
+            help
+                A multiple of 10 l (checked at compile time).
 
     endmenu
 

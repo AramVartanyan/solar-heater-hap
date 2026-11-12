@@ -7,6 +7,8 @@
 #include "sh_state.h"           /* SH_TEMP_INVALID */
 #include "sh_alarm.h"
 #include "sh_tz.h"
+#include "sh_pump_ctl.h"        /* SH_AIR_* */
+#include "sh_cool.h"
 #include "sh_web_api.h"
 
 /* The functions this firmware has. A step that adds a function adds its name here and wires its
@@ -16,6 +18,7 @@ static const char *const FEATURES[] = {
     "alarms", "temps", "pump", "pump_test", "settings", "frost",
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
+    "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -112,6 +115,21 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     }
     put(&o, "],\"test\":%d,\"left\":%lu,", s->test_on, (unsigned long)s->test_left_s);
 
+    /* season; night cooling: the session (1 tank above Tmax, 2 E4, 3 vacation), its target and
+     * until when, the heater, the learned target and sunrise / sunset; air venting */
+    put(&o, "\"winter\":%d,\"cool\":{\"on\":%d,\"target\":", s->winter, s->cool);
+    put_or_null(&o, s->cool == SH_COOL_TMAX || s->cool == SH_COOL_E4, s->cool_target);
+    put(&o, ",\"until\":");
+    put_or_null(&o, s->cool != SH_COOL_NONE && s->cool_until >= 0, s->cool_until);
+    put(&o, ",\"heater\":%d,\"learned\":%d,\"rise\":", s->cool_heater, s->cool_learned);
+    put_or_null(&o, s->sunrise >= 0, s->sunrise);
+    put(&o, ",\"set\":");
+    put_or_null(&o, s->sunset >= 0, s->sunset);
+    const uint32_t pause_s = sh_air_pause_s(&s->cfg.inst);
+    put(&o, "},\"air\":{\"on\":%d,\"run\":%d,\"cycle\":%d,\"left\":%lu,\"cycles\":%u,\"work\":%u,"
+        "\"pause\":%lu},", s->air_on, s->air_run, s->air_cycle, (unsigned long)s->air_left_s, SH_AIR_CYCLES,
+        SH_AIR_RUN_S / 60u, (unsigned long)((pause_s + 30) / 60));
+
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
     for (int id = 0; id < SH_SET_COUNT; id++) {
@@ -124,14 +142,18 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
 
     put(&o, "\"inst\":{");
     for (int id = 0; id < SH_INST_COUNT; id++) {
-        put(&o, "%s\"%s\":{\"v\":%d,\"min\":%d,\"max\":%d}", id ? "," : "", sh_inst_info[id].key,
+        put(&o, "%s\"%s\":{\"v\":%d,\"min\":%d,\"max\":%d", id ? "," : "", sh_inst_info[id].key,
             s->cfg.inst.v[id], sh_inst_info[id].min, sh_inst_info[id].max);
+        if (sh_inst_info[id].step != 1) {
+            put(&o, ",\"step\":%d", sh_inst_info[id].step);
+        }
+        put(&o, "}");
     }
     sh_limits_t lim;
     sh_limits_calc(&s->cfg.inst, &lim);
     const int16_t used = s->col_protect < lim.protect_cap ? s->col_protect : lim.protect_cap;
-    put(&o, "},\"calc\":{\"boil\":%d,\"cap\":%d,\"prot\":%d,\"prot_set\":%d,\"frost\":%d},",
-        lim.boiling, lim.protect_cap, used, s->col_protect, lim.frost);
+    put(&o, "},\"calc\":{\"boil\":%d,\"cap\":%d,\"prot\":%d,\"prot_set\":%d,\"frost\":%d,\"vac\":%d},",
+        lim.boiling, lim.protect_cap, used, s->col_protect, lim.frost, lim.vacation);
 
     put(&o, "\"net\":{\"ssid\":");
     put_str(&o, s->ssid);
@@ -150,8 +172,9 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, c->tz);
     put(&o, ",\"tzok\":%d,\"peak\":", c->tz_confirmed);
     put_or_null(&o, c->peak >= 0, c->peak);
-    put(&o, "},\"run\":[%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
-        (unsigned long)((s->run_s[1] + 30) / 60), (unsigned long)((s->run_s[2] + 30) / 60));
+    put(&o, "},\"run\":[%lu,%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
+        (unsigned long)((s->run_s[1] + 30) / 60), (unsigned long)((s->run_s[2] + 30) / 60),
+        (unsigned long)((s->run_s[SH_RUN_COOL] + 30) / 60));
 
     return o.full ? -1 : (int)o.len;
 }
@@ -173,7 +196,8 @@ static void chart_slot(void *ctx, const sh_chart_slot_t *s)
     put_or_null(c->o, s->t_col != SH_TEMP_INVALID, s->t_col);
     put(c->o, ",");
     put_or_null(c->o, s->t_tank != SH_TEMP_INVALID, s->t_tank);
-    put(c->o, ",%u,%u,%u]", (s->run_s[0] + 30u) / 60u, (s->run_s[1] + 30u) / 60u, (s->run_s[2] + 30u) / 60u);
+    put(c->o, ",%u,%u,%u,%u]", (s->run_s[0] + 30u) / 60u, (s->run_s[1] + 30u) / 60u, (s->run_s[2] + 30u) / 60u,
+        (s->run_s[SH_RUN_COOL] + 30u) / 60u);
     c->first = false;
 }
 
@@ -212,7 +236,8 @@ int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days,
         put_hist_temp(&o, "cn", r->col_min);
         put_hist_temp(&o, "tx", r->tank_max);
         put_hist_temp(&o, "tn", r->tank_min);
-        put(&o, ",\"run\":[%u,%u,%u],\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2]);
+        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2],
+            r->cool_min);
         bool first = true;
         for (int a = 0; a < SH_ALARM_COUNT; a++) {
             if (r->alarms & SH_ALARM_BIT(a)) {
@@ -419,6 +444,22 @@ sh_web_res_t sh_web_test(const char *body, bool test_on, sh_web_test_t *cmd)
     return SH_WEB_OK;
 }
 
+sh_web_res_t sh_web_air(const char *body, bool air_on, bool test_on, sh_web_air_t *cmd)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "cmd", v)) {
+        return SH_WEB_BAD;
+    }
+    if (strcmp(v, "start") == 0) {
+        *cmd = air_on || test_on ? SH_WEB_AIR_NONE : SH_WEB_AIR_START;
+    } else if (strcmp(v, "stop") == 0) {
+        *cmd = air_on ? SH_WEB_AIR_STOP : SH_WEB_AIR_NONE;
+    } else {
+        return SH_WEB_BAD;
+    }
+    return SH_WEB_OK;
+}
+
 sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *what)
 {
     char v[VALUE_MAX];
@@ -497,6 +538,10 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_CF_RUN]       = "cf_run",
         [SH_PUMP_REASON_CF_WAIT]      = "cf_wait",
         [SH_PUMP_REASON_CF_HEATER]    = "cf_heater",
+        [SH_PUMP_REASON_COOL]         = "cool",
+        [SH_PUMP_REASON_VACATION]     = "vacation",
+        [SH_PUMP_REASON_AIR_RUN]      = "air_run",
+        [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];

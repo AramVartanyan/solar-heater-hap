@@ -4,10 +4,13 @@
 #include "sh_installer.h"
 
 const sh_inst_info_t sh_inst_info[SH_INST_COUNT] = {
-    [SH_INST_FLUID]    = { "fluid",     0, SH_FLUID_COUNT - 1 },
-    [SH_INST_GLYCOL]   = { "glycol",    0,  60 },
-    [SH_INST_PRESSURE] = { "press",     5,  60 },
-    [SH_INST_COL_MAX]  = { "col_max", 100, 250 },
+    [SH_INST_FLUID]    = { "fluid",      0, SH_FLUID_COUNT - 1, 1 },
+    [SH_INST_GLYCOL]   = { "glycol",     0,   60,  1 },
+    [SH_INST_PRESSURE] = { "press",      5,   60,  1 },
+    [SH_INST_COL_MAX]  = { "col_max",  100,  250,  1 },
+    [SH_INST_COL_TYPE] = { "col_type",   0, SH_COL_TYPE_COUNT - 1, 1 },
+    [SH_INST_COL_AREA] = { "col_area",   5,  200,  1 },
+    [SH_INST_TANK_VOL] = { "tank_vol",  50, 1000, 10 },
 };
 
 /* Antoine equation for water, 99 - 374 °C: log10(P / mmHg) = A - B / (C + T / °C) */
@@ -22,6 +25,7 @@ const sh_inst_info_t sh_inst_info[SH_INST_COUNT] = {
 #define FROST_MAX       100
 #define COL_MAX_MARGIN  50          /* protection at most 5 K below the collector maximum ... */
 #define BOILING_MARGIN  100         /* ... and 10 K below the boiling point */
+#define VACATION_PCT    75          /* vacation: protection at 75 % of the collector maximum */
 
 typedef struct {
     int16_t pct;                /* propylene glycol, % by volume */
@@ -33,6 +37,8 @@ static const point_t BOIL_RISE[] = { { 0, 0 }, { 20, 10 }, { 30, 20 }, { 40, 30 
 /* Freezing point of the mixture (likewise) */
 static const point_t FREEZING[] = { { 0, 0 }, { 10, -30 }, { 20, -80 }, { 30, -140 }, { 40, -220 },
                                     { 50, -330 }, { 60, -480 } };
+/* Viscosity coefficient of the air venting pause, tenths */
+static const point_t VISCOSITY[] = { { 0, 10 }, { 10, 13 }, { 30, 25 }, { 40, 35 }, { 50, 45 }, { 60, 55 } };
 
 /* Linear between the points of the table; outside it the first / last value. */
 static double interpolate(const point_t *tab, int n, int pct)
@@ -51,7 +57,8 @@ static double interpolate(const point_t *tab, int n, int pct)
 
 static bool value_ok(sh_inst_t id, int16_t v)
 {
-    return v >= sh_inst_info[id].min && v <= sh_inst_info[id].max;
+    return v >= sh_inst_info[id].min && v <= sh_inst_info[id].max &&
+           (v - sh_inst_info[id].min) % sh_inst_info[id].step == 0;
 }
 
 bool sh_installer_ok(const sh_installer_t *d)
@@ -104,4 +111,14 @@ void sh_limits_calc(const sh_installer_t *d, sh_limits_t *out)
         frost = FROST_MAX;
     }
     out->frost = (int16_t)frost;
+
+    const int16_t by_max = (int16_t)(d->v[SH_INST_COL_MAX] * 10 * VACATION_PCT / 100);
+    out->vacation = by_max < by_boiling ? by_max : by_boiling;
+}
+
+uint32_t sh_air_pause_s(const sh_installer_t *d)
+{
+    const int pct = d->v[SH_INST_FLUID] == SH_FLUID_GLYCOL ? d->v[SH_INST_GLYCOL] : 0;
+    /* tenths of the coefficient x 60 s = 10 min x the coefficient */
+    return (uint32_t)(interpolate(VISCOSITY, 6, pct) * (SH_AIR_PAUSE_BASE_S / 10) + 0.5);
 }

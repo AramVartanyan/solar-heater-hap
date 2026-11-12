@@ -45,9 +45,10 @@ button.row{cursor:pointer}
 table{width:100%;border-collapse:collapse;font-size:16px}
 th,td{padding:11px 10px;text-align:left}th{color:var(--sub);font-weight:500;font-size:13px}
 td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
-td.cur{white-space:nowrap}
+td+td{white-space:nowrap}
 td input{font:inherit;color:var(--blue);background:none;border:0;text-align:right;width:2.4em;padding:2px 0}
 .cur{background:rgba(63,136,242,.12)}
+td select,.v select{font:inherit}
 .note{color:var(--sub);font-size:13px;margin:6px 18px 0;white-space:pre-line}
 .act{color:var(--blue)}.act.red{color:var(--red)}
 .calc{color:var(--blue)}
@@ -79,7 +80,7 @@ section{display:none}section.on{display:block}
 <div class="warn hide" id="offline" data-t="offline"></div>
 <div class="top">
  <div><h1 data-t="title"></h1>
- <p class="dev"><span data-f="season"><span data-t="season"></span> — · </span><span data-f="clock"><span id="hd-time">--:--</span></span></p></div>
+ <p class="dev"><span data-f="season"><span id="hd-season">—</span> · </span><span data-f="clock"><span id="hd-time">--:--</span></span></p></div>
  <div class="lang">
   <button id="l-bg" title="Български"><svg viewBox="0 0 5 3"><path fill="#fff" d="M0 0h5v3H0z"/><path fill="#00966E" d="M0 1h5v1H0z"/><path fill="#D62612" d="M0 2h5v1H0z"/></svg></button>
   <button id="l-en" title="English"><svg viewBox="0 0 60 36"><path fill="#012169" d="M0 0h60v36H0z"/><path d="M0 0l60 36M60 0L0 36" stroke="#fff" stroke-width="7"/><path d="M0 0l60 36M60 0L0 36" stroke="#C8102E" stroke-width="3"/><path d="M30 0v36M0 18h60" stroke="#fff" stroke-width="12"/><path d="M30 0v36M0 18h60" stroke="#C8102E" stroke-width="7"/></svg></button>
@@ -97,6 +98,7 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
   <div class="row" data-f="run_today"><span data-t="today"></span><span class="v" id="run-today">—</span></div>
+  <div class="row hide" data-f="night_cool" id="cool-row"><span data-t="night_s"></span><span class="v" id="cool-v" style="white-space:normal">—</span></div>
  </div>
  <h2 data-t="chart" data-f="chart"></h2>
  <div class="grp chart" data-f="chart"><svg id="chart" viewBox="0 0 320 170"></svg>
@@ -105,22 +107,22 @@ section{display:none}section.on{display:block}
  <p class="note" data-f="chart" id="chart-note"></p>
  <h2 data-t="system"></h2>
  <div class="grp">
-  <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v">—</span></div>
-  <div class="row" data-f="season"><span data-t="season"></span><span class="v">—</span></div>
+  <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v" id="mode-v">—</span></div>
+  <div class="row" data-f="season"><span data-t="season"></span><span class="v" id="season-v">—</span></div>
   <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
   <div class="row" data-f="clock"><span data-t="clock"></span><span class="v" id="clock-v">—</span></div>
  </div>
  <h2 data-t="last7" data-f="history"></h2>
  <div class="grp" style="padding:4px 6px" data-f="history">
-  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th></tr></thead><tbody id="days"></tbody></table>
+  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th></tr></thead><tbody id="days"></tbody></table>
  </div>
  <p class="note" data-f="history" data-t="days_note"></p>
 </section>
 
 <section id="s2">
  <h2 data-t="vac" data-f="vacation"></h2>
- <div class="grp" data-f="vacation"><div class="row"><span data-t="vac_mode"></span><span class="sw off"></span></div></div>
- <p class="note" data-f="vacation" data-t="vac_note"></p>
+ <div class="grp" data-f="vacation"><div class="row"><span data-t="vac_mode"></span><button class="sw off" data-sw="hol" role="switch"></button></div></div>
+ <p class="note" data-f="vacation" id="vac-note"></p>
  <h2 data-t="pump"></h2>
  <div data-f="pump_test">
   <div class="grp"><div class="row"><span data-t="test"></span><span class="v" id="test-v">—</span></div></div>
@@ -134,28 +136,30 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="air" data-f="deaerate"></h2>
  <div data-f="deaerate">
-  <div class="grp"><div class="row"><span data-t="air_d"></span><span class="v">—</span></div></div>
-  <button class="btn o" data-t="air_start"></button>
+  <div class="grp"><div class="row"><span id="air-d">—</span><span class="v" id="air-v"></span></div></div>
+  <button class="btn o" id="b-air" data-t="air_start"></button>
+  <button class="btn r hide" id="b-air-stop" data-t="test_stop"></button>
+  <p class="note" id="air-note"></p>
  </div>
 </section>
 
 <section id="s3">
  <h2 data-t="season" data-f="season"></h2>
- <div class="grp" data-f="season"><div class="row"><span data-t="season"></span><span class="v">— ›</span></div></div>
+ <div class="grp" data-f="season"><label class="row"><span data-t="season"></span><span class="v"><select data-k="ssn"><option value="2" data-t="s_auto"></option><option value="0" data-t="summer"></option><option value="1" data-t="winter"></option></select></span></label></div>
  <h2 data-t="common"></h2>
  <div class="grp">
   <label class="row" data-f="settings"><span data-t="tmax"></span><span class="v"><input type="number" inputmode="numeric" data-k="tbo"> °C</span></label>
-  <div class="row" data-f="night_cool"><span data-t="night"></span><span class="sw off"></span></div>
+  <div class="row" data-f="night_cool"><span data-t="night"></span><button class="sw off" id="sw-nc" role="switch"></button></div>
   <div class="row" data-f="frost"><span data-t="frost"></span><button class="sw off" id="sw-fro" role="switch"></button></div>
   <label class="row" data-f="settings"><span data-t="test_time"></span><span class="v"><input type="number" inputmode="numeric" data-k="t_st"> s</span></label>
  </div>
  <h2 data-t="by_season"></h2>
  <div class="grp" style="padding:4px 6px">
-  <table><tr><th data-t="param"></th><th class="cur" data-t="summer"></th><th data-f="season" data-t="winter"></th></tr>
-  <tr data-f="settings"><td data-t="col_min"></td><td class="cur"><input type="number" inputmode="numeric" data-k="c_lo"> °C</td><td data-f="season">—</td></tr>
-  <tr data-f="settings"><td data-t="d_on"></td><td class="cur"><input type="number" inputmode="numeric" data-k="d_on"> K</td><td data-f="season">—</td></tr>
-  <tr data-f="settings"><td data-t="d_off"></td><td class="cur"><input type="number" inputmode="numeric" data-k="d_of"> K</td><td data-f="season">—</td></tr>
-  <tr data-f="night_cool"><td data-t="night_s"></td><td class="cur">—</td><td>—</td></tr></table>
+  <table id="season-t"><tr><th data-t="param"></th><th data-t="summer"></th><th data-f="season" data-t="winter"></th></tr>
+  <tr data-f="settings"><td data-t="col_min"></td><td><input type="number" inputmode="numeric" data-k="c_lo"> °C</td><td data-f="season"><input type="number" inputmode="numeric" data-k="c_lo_w"> °C</td></tr>
+  <tr data-f="settings"><td data-t="d_on"></td><td><input type="number" inputmode="numeric" data-k="d_on"> K</td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_on_w"> K</td></tr>
+  <tr data-f="settings"><td data-t="d_off"></td><td><input type="number" inputmode="numeric" data-k="d_of"> K</td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_of_w"> K</td></tr>
+  <tr data-f="night_cool"><td data-t="night_s"></td><td><button class="sw-btn" data-sw="nc"></button></td><td><button class="sw-btn" data-sw="nc_w"></button></td></tr></table>
  </div>
  <p class="note" data-f="season" data-t="season_note"></p>
 </section>
@@ -174,9 +178,10 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="col_tank"></h2>
  <div class="grp">
-  <div class="row" data-f="col_type"><span data-t="col"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="col_type"><span data-t="col_kind"></span><span class="v"><select data-p data-k="col_type"><option value="0" data-t="flat"></option><option value="1" data-t="tubes"></option></select></span></label>
+  <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
-  <div class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
   <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">— ›</span></div>
   <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
  </div>
@@ -186,7 +191,7 @@ section{display:none}section.on{display:block}
   <div class="row" data-f="calc"><span data-t="cap"></span><span class="v calc" id="c-cap">—</span></div>
   <div class="row" data-f="calc"><span data-t="prot"></span><span class="v calc" id="c-prot">—</span></div>
   <div class="row" data-f="calc"><span data-t="no_start"></span><span class="v calc" id="c-ns">—</span></div>
-  <div class="row" data-f="vac_limit"><span data-t="vac_limit"></span><span class="v calc">—</span></div>
+  <div class="row" data-f="vac_limit"><span data-t="vac_limit"></span><span class="v calc" id="c-vac">—</span></div>
   <div class="row" data-f="calc"><span data-t="frost_below"></span><span class="v calc" id="c-frost">—</span></div>
  </div>
  <p class="note hide" id="n-prot"></p>
@@ -211,6 +216,13 @@ section{display:none}section.on{display:block}
   <div class="row" data-f="timezone"><span data-t="peak"></span><span class="v" id="peak-v">—</span></div>
   <div class="row" data-f="city"><span data-t="city"></span><span class="v">— ›</span></div>
  </div>
+ <h2 data-t="learned" data-f="night_cool"></h2>
+ <div class="grp" data-f="night_cool">
+  <div class="row"><span data-t="l_rise"></span><span class="v" id="l-rise">—</span></div>
+  <div class="row"><span data-t="l_set"></span><span class="v" id="l-set">—</span></div>
+  <div class="row"><span data-t="l_target"></span><span class="v" id="l-target">—</span></div>
+ </div>
+ <p class="note" data-f="night_cool" data-t="learned_note"></p>
  <h2 data-t="fw"></h2>
  <div class="grp">
   <div class="row" data-f="fw"><span data-t="ver"></span><span class="v" id="fw-v">—</span></div>
@@ -247,16 +259,25 @@ title:'Соларен контролер',offline:'Няма връзка с ко
 tab1:'Състояние',tab2:'Управление',tab3:'Настройки',tab4:'Сервизни',tab5:'Система',
 temps:'Температури',tank:'Бойлер',col:'Колектор',no_sensor:'датчикът не отговаря',
 pump:'Помпа',runs:'Работи',idle:'Спряна',today:'Днес',chart:'Графика',
-k_charge:'зареждане',k_prot:'защита',k_other:'друго',chart_day:'Температурите днес, от полунощ (местно време).\nЦветната лента отдолу показва кога е работила помпата.',
+k_charge:'зареждане',k_prot:'защита / охлаждане',k_other:'друго',chart_day:'Температурите днес, от полунощ (местно време).\nЦветната лента отдолу показва кога е работила помпата.',
 chart_24:'Температурите през последните 24 часа (часовникът не е сверен).\nЦветната лента отдолу показва кога е работила помпата.',
 c_unset:'не е сверен',c_tz:'зоната не е потвърдена',c_bad:'ненадежден',c_ok:'надежден',
 last7:'Последните 7 дни',date:'Дата',no_days:'Още няма записан ден.',
-days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
+cool_h:'Охл.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
-vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора, нощем охлажда бойлера. Изключва се само ръчно.',
+vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора ({vac} °C) и не зарежда бойлера, нощем охлажда бойлера. Изключва се само ръчно.',
+m_normal:'Нормален',m_vac:'Ваканция',s_auto:'Автоматичен',s_is_auto:'автоматично',s_hand:'ръчно',
+cool_1:'бойлерът е над Tmax',cool_2:'E4 през деня',cool_3:'ваканция',cool_to:'цел {t} °C',cool_eq:'до изравняване',
+cool_until:'до {h}',cool_rise:'до изгрев',
+a_heat:'Нощното охлаждане е спряно',d_heat:'Бойлерът се топли, докато помпата го охлажда — работи нагревателят. Охлаждането е спряно до следващата нощ.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
 test_note:'Тестът спира сам, когато времето изтече; „Спри“ действа не по-рано от 1 min след пускането.',
-air:'Обезвъздушаване',air_d:'Цикли работа / престой',air_start:'Започни обезвъздушаване',
+air:'Обезвъздушаване',air_d:'{n} цикъла · работа {w} min · престой {p} min',air_start:'Започни обезвъздушаване',
+air_water:'Престоят е изчислен за вода. Общо {tot} min.',air_pg:'Престоят е изчислен за пропилен-гликол {g} %. Общо {tot} min.',
+air_run:'цикъл {c} от {n} — работа',air_pause:'цикъл {c} от {n} — престой',on:'вкл.',off:'изкл.',
+col_kind:'Вид на колектора',col_area:'Площ на колектора',flat:'Плосък',tubes:'Вакуумни тръби',
+learned:'Научени стойности',l_rise:'Изгрев',l_set:'Залез',l_target:'Цел на нощното охлаждане',
+learned_note:'Изгрев и залез: средното от последните 7 засечени по колектора (местно време).\nЦелта: изчислена от колектора и бойлера, с научената поправка.',
 common:'Общи',tmax:'Максимум на бойлера (Tmax)',night:'Нощно охлаждане над Tmax',frost:'Защита от замръзване',
 test_time:'Време за тест на помпата',by_season:'По сезони',param:'Параметър',summer:'Лято',winter:'Зима',
 col_min:'Мин. температура на колектора',d_on:'Разлика за включване',d_off:'Разлика за изключване',
@@ -278,7 +299,7 @@ q_wifi:'Изтриване на запазената Wi-Fi мрежа? Конт�
 q_defaults:'Връщане на всички параметри (потребителски и сервизни) към стойностите по подразбиране?',
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
 q_history:'Изтриване на историята (всички дневни обобщения)?',
-q_learned:'Нулиране на научените стойности (засега — проверката на часовата зона)?',
+q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона)?',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
 a_E1:'Повреден датчик на колектора',d_E1:'Датчикът не отговаря. Помпата работи на проби. Проверете кабела и датчика.',
 a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът не отговаря. Помпата работи само по температурата на колектора. Проверете кабела и датчика.',
@@ -294,22 +315,32 @@ r_ceiling:'бойлерът е на аварийния таван',r_sensor:'н�
 r_tf_run:'зареждане по колектора (повреден датчик на бойлера)',r_tf_cold:'колекторът е студен (повреден датчик на бойлера)',
 r_tf_hot:'колекторът е горещ (повреден датчик на бойлера)',r_tf_probe:'проба при горещ колектор (повреден датчик на бойлера)',
 r_cf_probe:'проба (повреден датчик на колектора)',r_cf_run:'бойлерът се топли (повреден датчик на колектора)',
-r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена'
+r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена',
+r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой'
 },en:{
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
 temps:'Temperatures',tank:'Tank',col:'Collector',no_sensor:'sensor not answering',
 pump:'Pump',runs:'Running',idle:'Stopped',today:'Today',chart:'Chart',
-k_charge:'charging',k_prot:'protection',k_other:'other',chart_day:'Today\'s temperatures, from midnight (local time).\nThe coloured band below shows when the pump ran.',
+k_charge:'charging',k_prot:'protection / cooling',k_other:'other',chart_day:'Today\'s temperatures, from midnight (local time).\nThe coloured band below shows when the pump ran.',
 chart_24:'The temperatures of the last 24 hours (the clock is not set).\nThe coloured band below shows when the pump ran.',
 c_unset:'not set',c_tz:'time zone not confirmed',c_bad:'not reliable',c_ok:'reliable',
 last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
-days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
+cool_h:'Cool.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
-vac:'Vacation',vac_mode:'Vacation mode',vac_note:'Protects the collector by day, cools the tank at night. Switched off by hand only.',
+vac:'Vacation',vac_mode:'Vacation mode',vac_note:'By day protects the collector ({vac} °C) and does not charge the tank, at night cools the tank. Switched off by hand only.',
+m_normal:'Normal',m_vac:'Vacation',s_auto:'Automatic',s_is_auto:'automatic',s_hand:'by hand',
+cool_1:'tank above Tmax',cool_2:'E4 during the day',cool_3:'vacation',cool_to:'target {t} °C',cool_eq:'until equal',
+cool_until:'until {h}',cool_rise:'until sunrise',
+a_heat:'Night cooling stopped',d_heat:'The tank warms up while the pump cools it — the heater is on. The cooling is stopped until the next night.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
 test_note:'The test stops by itself when the time is over; "Stop" acts not earlier than 1 min after the start.',
-air:'Air venting',air_d:'Run / pause cycles',air_start:'Start venting',
+air:'Air venting',air_d:'{n} cycles · run {w} min · pause {p} min',air_start:'Start venting',
+air_water:'The pause is computed for water. {tot} min in all.',air_pg:'The pause is computed for propylene glycol {g} %. {tot} min in all.',
+air_run:'cycle {c} of {n} — run',air_pause:'cycle {c} of {n} — pause',on:'on',off:'off',
+col_kind:'Collector kind',col_area:'Collector area',flat:'Flat',tubes:'Evacuated tubes',
+learned:'Learned values',l_rise:'Sunrise',l_set:'Sunset',l_target:'Night cooling target',
+learned_note:'Sunrise and sunset: the average of the last 7 detected by the collector (local time).\nThe target: computed from the collector and the tank, with the learned correction.',
 common:'Common',tmax:'Tank maximum (Tmax)',night:'Night cooling above Tmax',frost:'Frost protection',
 test_time:'Pump test time',by_season:'By season',param:'Parameter',summer:'Summer',winter:'Winter',
 col_min:'Min. collector temperature',d_on:'Switch-on difference',d_off:'Switch-off difference',
@@ -331,7 +362,7 @@ q_wifi:'Erase the stored Wi-Fi network? The controller will restart and open its
 q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
 q_history:'Erase the history (all daily summaries)?',
-q_learned:'Reset the learned values (for now — the time zone check)?',
+q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check)?',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
 a_E1:'Collector sensor fault',d_E1:'The sensor does not answer. The pump runs on probes. Check the cable and the sensor.',
 a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the collector temperature only. Check the cable and the sensor.',
@@ -347,7 +378,8 @@ r_ceiling:'tank at the emergency ceiling',r_sensor:'no measurement',r_both_fault
 r_tf_run:'charging by the collector (tank sensor fault)',r_tf_cold:'collector cold (tank sensor fault)',
 r_tf_hot:'collector hot (tank sensor fault)',r_tf_probe:'probe at a hot collector (tank sensor fault)',
 r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector sensor fault)',
-r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed'
+r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed',
+r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
@@ -394,24 +426,48 @@ async function refresh(){
   if(fails===1)setTimeout(refresh,1000);
  }
 }
+const fill=(k,o)=>t(k).replace(/\{(\w+)\}/g,(m,x)=>o[x]);
 function testText(){
  if(!S)return;
- const left=Math.max(0,S.left-Math.round((Date.now()-leftAt)/1000));
+ const gone=Math.round((Date.now()-leftAt)/1000),left=Math.max(0,S.left-gone);
  $('#test-v').textContent=S.test?t('left')+' '+left+' s':S.set.t_st.v+' s';
+ const a=S.air;
+ $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+' min':'';
 }
 function render(){
  if(!S)return;
  gray(S.feat);
- const info=['Hot','Fro'],sub={boil:deg(S.calc.boil),prot:deg(S.calc.prot),frost:deg(S.calc.frost)};
+ const vac=!!S.set.hol.v,co=S.cool,air=S.air;
+ const info=['Hot','Fro'],sub={boil:deg(S.calc.boil),prot:deg(vac?S.calc.vac:S.calc.prot),frost:deg(S.calc.frost)};
  const al=$('#alarms');al.textContent='';
- S.alarms.forEach(c=>{const d=document.createElement('div'),b=document.createElement('b'),p=document.createElement('div');
-  d.className='alarm'+(info.includes(c)?' info':'');b.textContent=c+' — '+t('a_'+c);
-  p.textContent=t('d_'+c).replace(/\{(\w+)\}/g,(m,k)=>sub[k]);d.append(b,p);al.append(d)});
+ const card=(cls,head,text)=>{const d=document.createElement('div'),b=document.createElement('b'),p=document.createElement('div');
+  d.className='alarm'+cls;b.textContent=head;p.textContent=text;d.append(b,p);al.append(d)};
+ S.alarms.forEach(c=>card(info.includes(c)?' info':'',c+' — '+t('a_'+c),fill('d_'+c,sub)));
+ if(co.heater)card(' info',t('a_heat'),t('d_heat'));     /* information, after the alarms */
+ const ssn=t(S.winter?'winter':'summer');
+ $('#hd-season').textContent=ssn;
+ $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
+ $('#mode-v').textContent=t(vac?'m_vac':'m_normal');
+ $('#cool-row').classList.toggle('hide',!co.on);
+ if(co.on)$('#cool-v').textContent=[t('cool_'+co.on),co.target==null?t('cool_eq'):fill('cool_to',{t:deg(co.target)}),
+  co.until==null?t('cool_rise'):fill('cool_until',{h:hm(co.until)})].join(' · ');
+ $$('[data-sw]').forEach(e=>{const on=!!S.set[e.dataset.sw].v;
+  if(e.classList.contains('sw')){e.classList.toggle('off',!on);e.setAttribute('aria-checked',on)}else e.textContent=t(on?'on':'off')});
+ const nc=S.winter?'nc_w':'nc';$('#sw-nc').classList.toggle('off',!S.set[nc].v);$('#sw-nc').setAttribute('aria-checked',!!S.set[nc].v);
+ $('#vac-note').textContent=fill('vac_note',{vac:deg(S.calc.vac)});
+ $$('#season-t tr').forEach(r=>[...r.children].forEach((c,i)=>c.classList.toggle('cur',i==(S.winter?2:1))));
+ $('#air-d').textContent=fill('air_d',{n:air.cycles,w:air.work,p:air.pause});
+ $('#air-note').textContent=fill(S.inst.fluid.v?'air_pg':'air_water',{g:S.inst.glycol.v,tot:air.cycles*(air.work+air.pause)});
+ $('#b-air').classList.toggle('hide',!!air.on);$('#b-air').disabled=!!S.test;$('#b-air-stop').classList.toggle('hide',!air.on);
+ $('#b-start').disabled=!!air.on;
+ $('#c-vac').textContent=deg(S.calc.vac)+' °C';
+ $('#l-rise').textContent=co.rise==null?'—':hm(co.rise);$('#l-set').textContent=co.set==null?'—':hm(co.set);
+ $('#l-target').textContent=deg(co.learned)+' °C';
  $('#t-tank').textContent=S.tank==null?'---':deg(S.tank)+'°';
  $('#s-tank').textContent=S.tank==null?t('no_sensor'):'Tmax '+S.set.tbo.v+' °C';
  $('#t-col').textContent=S.col==null?'---':deg(S.col)+'°';
  $('#s-col').textContent=S.col==null?t('no_sensor'):'';
- const prot=['protect','frost','tf_probe'].includes(S.why);
+ const prot=['protect','frost','tf_probe','cool'].includes(S.why);
  $('#p-dot').style.background=S.pump?(prot?'var(--orange)':'var(--green)'):'';
  $('#p-txt').textContent=t(S.pump?'runs':'idle')+' — '+t('r_'+S.why+(S.why=='diff'?(S.pump?'_on':'_off'):''));
  testText();
@@ -432,7 +488,7 @@ function render(){
  const c=S.clock;
  $('#hd-time').textContent=(c.min==null?'--:--':hm(c.min))+(c.st=='ok'?'':' ('+t('c_'+c.st)+')');
  $('#clock-v').textContent=t('c_'+c.st);
- $('#run-today').textContent=dur(S.run[0]+S.run[1]+S.run[2]);
+ $('#run-today').textContent=dur(S.run[0]+S.run[1]+S.run[2]+S.run[3]);
  $('#peak-v').textContent=c.peak==null?'—':hm(c.peak)+(c.peak>=600&&c.peak<=1020?' ✓':' ✗');
  const sel=$('#tz-sel');
  if(TZ&&!sel.options.length)TZ.forEach((z,i)=>sel.add(new Option(z,i)));
@@ -458,17 +514,17 @@ function drawChart(){
   C.pts.forEach(p=>{const v=p[k];if(v==null){prev=null;return}d+=(prev?'L':'M')+X(p[0]).toFixed(1)+' '+Y(v).toFixed(1);prev=1});
   if(d)h+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/>`});
  h+=`<rect x="${L}" y="${BY}" width="${W-L-R}" height="12" rx="2" fill="var(--off)"/>`;
- C.pts.forEach(p=>{let x=X(p[0]-10);[[3,'var(--green)'],[4,'var(--orange)'],[5,'var(--sub)']].forEach(([k,col])=>{
+ C.pts.forEach(p=>{let x=X(p[0]-10);[[3,'var(--green)'],[4,'var(--orange)'],[6,'var(--orange)'],[5,'var(--sub)']].forEach(([k,col])=>{
   if(p[k]>0){h+=`<rect x="${x.toFixed(1)}" y="${BY}" width="${(p[k]*pw).toFixed(2)}" height="12" fill="${col}"/>`;x+=p[k]*pw}})});
  $('#chart').setAttribute('viewBox','0 0 320 156');$('#chart').innerHTML=h;
  $('#chart-note').textContent=t(day?'chart_day':'chart_24');
 }
 function drawDays(){
  const b=$('#days');if(!D)return;b.textContent='';
- if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=4;c.textContent=t('no_days');return}
+ if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=5;c.textContent=t('no_days');return}
  const tv=v=>v==null?'—':deg(v)+'°';
- D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2];
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h'].forEach(x=>r.insertCell().textContent=x)});
+ D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool?d.cool+' min':'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}
@@ -488,6 +544,11 @@ $$('[data-k]').forEach(e=>e.onchange=async()=>{
 $('#i-fluid').onchange=async e=>{const v=+e.target.value;e.target.blur();
  await post('/api/set',v?{fluid:1,glycol:S.inst.glycol.v}:{fluid:0});refresh()};
 $('#sw-fro').onclick=async()=>{await post('/api/set',{fro:S&&S.fro?0:1});refresh()};
+const flip=async k=>{if(S){await post('/api/set',{[k]:S.set[k].v?0:1});refresh()}};
+$$('[data-sw]').forEach(e=>e.onclick=()=>flip(e.dataset.sw));
+$('#sw-nc').onclick=()=>flip(S&&S.winter?'nc_w':'nc');     /* the night cooling of the current season */
+[['#b-air','start'],['#b-air-stop','stop']].forEach(([s,c])=>
+ $(s).onclick=async()=>{await post('/api/air',{cmd:c});setTimeout(refresh,300)});
 [['#b-start','start'],['#b-plus','plus'],['#b-minus','minus'],['#b-stop','stop']].forEach(([s,c])=>
  $(s).onclick=async()=>{await post('/api/test',{cmd:c});setTimeout(refresh,300)});
 $$('.unlock').forEach(b=>b.onclick=async()=>{

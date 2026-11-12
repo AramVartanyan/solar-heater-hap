@@ -9,6 +9,7 @@
 #include "sh_state.h"
 #include "sh_alarm.h"
 #include "sh_menu.h"
+#include "sh_pump_ctl.h"
 #include "sh_buttons.h"
 #include "sh_display.h"
 
@@ -31,6 +32,21 @@ static const uint8_t s_digit[10] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0
 static const uint8_t s_boil[DIGITS] = { 0x7C /* b */, 0x5C /* o */, 0x16 /* il */ };
 static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ };
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
+static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
+/* Air venting: "AIr", then the phase "run" / "PAu" and the minutes left */
+static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
+static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
+static const uint8_t s_pau[DIGITS]  = { 0x73 /* P */, 0x77 /* A */, 0x1C /* u */ };
+/* Values of SSn (in the order of sh_season_mode_t) and of HoL (off, on) */
+static const uint8_t s_seasons[SH_SEASON_MODES][DIGITS] = {
+    [SH_SEASON_SUMMER] = { 0x6D /* S */, 0x1C /* u */, 0x54 /* n */ },
+    [SH_SEASON_WINTER] = { 0x39 /* C */, 0x38 /* L */, 0x5E /* d */ },
+    [SH_SEASON_AUTO]   = { 0x77 /* A */, 0x1C /* u */, 0x78 /* t */ },
+};
+static const uint8_t s_on_off[2][DIGITS] = {
+    { 0x5C /* o */, 0x71 /* F */, 0x71 /* F */ },
+    { 0, 0x5C /* o */, 0x54 /* n */ },
+};
 
 /* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot", "Fro" */
 static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
@@ -43,14 +59,16 @@ static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
     [SH_ALARM_FRO] = { 0x71 /* F */, 0x50 /* r */, 0x5C /* o */ },
 };
 
-/* Menu items, in the order of sh_setting_t, then End */
+/* Menu items, in the order of sh_menu_item_t */
 static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
-    [SH_SET_TANK_MAX] = { 0x78 /* t */, 0x7C /* b */, 0x5C /* o */ },
-    [SH_SET_COL_MIN]  = { 0x39 | SEG_DP /* C. */, 0x38 /* L */, 0x5C /* o */ },
-    [SH_SET_DIFF_ON]  = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x54 /* n */ },
-    [SH_SET_DIFF_OFF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
-    [SH_SET_TEST_S]   = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
-    [SH_MENU_END]     = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
+    [SH_MENU_SSN] = { 0x6D /* S */, 0x6D /* S */, 0x54 /* n */ },
+    [SH_MENU_HOL] = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ },
+    [SH_MENU_TBO] = { 0x78 /* t */, 0x7C /* b */, 0x5C /* o */ },
+    [SH_MENU_CLO] = { 0x39 | SEG_DP /* C. */, 0x38 /* L */, 0x5C /* o */ },
+    [SH_MENU_DON] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x54 /* n */ },
+    [SH_MENU_DOF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
+    [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
+    [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
 /* What is on the display: raw segments, or a temperature (printed by the library). */
@@ -120,11 +138,35 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
 {
     if (v->mode == SH_MENU_LIST) {
         set_seg(s, s_items[v->pos < SH_MENU_ITEMS ? v->pos : SH_MENU_END]);
-    } else if (v->value_visible) {
-        set_number(s, v->value);
-    } else {
+    } else if (!v->value_visible) {
         const uint8_t blank[DIGITS] = { 0 };
         set_seg(s, blank);
+    } else if (v->pos == SH_MENU_SSN) {
+        set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
+    } else if (v->pos == SH_MENU_HOL) {
+        set_seg(s, s_on_off[v->value != 0]);
+    } else {
+        set_number(s, v->value);
+    }
+}
+
+/* Air venting: "AIr" 3 s, then every 7 s: the phase 1 s, the minutes left 5 s, "AIr" 1 s. */
+static void air_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
+{
+    const uint32_t elapsed = now_s - st->modes.air_start_s;
+    const uint32_t period = SH_AIR_RUN_S + st->modes.air_pause_s;
+    const uint32_t total = sh_air_total_s(st->modes.air_pause_s);
+    switch (sh_menu_air_screen(elapsed)) {
+    case SH_MENU_AIR_PHASE:
+        set_seg(s, elapsed % period < SH_AIR_RUN_S ? s_run : s_pau);
+        break;
+    case SH_MENU_AIR_LEFT:
+        set_number(s, total > elapsed ? (int)((total - elapsed + 59) / 60) : 0);
+        break;
+    case SH_MENU_AIR_LABEL:
+    default:
+        set_seg(s, s_air);
+        break;
     }
 }
 
@@ -139,15 +181,18 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
 }
 
 /* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
- * codes (1 s each). Returns false when the cycle is over (the caller starts it again). */
+ * codes and "HoL" in the vacation (1 s each). Returns false when the cycle is over (the caller starts it again). */
 static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
 {
     if (ms >= CYCLE_MS) {
         const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
-        if (code == SH_ALARM_COUNT) {
+        if (code != SH_ALARM_COUNT) {
+            set_seg(s, s_codes[code]);
+        } else if (st->vacation && (ms - CYCLE_MS) / SH_ALARM_CODE_MS == sh_alarm_count(st->alarms)) {
+            set_seg(s, s_hol);          /* vacation: after the codes */
+        } else {
             return false;
         }
-        set_seg(s, s_codes[code]);
     } else if (ms < LABEL_MS) {
         set_seg(s, s_boil);
     } else if (ms < LABEL_MS + VALUE_MS) {
@@ -168,7 +213,7 @@ static void display_task(void *arg)
     (void)arg;
     screen_t shown = { 0 };
     bool written = false;
-    bool was_normal = true, was_test = false;
+    bool was_normal = true, was_test = false;       /* was_test: the test or the air venting */
     uint32_t cycle_ms = (uint32_t)(esp_timer_get_time() / 1000);
 
     for (;;) {
@@ -185,16 +230,19 @@ static void display_task(void *arg)
         if (!normal) {
             menu_screen(&scr, &view);   /* no alarms or test in the menu */
         } else {
-            if (!was_normal || (was_test && !st.test_on)) {
+            const bool special = st.test_on || st.modes.air_on;
+            if (!was_normal || (was_test && !special)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
             if (st.test_on) {
                 test_screen(&scr, &st, now_s);
+            } else if (st.modes.air_on) {
+                air_screen(&scr, &st, now_s);
             } else if (!normal_screen(&scr, &st, now_ms - cycle_ms)) {
                 cycle_ms = now_ms;      /* the codes are over: from "Boil" again */
                 normal_screen(&scr, &st, 0);
             }
-            was_test = st.test_on;
+            was_test = special;
         }
         was_normal = normal;
 

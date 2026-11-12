@@ -34,7 +34,7 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
         out.pattern = SH_IND_DOUBLE;
         return out;
     }
-    if (in->alarms & SH_ALARM_PROTECT) {
+    if ((in->alarms & SH_ALARM_PROTECT) || (in->cooling && in->pump_on)) {
         out.color = SH_COLOR_ORANGE;
     } else if (in->vacation) {
         out.color = SH_COLOR_PURPLE;
