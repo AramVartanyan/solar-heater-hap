@@ -21,11 +21,22 @@ void sh_state_get(sh_state_t *out)
     xSemaphoreGive(s_lock);
 }
 
-void sh_state_set_temps(int16_t t_col, int16_t t_tank)
+void sh_state_set_temps(int16_t t_col, int16_t t_tank, bool col_fault, bool tank_fault)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_state.t_col = t_col;
     s_state.t_tank = t_tank;
+    s_state.col_fault = col_fault;
+    s_state.tank_fault = tank_fault;
+    xSemaphoreGive(s_lock);
+}
+
+void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.test_on = on;
+    s_state.test_start_s = start_s;
+    s_state.test_end_s = end_s;
     xSemaphoreGive(s_lock);
 }
 

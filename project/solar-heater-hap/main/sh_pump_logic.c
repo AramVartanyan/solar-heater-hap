@@ -4,8 +4,7 @@
 #include "sh_state.h"           /* SH_TEMP_INVALID */
 #include "sh_pump_logic.h"
 
-/* A single-value limit with the 2 K return zone: set at >= limit, cleared below limit - 2 K. */
-static bool latch(bool active, int16_t t, int16_t limit)
+bool sh_pump_latch(bool active, int16_t t, int16_t limit)
 {
     if (t >= limit) {
         return true;
@@ -27,6 +26,17 @@ int16_t sh_pump_col_protect(const sh_pump_params_t *p)
     return p->col_protect < SH_PUMP_COL_PROTECT_CAP ? p->col_protect : SH_PUMP_COL_PROTECT_CAP;
 }
 
+void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank)
+{
+    if (t_col != SH_TEMP_INVALID) {
+        st->col_boiling = sh_pump_latch(st->col_boiling, t_col, SH_PUMP_COL_BOILING);
+    }
+    if (t_tank != SH_TEMP_INVALID) {
+        st->tank_ceiling = sh_pump_latch(st->tank_ceiling, t_tank, SH_PUMP_TANK_CEILING);
+        st->tank_max = sh_pump_latch(st->tank_max, t_tank, p->tank_max);
+    }
+}
+
 void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank,
                     uint32_t elapsed_s)
 {
@@ -34,13 +44,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     const bool tank_ok = t_tank != SH_TEMP_INVALID;
 
     /* The limits follow every valid temperature, whatever the pump does. */
-    if (col_ok) {
-        st->col_boiling = latch(st->col_boiling, t_col, SH_PUMP_COL_BOILING);
-    }
-    if (tank_ok) {
-        st->tank_ceiling = latch(st->tank_ceiling, t_tank, SH_PUMP_TANK_CEILING);
-        st->tank_max = latch(st->tank_max, t_tank, p->tank_max);
-    }
+    sh_pump_track_limits(p, st, t_col, t_tank);
 
     /* 1. Without both temperatures nothing can be judged: off (the full sensor-fault logic is a
      *    later step). The collector protection ends with the stop. */
@@ -123,6 +127,17 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_MIN_RUN]      = "minimum run time",
         [SH_PUMP_REASON_MIN_OFF]      = "minimum off time",
         [SH_PUMP_REASON_COL_MIN]      = "collector below minimum",
+        [SH_PUMP_REASON_TEST]         = "pump test",
+        [SH_PUMP_REASON_ANTI_SEIZE]   = "anti-seize",
+        [SH_PUMP_REASON_BOTH_FAULT]   = "both sensors faulty",
+        [SH_PUMP_REASON_TF_RUN]       = "tank sensor faulty: collector warm",
+        [SH_PUMP_REASON_TF_COLD]      = "tank sensor faulty: collector cold",
+        [SH_PUMP_REASON_TF_HOT]       = "tank sensor faulty: collector hot",
+        [SH_PUMP_REASON_TF_PROBE]     = "tank sensor faulty: probe at collector emergency",
+        [SH_PUMP_REASON_CF_PROBE]     = "collector sensor faulty: probe",
+        [SH_PUMP_REASON_CF_RUN]       = "collector sensor faulty: tank rises",
+        [SH_PUMP_REASON_CF_WAIT]      = "collector sensor faulty: waiting for probe",
+        [SH_PUMP_REASON_CF_HEATER]    = "collector sensor faulty: heater, probe postponed",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && names[reason] != NULL) {
         return names[reason];
