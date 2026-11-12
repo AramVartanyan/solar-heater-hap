@@ -1,5 +1,7 @@
 /* Pump decision, normal mode (doc/operating-modes.md 2.1) — plain C, no ESP-IDF / FreeRTOS, so the
- * same file is compiled into the host test (project/solar-heater-hap/test).
+ * same file is compiled into the host test (project/solar-heater-hap/test). The pump test, the
+ * anti-seize run and the sensor-fault modes are in sh_pump_ctl, which calls this decision in the
+ * normal mode.
  *
  * Temperatures are tenths of °C (differences: tenths of K), times are seconds of a monotonic clock.
  * Every single-value limit is active at >= value and released at < value - 2 K.
@@ -34,6 +36,18 @@ typedef enum {
     SH_PUMP_REASON_MIN_RUN,         /* on:  difference low, minimum run time not over */
     SH_PUMP_REASON_MIN_OFF,         /* off: difference enough, minimum off time not over */
     SH_PUMP_REASON_COL_MIN,         /* off: difference enough, collector below its minimum */
+    /* sh_pump_ctl: pump test, anti-seize, sensor faults */
+    SH_PUMP_REASON_TEST,            /* on:  pump test (buttons) */
+    SH_PUMP_REASON_ANTI_SEIZE,      /* on:  anti-seize run after 24 h without running */
+    SH_PUMP_REASON_BOTH_FAULT,      /* off: both sensors faulty */
+    SH_PUMP_REASON_TF_RUN,          /* on:  tank sensor faulty, collector warm enough */
+    SH_PUMP_REASON_TF_COLD,         /* off: tank sensor faulty, collector too cold */
+    SH_PUMP_REASON_TF_HOT,          /* off: tank sensor faulty, collector at 95 °C, not yet below 93 °C */
+    SH_PUMP_REASON_TF_PROBE,        /* on:  tank sensor faulty, probe at the collector emergency temperature */
+    SH_PUMP_REASON_CF_PROBE,        /* on:  collector sensor faulty, probe (does the tank rise?) */
+    SH_PUMP_REASON_CF_RUN,          /* on:  collector sensor faulty, the tank rises */
+    SH_PUMP_REASON_CF_WAIT,         /* off: collector sensor faulty, waiting for the next probe */
+    SH_PUMP_REASON_CF_HEATER,       /* off: collector sensor faulty, heater running, probe postponed */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -57,6 +71,15 @@ typedef struct {
     bool tank_max;                  /* tank reached Tmax, not yet below it - 2 K */
     bool col_protect;               /* collector protection is running the pump */
 } sh_pump_state_t;
+
+/* A single-value limit with the 2 K return zone: true at t >= limit, false at t < limit - 2 K,
+ * unchanged in between. */
+bool sh_pump_latch(bool active, int16_t t, int16_t limit);
+
+/* Updates the memory of the limits (boiling point, tank ceiling, Tmax) from every valid
+ * temperature (SH_TEMP_INVALID leaves the limits of that sensor as they are). Called by
+ * sh_pump_decide(); the caller may call it also when it does not decide (it is idempotent). */
+void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank);
 
 /* One decision. `elapsed_s` is the time since `st->on` last changed (since the start, if it never
  * did); the caller restarts that time whenever `st->on` changes. Updates `st`. */

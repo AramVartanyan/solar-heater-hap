@@ -2,7 +2,7 @@
  *
  * Boot order:
  *   1. pump relay forced off (before anything that can take time)
- *   2. NVS, shared state
+ *   2. NVS, shared state, user settings
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task
  *   5. Wi-Fi (captive-wifi); HomeKit follows in a later phase
@@ -17,6 +17,7 @@
 
 #include "sh_config.h"
 #include "sh_state.h"
+#include "sh_settings_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_sensors.h"
@@ -60,6 +61,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(err);
     sh_state_init();
+    ESP_ERROR_CHECK(sh_settings_init());
 
     ESP_LOGI(TAG, "solar-heater-hap %s", esp_app_get_description()->version);
 
