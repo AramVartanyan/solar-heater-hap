@@ -8,15 +8,20 @@
 #   test_menu         menu transitions, test screen (sh_menu + sh_settings)
 #   test_alarm        alarm codes, E6, display order (sh_alarm + sh_pump_ctl + sh_pump_logic)
 #   test_ind          status LED: colour, pattern, times (sh_ind)
+#   test_installer    installer data and the computed limits (sh_installer)
+#   test_web          web interface: status, requests, day chart (sh_web_api)
+#   test_clock        browser time, time zones, dates, time zone check by the collector peak (sh_clock)
+#   test_history      day chart, day, daily summary, log in flash, CSV (sh_history + sh_clock)
 
 CC      := gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O1
 MAIN    := ../main
 BUILD   := build
 TESTS   := test_pump_logic test_pump_ctl test_meas test_settings test_menu test_alarm test_ind \
-           test_installer test_web
-WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_alarm.c \
-           $(MAIN)/sh_pump_logic.c
+           test_installer test_web test_clock test_history
+HIST_SRC := $(MAIN)/sh_history.c $(MAIN)/sh_clock.c $(MAIN)/sh_alarm.c
+WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
+           $(HIST_SRC)
 HDRS    := $(wildcard $(MAIN)/sh_*.h) test_util.h
 
 .PHONY: test sim clean
@@ -33,6 +38,8 @@ $(BUILD)/test_alarm:      test_alarm.c $(MAIN)/sh_alarm.c $(MAIN)/sh_pump_ctl.c 
 $(BUILD)/test_ind:        test_ind.c $(MAIN)/sh_ind.c $(HDRS)
 $(BUILD)/test_installer:  test_installer.c $(MAIN)/sh_installer.c $(HDRS)
 $(BUILD)/test_web:        test_web.c $(WEB_SRC) $(HDRS)
+$(BUILD)/test_clock:      test_clock.c $(MAIN)/sh_clock.c $(HDRS)
+$(BUILD)/test_history:    test_history.c $(HIST_SRC) $(HDRS)
 $(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(MAIN)/sh_pump_ctl.c $(HDRS)
 
 $(BUILD)/%:

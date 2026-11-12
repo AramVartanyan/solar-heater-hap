@@ -23,6 +23,9 @@ typedef struct {
     bool    vacation;
     bool    ota_running;
     uint8_t alarms;             /* active codes: SH_ALARM_BIT() of sh_alarm_t (sh_alarm.h) */
+    bool    clock_set;          /* the clock is set (SNTP or browser); the local time: sh_clock_now() */
+    bool    clock_reliable;     /* ... and the time zone check does not doubt it; otherwise the
+                                   logic uses its variants without a clock */
 } sh_state_t;
 
 void sh_state_init(void);
@@ -32,3 +35,4 @@ void sh_state_set_pump(bool on, sh_pump_reason_t reason);
 void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s);
 void sh_state_set_wifi(bool connected, bool portal);
 void sh_state_set_alarms(uint8_t alarms);
+void sh_state_set_clock(bool set, bool reliable);

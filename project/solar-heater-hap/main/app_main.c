@@ -2,11 +2,11 @@
  *
  * Boot order:
  *   1. pump relay forced off (before anything that can take time)
- *   2. NVS, shared state, user settings, installer data
+ *   2. NVS, shared state, user settings, installer data, time zone, history
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task
- *   5. Wi-Fi (captive-wifi) and the web interface (while connected to the router); HomeKit
- *      follows in a later phase
+ *   5. Wi-Fi (captive-wifi), the clock (SNTP) and the web interface (while connected to the
+ *      router); HomeKit follows in a later phase
  */
 
 #include "freertos/FreeRTOS.h"
@@ -20,6 +20,8 @@
 #include "sh_state.h"
 #include "sh_settings_store.h"
 #include "sh_installer_store.h"
+#include "sh_clock_sync.h"
+#include "sh_history_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_sensors.h"
@@ -36,6 +38,7 @@ static void wifi_event(captive_wifi_event_t evt, void *ctx)
     switch (evt) {
     case CAPTIVE_WIFI_EVT_STA_CONNECTED:
         sh_state_set_wifi(true, false);
+        sh_clock_sync_connected();
         sh_web_enable(true);
         break;
     case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
@@ -69,6 +72,8 @@ void app_main(void)
     sh_state_init();
     ESP_ERROR_CHECK(sh_settings_init());
     ESP_ERROR_CHECK(sh_installer_init());
+    ESP_ERROR_CHECK(sh_clock_sync_init());
+    sh_history_init();
 
     ESP_LOGI(TAG, "solar-heater-hap %s", esp_app_get_description()->version);
 

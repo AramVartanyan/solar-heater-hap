@@ -1,7 +1,9 @@
 /* Host test of the web interface data and request checks (main/sh_web_api.c;
  * doc/tasks/step6-installer-web.md 3.4): the status JSON, the settings ("set") with the checks of
- * the menu, the access code, the pump test commands, the resets. */
+ * the menu, the access code, the pump test commands, the resets; the clock, the time zone, the day
+ * chart and the last days (doc/tasks/step9-clock-history.md 3.4). */
 
+#include <stdio.h>
 #include <string.h>
 #include "test_util.h"
 #include "sh_state.h"
@@ -17,6 +19,7 @@ static sh_web_config_t config(void)
         .settings = { .v = { 70, 25, 6, 4, 300 } },
         .frost = true,
         .inst = { .v = { SH_FLUID_WATER, 0, 15, 120 } },
+        .tz = SH_ZONE_NONE,
     };
     return c;
 }
@@ -25,7 +28,7 @@ static sh_web_status_t status(void)
 {
     const sh_web_status_t s = {
         .t_col = 523, .t_tank = 418, .pump_on = true, .reason = SH_PUMP_REASON_DIFF,
-        .cfg = config(), .col_protect = 1100,
+        .cfg = config(), .col_protect = 1100, .peak_min = SH_PEAK_NONE,
         .name = "solar-heater", .version = "0.1.0", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
     };
     return s;
@@ -50,8 +53,10 @@ static void test_status(void)
     CHECK(strcmp(json(&s),
         "{\"name\":\"solar-heater\",\"fw\":\"0.1.0\","
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
-        "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\"],"
+        "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\","
+        "\"clock\",\"timezone\",\"run_today\",\"chart\",\"learned\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
+        "\"run\":[0,0,0],\"clock\":{\"set\":0,\"ok\":0,\"min\":0},\"tz\":-1,\"peak\":null,"
         "\"set\":{\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
         "\"c_lo\":{\"v\":25,\"min\":10,\"max\":80,\"step\":1},"
         "\"d_on\":{\"v\":6,\"min\":5,\"max\":20,\"step\":1},"
@@ -106,6 +111,31 @@ static void test_status_values(void)
     s.test_on = true;
     s.test_left_s = 245;
     HAS(&s, "\"test\":1,\"left\":245,");
+
+    /* the clock, the time zone, the collector peak, the pump today */
+    s = status();
+    s.clock_set = true;
+    s.clock_min = 14 * 60 + 32;
+    HAS(&s, "\"clock\":{\"set\":1,\"ok\":0,\"min\":872},");
+    s.clock_ok = true;
+    s.cfg.tz = (int16_t)sh_zone_find("Europe/Sofia");
+    s.peak_min = 13 * 60 + 10;
+    s.peak_in = true;
+    s.run_s[SH_RUN_CHARGE] = 11520;
+    s.run_s[SH_RUN_PROTECT] = 240;
+    s.run_s[SH_RUN_OTHER] = 60;
+    HAS(&s, "\"run\":[11520,240,60],\"clock\":{\"set\":1,\"ok\":1,\"min\":872},");
+    HAS(&s, "\"peak\":{\"min\":790,\"in\":1},");
+    char tz[16];
+    snprintf(tz, sizeof(tz), "\"tz\":%d,", sh_zone_find("Europe/Sofia"));
+    HAS(&s, tz);
+    s.peak_in = false;
+    HAS(&s, "\"peak\":{\"min\":790,\"in\":0},");
+
+    /* the history is a function only with its partition */
+    HAS_NOT(&s, "\"history\"");
+    s.history = true;
+    HAS(&s, "\"learned\",\"history\"],");
 
     /* the menu values with the range the others leave them; the frost switch */
     s = status();
@@ -343,8 +373,113 @@ static void test_reset(void)
     /* never without the access code */
     CHECK_EQ(sh_web_reset("what=factory", CODE, &what), SH_WEB_DENIED);
     CHECK_EQ(sh_web_reset("what=wifi&code=123456", CODE, &what), SH_WEB_DENIED);
+    CHECK_EQ(sh_web_reset("what=learned&code=" CODE, CODE, &what), SH_WEB_OK);
+    CHECK_EQ(what, SH_WEB_RESET_LEARNED);
+    CHECK_EQ(sh_web_reset("what=history&code=" CODE, CODE, &what), SH_WEB_OK);
+    CHECK_EQ(what, SH_WEB_RESET_HISTORY);
+    CHECK_EQ(sh_web_reset("what=history", CODE, &what), SH_WEB_DENIED);
     CHECK_EQ(sh_web_reset("what=homekit&code=" CODE, CODE, &what), SH_WEB_BAD);
     CHECK_EQ(sh_web_reset("code=" CODE, CODE, &what), SH_WEB_BAD);
+}
+
+/* The time zone: an index of the list, only with the access code. */
+static void test_set_zone(void)
+{
+    sh_web_config_t c = config();
+    unsigned ch = 0;
+    char body[48];
+    const int sofia = sh_zone_find("Europe/Sofia");
+    CHECK(sofia > 0);
+    snprintf(body, sizeof(body), "tz=%d&code=" CODE, sofia);
+    CHECK_EQ(sh_web_set(body, CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.tz, sofia);
+    CHECK_EQ(ch, SH_WEB_CH_TZ);
+    CHECK_EQ(sh_web_set("tz=0&code=" CODE, CODE, &c, &ch), SH_WEB_OK);     /* UTC, confirmed */
+    CHECK_EQ(c.tz, 0);
+
+    c = config();
+    snprintf(body, sizeof(body), "tz=%d", sofia);
+    CHECK_EQ(sh_web_set(body, CODE, &c, &ch), SH_WEB_DENIED);
+    snprintf(body, sizeof(body), "tz=%d&code=000000", sofia);
+    CHECK_EQ(sh_web_set(body, CODE, &c, &ch), SH_WEB_DENIED);
+    snprintf(body, sizeof(body), "tz=%d&code=" CODE, sh_zone_count);
+    CHECK_EQ(sh_web_set(body, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(sh_web_set("tz=-1&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(sh_web_set("tz=Europe&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(c.tz, SH_ZONE_NONE);               /* nothing changed */
+
+    /* the names for the page, in the order of the list */
+    static char json[SH_WEB_ZONES_MAX];
+    const int len = sh_web_zones_json(json, sizeof(json));
+    CHECK(len > 0 && len == (int)strlen(json));
+    CHECK(strncmp(json, "[\"UTC\",\"Africa/Cairo\",", 22) == 0);
+    CHECK(strstr(json, ",\"Europe/Sofia\",") != NULL);
+    CHECK(json[len - 1] == ']');
+    CHECK_EQ(sh_web_zones_json(json, 100), -1);
+}
+
+/* The clock of the browser: seconds since 1970, no access code. */
+static void test_time(void)
+{
+    uint32_t t = 0;
+    CHECK_EQ(sh_web_time("t=1794484800", &t), SH_WEB_OK);
+    CHECK_EQ(t, 1794484800u);
+    CHECK_EQ(sh_web_time("code=" CODE "&t=1704067200", &t), SH_WEB_OK);    /* 2024-01-01 */
+    CHECK_EQ(t, 1704067200u);
+    CHECK_EQ(sh_web_time("t=4294967295", &t), SH_WEB_OK);
+    t = 7;
+    CHECK_EQ(sh_web_time("t=1704067199", &t), SH_WEB_BAD);     /* a browser without a clock */
+    CHECK_EQ(sh_web_time("t=4294967296", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("t=0", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("t=-1794484800", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("t=1794484800x", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("t=", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("time=1794484800", &t), SH_WEB_BAD);
+    CHECK_EQ(sh_web_time("", &t), SH_WEB_BAD);
+    CHECK_EQ(t, 7);
+}
+
+/* The day chart and the last days. */
+static void test_history(void)
+{
+    static char json[SH_WEB_HISTORY_MAX];
+    const sh_hist_point_t pts[] = {
+        { .x = 10, .t_col = 52, .t_tank = 418 },
+        { .x = 20, .t_col = SH_TEMP_INVALID, .t_tank = -5, .run_s = { 600, 0, 0 } },
+        { .x = 30, .t_col = 1105, .t_tank = SH_TEMP_INVALID, .run_s = { 100, 440, 60 } },
+    };
+    const sh_hist_day_t days[] = {
+        { .day = sh_clock_day(2026, 11, 11), .col_max = 783, .col_min = -21, .tank_max = 624,
+          .tank_min = 407, .run_min = { 192, 4, 1 }, .alarms = SH_ALARM_BIT(SH_ALARM_E1) |
+          SH_ALARM_BIT(SH_ALARM_HOT), .peak_min = 790 },
+        { .day = sh_clock_day(2026, 11, 10), .col_max = SH_TEMP_INVALID, .col_min = SH_TEMP_INVALID,
+          .tank_max = SH_TEMP_INVALID, .tank_min = SH_TEMP_INVALID, .peak_min = SH_PEAK_NONE },
+    };
+    int len = sh_web_history_json(json, sizeof(json), pts, 3, true, days, 2);
+    CHECK_EQ(len, (int)strlen(json));
+    CHECK(strcmp(json,
+        "{\"day\":1,\"pts\":[[10,52,418,0,0,0],[20,null,-5,600,0,0],[30,1105,null,100,440,60]],"
+        "\"days\":[{\"d\":\"2026-11-11\",\"t\":[783,-21,624,407],\"run\":[192,4,1],"
+        "\"al\":[\"E1\",\"Hot\"]},"
+        "{\"d\":\"2026-11-10\",\"t\":[null,null,null,null],\"run\":[0,0,0],\"al\":[]}]}") == 0);
+
+    len = sh_web_history_json(json, sizeof(json), pts, 0, false, days, 0);
+    CHECK(len > 0 && strcmp(json, "{\"day\":0,\"pts\":[],\"days\":[]}") == 0);
+
+    /* the longest answer fits the buffer: 144 points and 7 days with every code */
+    static sh_hist_point_t full[SH_HIST_SLOTS];
+    sh_hist_day_t week[SH_HIST_WEB_DAYS];
+    for (int i = 0; i < SH_HIST_SLOTS; i++) {
+        full[i] = (sh_hist_point_t){ .x = -1430, .t_col = -1234, .t_tank = -1234, .run_s = { 600, 600, 600 } };
+    }
+    for (int i = 0; i < SH_HIST_WEB_DAYS; i++) {
+        week[i] = (sh_hist_day_t){ .day = 65000, .col_max = -1234, .col_min = -1234, .tank_max = -1234,
+                                   .tank_min = -1234, .run_min = { 1440, 1440, 1440 },
+                                   .alarms = (1u << SH_ALARM_COUNT) - 1 };
+    }
+    len = sh_web_history_json(json, sizeof(json), full, SH_HIST_SLOTS, false, week, SH_HIST_WEB_DAYS);
+    CHECK(len > 0 && len == (int)strlen(json));
+    CHECK_EQ(sh_web_history_json(json, 64, full, SH_HIST_SLOTS, false, week, SH_HIST_WEB_DAYS), -1);
 }
 
 int main(void)
@@ -358,5 +493,8 @@ int main(void)
     test_code();
     test_pump_test();
     test_reset();
+    test_set_zone();
+    test_time();
+    test_history();
     return test_summary("test_web");
 }

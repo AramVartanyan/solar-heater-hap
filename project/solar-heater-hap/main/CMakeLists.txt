@@ -17,6 +17,10 @@ idf_component_register(
         "sh_installer.c"
         "sh_installer_store.c"
         "sh_reset.c"
+        "sh_clock.c"
+        "sh_clock_sync.c"
+        "sh_history.c"
+        "sh_history_store.c"
         "sh_web_api.c"
         "sh_web.c"
         "sh_menu.c"
@@ -27,6 +31,7 @@ idf_component_register(
     REQUIRES
         # ESP-IDF
         driver esp_timer nvs_flash esp_wifi esp_event esp_netif esp_app_format esp_http_server
+        esp_partition lwip
         # project/common (git submodules)
         button outputwrite captive-wifi container_nvs general-ota esp_tm1637 ds18b20
         # managed components (idf_component.yml)

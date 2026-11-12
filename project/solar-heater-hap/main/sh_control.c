@@ -14,6 +14,8 @@
 #include "sh_ind.h"
 #include "sh_settings_store.h"
 #include "sh_installer_store.h"
+#include "sh_clock_sync.h"
+#include "sh_history_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -191,6 +193,21 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
                          (alarms & bit) ? "active" : "cleared", col, tank);
             }
         }
+    }
+
+    /* the day chart, the day and the time zone check; the clock for the rest of the logic */
+    sh_clock_now_t clock;
+    sh_clock_now(&clock);
+    const sh_hist_in_t hin = {
+        .now_s = now,
+        .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .pump_on = pump->on, .reason = pump->reason, .alarms = alarms,
+        .clock_set = clock.set, .day = clock.day, .sec = clock.sec,
+        .zone_confirmed = clock.zone != SH_ZONE_NONE,
+    };
+    const bool reliable = sh_history_step(&hin);
+    if (clock.set != st.clock_set || reliable != st.clock_reliable) {
+        sh_state_set_clock(clock.set, reliable);
     }
 
     /* status LED: computed only when its inputs change */

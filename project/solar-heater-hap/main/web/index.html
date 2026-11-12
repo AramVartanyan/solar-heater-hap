@@ -63,13 +63,19 @@ section{display:none}section.on{display:block}
 .box p{margin:0;padding:20px 18px;font-size:16px}
 .box div{display:flex;border-top:.5px solid var(--sep)}
 .box button{flex:1;border:0;background:none;font:inherit;font-size:17px;color:var(--blue);padding:12px;cursor:pointer}
+.chart{padding:10px 8px 6px}.chart svg{display:block;width:100%;height:auto}
+.chart text{font-size:9px;fill:var(--sub)}
+.leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub);padding:6px 6px 2px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#days td,#days th{padding:8px 5px;font-size:14px;white-space:nowrap}
+a.row{text-decoration:none}
 .box button+button{border-left:.5px solid var(--sep);font-weight:600;color:var(--red)}
 </style></head><body>
 <div class="wrap">
 <div class="warn hide" id="offline" data-t="offline"></div>
 <div class="top">
  <div><h1 data-t="title"></h1>
- <p class="dev"><span id="dev"></span><span data-f="season"> · <span data-t="season"></span> —</span><span data-f="clock"> · --:--</span></p></div>
+ <p class="dev"><span id="dev"></span><span data-f="season"> · <span data-t="season"></span> —</span><span data-f="clock"> · <span id="hd-t">--:--</span></span></p></div>
  <div class="lang">
   <button id="l-bg" title="Български"><svg viewBox="0 0 5 3"><path fill="#fff" d="M0 0h5v3H0z"/><path fill="#00966E" d="M0 1h5v1H0z"/><path fill="#D62612" d="M0 2h5v1H0z"/></svg></button>
   <button id="l-en" title="English"><svg viewBox="0 0 60 36"><path fill="#012169" d="M0 0h60v36H0z"/><path d="M0 0l60 36M60 0L0 36" stroke="#fff" stroke-width="7"/><path d="M0 0l60 36M60 0L0 36" stroke="#C8102E" stroke-width="3"/><path d="M30 0v36M0 18h60" stroke="#fff" stroke-width="12"/><path d="M30 0v36M0 18h60" stroke="#C8102E" stroke-width="7"/></svg></button>
@@ -86,16 +92,21 @@ section{display:none}section.on{display:block}
  <h2 data-t="pump"></h2>
  <div class="grp">
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
-  <div class="row" data-f="run_today"><span data-t="today"></span><span class="v">—</span></div>
+  <div class="row" data-f="run_today"><span data-t="today"></span><span class="v" id="run-v">—</span></div>
  </div>
  <h2 data-t="chart" data-f="chart"></h2>
- <div class="grp" data-f="chart"><div class="row"><span data-t="chart_d"></span><span class="v">—</span></div></div>
+ <div class="grp chart" data-f="chart"><svg id="chart" viewBox="0 0 320 156" role="img"></svg>
+  <div class="leg"><span><i style="background:var(--red)"></i><span data-t="col"></span></span><span><i style="background:var(--blue)"></i><span data-t="tank"></span></span><span><i style="background:var(--green)"></i><span data-t="k_charge"></span></span><span><i style="background:var(--orange)"></i><span data-t="k_prot"></span></span><span><i style="background:var(--sub)"></i><span data-t="k_other"></span></span></div>
+ </div>
+ <p class="note hide" id="n-chart" data-f="chart" data-t="chart_24"></p>
+ <h2 data-t="days7" data-f="history"></h2>
+ <div class="grp" data-f="history" style="padding:4px 6px"><table id="days"></table></div>
  <h2 data-t="system"></h2>
  <div class="grp">
   <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v">—</span></div>
   <div class="row" data-f="season"><span data-t="season"></span><span class="v">—</span></div>
   <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
-  <div class="row" data-f="clock"><span data-t="clock"></span><span class="v">—</span></div>
+  <div class="row" data-f="clock"><span data-t="clock"></span><span class="v" id="ck-v">—</span></div>
  </div>
 </section>
 
@@ -188,10 +199,12 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="time_place" data-f="timezone"></h2>
  <div class="grp">
-  <div class="row" data-f="timezone"><span data-t="tz"></span><span class="v">— ›</span></div>
-  <div class="row" data-f="timezone"><span data-t="peak"></span><span class="v">—</span></div>
+  <label class="row" data-f="timezone"><span data-t="tz"></span><span class="v"><select data-p id="i-tz"></select></span></label>
+  <div class="row" data-f="timezone"><span data-t="peak"></span><span class="v" id="pk-v">—</span></div>
   <div class="row" data-f="city"><span data-t="city"></span><span class="v">— ›</span></div>
  </div>
+ <p class="note hide" id="n-tz" data-f="timezone"></p>
+ <button class="btn hide" id="b-tz" data-f="timezone" data-p></button>
  <h2 data-t="fw"></h2>
  <div class="grp">
   <div class="row" data-f="fw"><span data-t="ver"></span><span class="v" id="fw-v">—</span></div>
@@ -200,13 +213,13 @@ section{display:none}section.on{display:block}
  <h2 data-f="homekit">HomeKit</h2>
  <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
  <h2 data-t="hist" data-f="history"></h2>
- <div class="grp" data-f="history"><div class="row"><span data-t="hist_dl"></span><span class="v">›</span></div></div>
+ <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download="solar-history.csv"><span data-t="hist_dl"></span><span class="v">›</span></a></div>
  <h2 data-t="reset"></h2>
  <div class="grp">
   <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi"></span><span class="v">›</span></button>
   <button class="row" data-f="homekit"><span data-t="rs_hk"></span><span class="v">›</span></button>
-  <button class="row" data-f="learned"><span data-t="rs_learn"></span><span class="v">›</span></button>
-  <button class="row" data-f="history"><span data-t="rs_hist"></span><span class="v">›</span></button>
+  <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn"></span><span class="v">›</span></button>
+  <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist"></span><span class="v">›</span></button>
   <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def"></span><span class="v">›</span></button>
   <button class="row" data-f="reset" data-p data-r="factory"><span data-t="rs_fact"></span><span class="v">›</span></button>
  </div>
@@ -226,7 +239,10 @@ const T={bg:{
 title:'Соларен контролер',offline:'Няма връзка с контролера.',
 tab1:'Състояние',tab2:'Управление',tab3:'Настройки',tab4:'Сервизни',tab5:'Система',
 temps:'Температури',tank:'Бойлер',col:'Колектор',no_sensor:'датчикът не отговаря',
-pump:'Помпа',runs:'Работи',idle:'Стои',today:'Днес',chart:'Графика',chart_d:'Температури и помпа за деня',
+pump:'Помпа',runs:'Работи',idle:'Стои',today:'Работа днес',chart:'Графика за деня',
+chart_24:'Часовникът не е сверен — графиката показва последните 24 h.',no_data:'още няма данни',
+k_charge:'зареждане',k_prot:'защита',k_other:'друго',days7:'Последните 7 дни',h_day:'Ден',
+ck_ok:'надежден',ck_bad:'ненадежден',ck_unset:'несверен',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора, нощем охлажда бойлера. Изключва се само ръчно.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
@@ -245,10 +261,14 @@ calc:'Изчислено',boil:'Точка на кипене',cap:'Защита 
 no_start:'Забрана за пускане над',vac_limit:'Праг във ваканция',frost_below:'Защита от замръзване под',
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
 net:'Мрежа',ip:'IP адрес',time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
+tz_none:'не е потвърдена (UTC)',tz_un:'Часовата зона не е потвърдена — часовникът работи по UTC.',
+tz_phone:'Часовата зона на това устройство е {z}.',tz_use:'Задай {z}',
 fw:'Фърмуер',ver:'Версия',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
 q_wifi:'Изтриване на запазената Wi-Fi мрежа? Контролерът ще се рестартира и ще отвори своята мрежа за настройка.',
+q_learned:'Изтриване на научените стойности? Проверката на часовата зона започва отначало.',
+q_history:'Изтриване на историята (дневните обобщения)?',
 q_defaults:'Връщане на всички параметри (потребителски и сервизни) към стойностите по подразбиране?',
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
@@ -271,7 +291,10 @@ r_cf_wait:'изчакване до следващата проба (повред
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
 temps:'Temperatures',tank:'Tank',col:'Collector',no_sensor:'sensor not answering',
-pump:'Pump',runs:'Running',idle:'Stopped',today:'Today',chart:'Chart',chart_d:'Temperatures and pump today',
+pump:'Pump',runs:'Running',idle:'Stopped',today:'Run time today',chart:'Chart of the day',
+chart_24:'The clock is not set — the chart shows the last 24 h.',no_data:'no data yet',
+k_charge:'charging',k_prot:'protection',k_other:'other',days7:'Last 7 days',h_day:'Day',
+ck_ok:'reliable',ck_bad:'unreliable',ck_unset:'not set',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'Protects the collector by day, cools the tank at night. Switched off by hand only.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
@@ -290,10 +313,14 @@ calc:'Computed',boil:'Boiling point',cap:'Collector protection (ceiling)',prot:'
 no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost protection below',
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
 net:'Network',ip:'IP address',time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
+tz_none:'not confirmed (UTC)',tz_un:'The time zone is not confirmed — the clock runs on UTC.',
+tz_phone:'The time zone of this device is {z}.',tz_use:'Set {z}',
 fw:'Firmware',ver:'Version',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
 q_wifi:'Erase the stored Wi-Fi network? The controller will restart and open its own setup network.',
+q_learned:'Erase the learned values? The time zone check starts again.',
+q_history:'Erase the history (the daily summaries)?',
 q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
@@ -314,9 +341,15 @@ r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
-let S=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
+let S=null,H=null,Z=[],lang,code='',unlocked=false,leftAt=0,toastT=0;
 const t=k=>T[lang][k]||k;
 const deg=v=>(v/10).toFixed(1).replace('-','−');
+const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const dur=m=>m<60?m+' min':Math.floor(m/60)+' h '+m%60+' min';
+const el=(tag,txt)=>{const e=document.createElement(tag);e.textContent=txt;return e};
+/* the zone of the browser, as the controller names it (-1: not in its list) */
+const ALIAS={'Europe/Kiev':'Europe/Kyiv','Asia/Calcutta':'Asia/Kolkata','Etc/UTC':'UTC','Etc/GMT':'UTC','GMT':'UTC'};
+function myZone(){try{const z=Intl.DateTimeFormat().resolvedOptions().timeZone;return Z.indexOf(ALIAS[z]||z)}catch(e){return -1}}
 
 /* The only place that greys out: every element names its function (data-f); the ones the
    firmware does not list are dimmed and cannot be used. */
@@ -338,7 +371,7 @@ function lock(on){
 async function post(url,data,quiet){
  const b=new URLSearchParams(data);if(code)b.set('code',code);
  try{const r=await fetch(url,{method:'POST',body:b});
-  if(r.status==403){lock(true);quiet||toast(t('bad_code'))}else if(!r.ok)toast(t('bad'));
+  if(r.status==403){lock(true);quiet||toast(t('bad_code'))}else if(!r.ok)quiet||toast(t('bad'));
   return r.ok}
  catch(e){offline(true);return false}
 }
@@ -385,7 +418,48 @@ function render(){
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
  $('#n-wifi').textContent=S.net.ssid?S.net.ssid+' · '+String(S.net.rssi).replace('-','−')+' dBm':'—';
  $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;
+ $('#hd-t').textContent=S.clock.set?hm(S.clock.min):'--:--';
+ $('#ck-v').textContent=S.clock.set?hm(S.clock.min)+' · '+t(S.clock.ok?'ck_ok':'ck_bad'):t('ck_unset');
+ $('#run-v').textContent=dur(Math.round((S.run[0]+S.run[1]+S.run[2])/60));
+ $('#pk-v').textContent=S.peak?hm(S.peak.min)+(S.peak.in?' ✓':' ✗'):t('no_data');
+ const z=$('#i-tz');if(document.activeElement!=z){z.textContent='';
+  if(S.tz<0){const o=el('option',t('tz_none'));o.value=-1;z.append(o)}
+  Z.forEach((n,i)=>{const o=el('option',n);o.value=i;z.append(o)});z.value=S.tz}
+ const mz=myZone(),sug=mz>=0&&mz!=S.tz,nz=$('#n-tz'),bz=$('#b-tz');
+ nz.classList.toggle('hide',!sug&&S.tz>=0);bz.classList.toggle('hide',!sug);
+ nz.textContent=(S.tz<0?t('tz_un')+' ':'')+(sug?t('tz_phone').replace('{z}',Z[mz]):'');
+ if(sug)bz.textContent=t('tz_use').replace('{z}',Z[mz]);
+ draw();
 }
+/* The chart of the day: the collector and the tank every 10 min, below them when the pump ran
+   (by kind). A point: [x, collector, tank, charging s, protection s, other s]; x is the end of
+   its interval — minute of the day, or minutes ago while the clock is not set. */
+function draw(){
+ if(!H)return;
+ const P=H.pts,X0=28,X1=314,Y0=8,Y1=112,B0=122,BH=12,W=X1-X0;
+ let lo=1e9,hi=-1e9;P.forEach(p=>[p[1],p[2]].forEach(v=>{if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v)}}));
+ if(lo>hi){lo=200;hi=800}
+ lo=Math.floor(lo/100)*100;const st=100*Math.max(1,Math.ceil((hi-lo)/400));hi=lo+st*Math.max(2,Math.ceil((hi-lo)/st));
+ const x=m=>X0+(H.day?m:1440-m)/1440*W,y=v=>Y1-(v-lo)/(hi-lo)*(Y1-Y0),f=n=>n.toFixed(1);
+ let s='';
+ for(let v=lo;v<=hi;v+=st)s+='<path d="M'+X0+' '+f(y(v))+'H'+X1+'" style="stroke:var(--sep);stroke-width:.5"/><text x="'+(X0-4)+'" y="'+f(y(v)+3)+'" text-anchor="end">'+String(v/10).replace('-','−')+'°</text>';
+ for(let h=0;h<=24;h+=6)s+='<text x="'+f(X0+h/24*W)+'" y="'+(B0+BH+12)+'" text-anchor="'+(h?h<24?'middle':'end':'start')+'">'+(H.day?String(h).padStart(2,'0'):h<24?'−'+(24-h)+(h?'':' h'):'0')+'</text>';
+ s+='<rect x="'+X0+'" y="'+B0+'" width="'+W+'" height="'+BH+'" rx="2" style="fill:var(--off)"/>';
+ const C=['var(--green)','var(--orange)','var(--sub)'],w=W/144;
+ P.forEach(p=>{let a=Math.max(X0,x(p[0])-w);for(let k=0;k<3;k++){const d=Math.min(p[3+k],600)/600*w;
+  if(d>0){s+='<rect x="'+f(a)+'" y="'+B0+'" width="'+f(d)+'" height="'+BH+'" style="fill:'+C[k]+'" shape-rendering="crispEdges"/>';a+=d}}});
+ [[1,'var(--red)'],[2,'var(--blue)']].forEach(([i,c])=>{let d='',up=true;
+  P.forEach(p=>{if(p[i]==null)up=true;else{d+=(up?'M':'L')+f(x(p[0]))+' '+f(y(p[i]));up=false}});
+  if(d)s+='<path d="'+d+'" style="fill:none;stroke:'+c+';stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round"/>'});
+ if(!P.length)s+='<text x="'+(X0+W/2)+'" y="'+(Y0+Y1)/2+'" text-anchor="middle" style="font-size:12px">'+t('no_data')+'</text>';
+ $('#chart').innerHTML=s;$('#n-chart').classList.toggle('hide',!!H.day);
+ const tb=$('#days'),tv=v=>v==null?'—':Math.round(v/10),row=(tag,c)=>{const r=document.createElement('tr');c.forEach(x=>r.append(el(tag,x)));tb.append(r);return r};
+ tb.textContent='';row('th',[t('h_day'),t('col')+' °C',t('tank')+' °C',t('pump'),'']);
+ H.days.forEach(d=>row('td',[d.d.slice(8)+'.'+d.d.slice(5,7),(tv(d.t[0])+' / '+tv(d.t[1])).replace(/-/g,'−'),
+  (tv(d.t[2])+' / '+tv(d.t[3])).replace(/-/g,'−'),dur(d.run[0]+d.run[1]+d.run[2]),d.al.join(' ')]));
+ if(!H.days.length)row('td',[t('no_data')]).firstChild.colSpan=5;
+}
+async function hist(){try{const r=await fetch('/api/history');if(r.ok){H=await r.json();draw()}}catch(e){}}
 function ask(q){return new Promise(res=>{
  $('#dlg-q').textContent=q;$('#dlg').classList.remove('hide');
  const end=v=>{$('#dlg').classList.add('hide');res(v)};
@@ -400,6 +474,8 @@ $$('[data-k]').forEach(e=>e.onchange=async()=>{
  if(e.value!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
 $('#i-fluid').onchange=async e=>{const v=+e.target.value;e.target.blur();
  await post('/api/set',v?{fluid:1,glycol:S.inst.glycol.v}:{fluid:0});refresh()};
+$('#i-tz').onchange=async e=>{const v=+e.target.value;e.target.blur();if(v>=0)await post('/api/set',{tz:v});refresh()};
+$('#b-tz').onclick=async()=>{await post('/api/set',{tz:myZone()});refresh()};
 $('#sw-fro').onclick=async()=>{await post('/api/set',{fro:S&&S.fro?0:1});refresh()};
 [['#b-start','start'],['#b-plus','plus'],['#b-minus','minus'],['#b-stop','stop']].forEach(([s,c])=>
  $(s).onclick=async()=>{await post('/api/test',{cmd:c});setTimeout(refresh,300)});
@@ -408,12 +484,17 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
  code=v;if(await post('/api/auth',{})){document.cookie='code='+v+';max-age=31536000;path=/';
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
- if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(w=='defaults'?'done':'restart'));refresh()}});
+ if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(w=='wifi'||w=='factory'?'restart':'done'));refresh();hist()}});
 
 let l='';try{l=localStorage.getItem('lang')}catch(e){}
 setLang(l||((navigator.language||'').toLowerCase().startsWith('bg')?'bg':'en'));
 code=cookie();
-(async()=>{if(code&&await post('/api/auth',{},1))lock(false);else lock(true);await refresh()})();
-setInterval(refresh,5000);setInterval(testText,1000);
+/* at every opening: the clock of this device (the controller takes it only if it has no fresher
+   time from the network), then the state, the zone names and the history */
+(async()=>{await post('/api/time',{t:Math.floor(Date.now()/1000)},1);
+ if(code&&await post('/api/auth',{},1))lock(false);else lock(true);
+ try{const r=await fetch('/api/zones');if(r.ok)Z=await r.json()}catch(e){}
+ await refresh();hist()})();
+setInterval(refresh,5000);setInterval(testText,1000);setInterval(hist,60000);
 </script>
 </body></html>

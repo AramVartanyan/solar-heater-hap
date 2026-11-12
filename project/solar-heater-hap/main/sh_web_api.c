@@ -13,7 +13,9 @@
 static const char *const FEATURES[] = {
     "alarms", "temps", "pump", "pump_test", "settings", "frost",
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
+    "clock", "timezone", "run_today", "chart", "learned",
 };
+#define FEATURE_HISTORY "history"       /* only with the "history" partition */
 
 /* ---- JSON ------------------------------------------------------------------------------- */
 
@@ -80,7 +82,7 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     for (size_t i = 0; i < sizeof(FEATURES) / sizeof(FEATURES[0]); i++) {
         put(&o, "%s\"%s\"", i ? "," : "", FEATURES[i]);
     }
-    put(&o, "],");
+    put(&o, "%s],", s->history ? ",\"" FEATURE_HISTORY "\"" : "");
 
     put_temp(&o, "tank", s->t_tank, s->tank_fault);
     put_temp(&o, "col", s->t_col, s->col_fault);
@@ -94,6 +96,15 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
         }
     }
     put(&o, "],\"test\":%d,\"left\":%lu,", s->test_on, (unsigned long)s->test_left_s);
+    put(&o, "\"run\":[%lu,%lu,%lu],", (unsigned long)s->run_s[SH_RUN_CHARGE],
+        (unsigned long)s->run_s[SH_RUN_PROTECT], (unsigned long)s->run_s[SH_RUN_OTHER]);
+    put(&o, "\"clock\":{\"set\":%d,\"ok\":%d,\"min\":%u},\"tz\":%d,", s->clock_set, s->clock_ok,
+        s->clock_min, s->cfg.tz);
+    if (s->peak_min == SH_PEAK_NONE) {
+        put(&o, "\"peak\":null,");
+    } else {
+        put(&o, "\"peak\":{\"min\":%u,\"in\":%d},", s->peak_min, s->peak_in);
+    }
 
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
@@ -122,6 +133,73 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ip);
     put(&o, ",\"rssi\":%d}}", s->rssi);
 
+    return o.full ? -1 : (int)o.len;
+}
+
+static void put_temp_item(out_t *o, int16_t t)
+{
+    if (t == SH_TEMP_INVALID) {
+        put(o, "null,");
+    } else {
+        put(o, "%d,", t);
+    }
+}
+
+int sh_web_history_json(char *buf, size_t size, const sh_hist_point_t *pts, int n, bool day,
+                        const sh_hist_day_t *days, int n_days)
+{
+    out_t o = { .buf = buf, .size = size };
+    if (size == 0) {
+        return -1;
+    }
+    put(&o, "{\"day\":%d,\"pts\":[", day);
+    for (int i = 0; i < n; i++) {
+        put(&o, "%s[%d,", i ? "," : "", pts[i].x);
+        put_temp_item(&o, pts[i].t_col);
+        put_temp_item(&o, pts[i].t_tank);
+        put(&o, "%u,%u,%u]", pts[i].run_s[SH_RUN_CHARGE], pts[i].run_s[SH_RUN_PROTECT],
+            pts[i].run_s[SH_RUN_OTHER]);
+    }
+    put(&o, "],\"days\":[");
+    for (int i = 0; i < n_days; i++) {
+        const sh_hist_day_t *d = &days[i];
+        int y, m, md;
+        sh_clock_date(d->day, &y, &m, &md);
+        put(&o, "%s{\"d\":\"%04d-%02d-%02d\",\"t\":[", i ? "," : "", y, m, md);
+        put_temp_item(&o, d->col_max);
+        put_temp_item(&o, d->col_min);
+        put_temp_item(&o, d->tank_max);
+        if (d->tank_min == SH_TEMP_INVALID) {
+            put(&o, "null");
+        } else {
+            put(&o, "%d", d->tank_min);
+        }
+        put(&o, "],\"run\":[%u,%u,%u],\"al\":[", d->run_min[SH_RUN_CHARGE], d->run_min[SH_RUN_PROTECT],
+            d->run_min[SH_RUN_OTHER]);
+        bool first = true;
+        for (int a = 0; a < SH_ALARM_COUNT; a++) {
+            if (d->alarms & SH_ALARM_BIT(a)) {
+                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+                first = false;
+            }
+        }
+        put(&o, "]}");
+    }
+    put(&o, "]}");
+    return o.full ? -1 : (int)o.len;
+}
+
+int sh_web_zones_json(char *buf, size_t size)
+{
+    out_t o = { .buf = buf, .size = size };
+    if (size == 0) {
+        return -1;
+    }
+    put(&o, "[");
+    for (int i = 0; i < sh_zone_count; i++) {
+        put(&o, "%s\"%s\"", i ? "," : "", sh_zones[i].name);
+    }
+    put(&o, "]");
     return o.full ? -1 : (int)o.len;
 }
 
@@ -258,6 +336,14 @@ sh_web_res_t sh_web_set(const char *body, const char *code, sh_web_config_t *cfg
                 known = true;
             }
         }
+        if (!known && strcmp(key, "tz") == 0) {
+            if (v < 0 || v >= sh_zone_count) {
+                return SH_WEB_BAD;
+            }
+            c.tz = v;               /* also the zone in use: this confirms it */
+            ch |= SH_WEB_CH_TZ;
+            known = true;
+        }
         if (!known) {
             return SH_WEB_BAD;
         }
@@ -265,10 +351,10 @@ sh_web_res_t sh_web_set(const char *body, const char *code, sh_web_config_t *cfg
     if (p == NULL || ch == 0) {
         return SH_WEB_BAD;                  /* malformed form, or nothing to set */
     }
+    if ((ch & (SH_WEB_CH_INSTALLER | SH_WEB_CH_TZ)) && !sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
     if (ch & SH_WEB_CH_INSTALLER) {
-        if (!sh_web_code_ok(body, code)) {
-            return SH_WEB_DENIED;
-        }
         if (c.inst.v[SH_INST_FLUID] == SH_FLUID_WATER && !glycol_given) {
             c.inst.v[SH_INST_GLYCOL] = 0;   /* water has no glycol */
         }
@@ -309,6 +395,10 @@ sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *wh
     }
     if (strcmp(v, "wifi") == 0) {
         *what = SH_WEB_RESET_WIFI;
+    } else if (strcmp(v, "learned") == 0) {
+        *what = SH_WEB_RESET_LEARNED;
+    } else if (strcmp(v, "history") == 0) {
+        *what = SH_WEB_RESET_HISTORY;
     } else if (strcmp(v, "defaults") == 0) {
         *what = SH_WEB_RESET_DEFAULTS;
     } else if (strcmp(v, "factory") == 0) {
@@ -317,6 +407,23 @@ sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *wh
         return SH_WEB_BAD;
     }
     return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
+}
+
+#define TIME_MIN        1704067200L     /* 2024-01-01: an earlier browser clock is not a clock */
+
+sh_web_res_t sh_web_time(const char *body, uint32_t *epoch_s)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "t", v) || v[0] < '0' || v[0] > '9') {
+        return SH_WEB_BAD;
+    }
+    char *end;
+    const long long t = strtoll(v, &end, 10);
+    if (*end != '\0' || t < TIME_MIN || t > UINT32_MAX) {
+        return SH_WEB_BAD;
+    }
+    *epoch_s = (uint32_t)t;
+    return SH_WEB_OK;
 }
 
 const char *sh_web_reason_key(sh_pump_reason_t reason)

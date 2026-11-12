@@ -6,9 +6,13 @@
  *
  *   GET  /            the page
  *   GET  /api/state   status (sh_web_api: JSON)
- *   POST /api/set     settings; the installer data only with the access code
+ *   GET  /api/history the day chart and the last daily summaries (JSON)
+ *   GET  /api/history.csv   all daily summaries as a file
+ *   GET  /api/zones   the names of the time zones (JSON)
+ *   POST /api/set     settings; the installer data and the time zone only with the access code
  *   POST /api/test    pump test: start, +60 s, -60 s, stop (as the buttons)
- *   POST /api/reset   Wi-Fi, default settings, factory — with the access code
+ *   POST /api/reset   Wi-Fi, learned values, history, default settings, factory — with the code
+ *   POST /api/time    the clock of the browser (sh_clock_sync decides whether to take it)
  *   POST /api/auth    checks the access code (the page asks once and keeps it)
  * Answers of the POSTs: 200, 400 (bad request, nothing changed), 403 (access code).
  * The access code: the last 6 characters of the setup network name ("SOLAR-810841" -> 810841). */

@@ -62,3 +62,11 @@ void sh_state_set_alarms(uint8_t alarms)
     s_state.alarms = alarms;
     xSemaphoreGive(s_lock);
 }
+
+void sh_state_set_clock(bool set, bool reliable)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.clock_set = set;
+    s_state.clock_reliable = reliable;
+    xSemaphoreGive(s_lock);
+}
