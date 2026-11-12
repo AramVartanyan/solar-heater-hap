@@ -175,21 +175,31 @@ bool sh_hist_open(sh_hist_t *h, const sh_hist_flash_t *f)
 
 bool sh_hist_append(sh_hist_t *h, const sh_hist_rec_t *r)
 {
-    const uint32_t i = h->head;
     const uint32_t per_sector = h->f->sector / SH_HIST_REC_SIZE;
     bool ok = true;
-    sh_hist_rec_t old;
-    if (read_slot(h, i, &old, &ok) != SH_HIST_EMPTY) {
-        ok = erase_sector_of(h, i);         /* unknown content where the head was found */
+    /* A place that is not empty (a bit lost in the free area, a record cut by a power failure)
+     * cannot be written over: it is left as it is (skipped as damaged) and the next place is taken.
+     * Erasing its sector instead would lose the valid records next to it. */
+    for (uint32_t tries = 0; tries < h->slots; tries++) {
+        const uint32_t i = h->head;
+        h->head = (i + 1) % h->slots;
+        if ((i + 1) % per_sector == 0) {
+            ok = erase_sector_of(h, h->head) && ok;     /* an empty record after the newest */
+        }
+        bool read_ok = true;
+        sh_hist_rec_t old;
+        const sh_hist_slot_t slot = read_slot(h, i, &old, &read_ok);
+        if (!read_ok) {
+            return false;
+        }
+        if (slot != SH_HIST_EMPTY) {
+            continue;
+        }
+        uint8_t buf[SH_HIST_REC_SIZE];
+        sh_hist_encode(r, buf);
+        return h->f->write(h->f->ctx, i * SH_HIST_REC_SIZE, buf, sizeof(buf)) && ok;
     }
-    if ((i + 1) % per_sector == 0) {
-        ok = erase_sector_of(h, (i + 1) % h->slots) && ok;  /* an empty record after the newest */
-    }
-    uint8_t buf[SH_HIST_REC_SIZE];
-    sh_hist_encode(r, buf);
-    ok = h->f->write(h->f->ctx, i * SH_HIST_REC_SIZE, buf, sizeof(buf)) && ok;
-    h->head = (i + 1) % h->slots;
-    return ok;
+    return false;
 }
 
 bool sh_hist_clear(sh_hist_t *h)

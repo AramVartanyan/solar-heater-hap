@@ -65,6 +65,18 @@ const sh_tz_t sh_tz_list[] = {
     { "Africa/Johannesburg",    "SAST-2" },
     { "Australia/Sydney",       "AEST-10AEDT,M10.1.0,M4.1.0/3" },
     { "Australia/Perth",        "AWST-8" },
+    { "Asia/Karachi",           "PKT-5" },              /* the rest of this group: step 9, from the */
+    { "Asia/Dhaka",             "<+06>-6" },            /* other experiment variant (PR #35); the  */
+    { "Asia/Bangkok",           "<+07>-7" },            /* rules shared by both lists are the same */
+    { "Asia/Seoul",             "KST-9" },
+    { "Asia/Tehran",            "<+0330>-3:30" },
+    { "Africa/Cairo",           "EET-2EEST,M4.5.5/0,M10.5.4/24" },
+    { "Africa/Lagos",           "WAT-1" },
+    { "Africa/Nairobi",         "EAT-3" },
+    { "Australia/Adelaide",     "ACST-9:30ACDT,M10.1.0,M4.1.0/3" },
+    { "Australia/Brisbane",     "AEST-10" },
+    { "Pacific/Auckland",       "NZST-12NZDT,M9.5.0,M4.1.0/3" },
+    { "Pacific/Honolulu",       "HST10" },
     /* America */
     { "America/New_York",       US("EST5EDT") },
     { "America/Toronto",        US("EST5EDT") },
@@ -73,6 +85,13 @@ const sh_tz_t sh_tz_list[] = {
     { "America/Phoenix",        "MST7" },
     { "America/Los_Angeles",    US("PST8PDT") },
     { "America/Sao_Paulo",      "<-03>3" },
+    { "America/Vancouver",      US("PST8PDT") },
+    { "America/Anchorage",      US("AKST9AKDT") },
+    { "America/Halifax",        US("AST4ADT") },
+    { "America/Mexico_City",    "CST6" },
+    { "America/Bogota",         "<-05>5" },
+    { "America/Santiago",       "<-04>4<-03>,M9.1.6/24,M4.1.6/24" },
+    { "Atlantic/Reykjavik",     "GMT0" },
 };
 
 const size_t sh_tz_count = sizeof(sh_tz_list) / sizeof(sh_tz_list[0]);

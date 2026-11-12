@@ -6,15 +6,18 @@
  *            local time (00:00 - 00:10, ...) and the chart is the day from midnight; without it
  *            they follow the time since boot and the chart is the last 24 h. Lost at restart.
  *   kinds    charging (difference, minimum run time, charging with a faulty sensor) / protection
- *            (collector protection, frost protection) / other (pump test, anti-seize run, the
- *            probes with a faulty sensor)
+ *            (collector protection, frost protection, the probe at the collector emergency
+ *            temperature with a faulty tank sensor — Hot) / other (pump test, anti-seize run, the
+ *            probe with a faulty collector sensor)
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
  *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
  *            day, the minute of the collector maximum (the first one). At the first step of the
  *            next day (a normal midnight: the next date, before 01:00) the day is handed over to
  *            be written; it is full when it was collected with a set clock from midnight to
  *            midnight, otherwise partial. Any other change of the date (the clock was set to
- *            another day) drops the collected day.
+ *            another day) drops the collected day; so does a jump of the local time of more than
+ *            1 h within the day (the clock set anew) — the day goes on as partial. Up to 1 h
+ *            (daylight saving time) and small SNTP corrections the day goes on as it was.
  * Temperatures are tenths of °C, times seconds of a monotonic clock. */
 #pragma once
 
@@ -26,6 +29,7 @@
 #define SH_CHART_SLOT_S     600
 #define SH_CHART_SLOT_MIN   10
 #define SH_DAY_MIN          1440
+#define SH_DAY_JUMP_MIN     61      /* a jump of the local time beyond this (min) = the clock set anew */
 
 typedef enum {
     SH_RUN_CHARGE = 0,
@@ -85,6 +89,8 @@ typedef struct {
     uint8_t cur_idx;
     uint32_t cur_run_s[SH_RUN_KINDS];
     uint32_t last_s;            /* the previous step */
+    bool last_set;              /* the clock was set at the previous step */
+    int32_t last_local;         /* its local time, minutes since 2020-01-01 */
     int last_kind;              /* the pump kind since the previous step, -1 off */
     sh_day_sum_t sum;           /* today */
 } sh_day_t;

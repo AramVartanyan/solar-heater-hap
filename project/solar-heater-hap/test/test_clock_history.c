@@ -173,7 +173,7 @@ static void test_kinds(void)
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_FROST), SH_RUN_PROTECT);
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_TEST), SH_RUN_OTHER);
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_ANTI_SEIZE), SH_RUN_OTHER);
-    CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_TF_PROBE), SH_RUN_OTHER);
+    CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_TF_PROBE), SH_RUN_PROTECT);   /* Hot, orange */
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_CF_PROBE), SH_RUN_OTHER);
 }
 
@@ -344,6 +344,55 @@ static void test_summary_day(void)
     sh_day_init(&s_d);
     CHECK_EQ(run(0, 2 * 86400, false, 0, 0, &in), 0);
     CHECK(!s_d.sum.valid);
+}
+
+/* The local time jumps within the day (from the other experiment variant, step 9, PR #35). */
+static void test_clock_jumps(void)
+{
+    const uint16_t D = 2800;
+    sh_day_in_t in = { .t_col = 300, .t_tank = 400, .pump_on = false, .reason = SH_PUMP_REASON_DIFF };
+
+    /* from midnight; daylight saving time +1 h at 03:00, back -1 h, an SNTP correction of 30 s:
+     * the day goes on, full */
+    sh_day_init(&s_d);
+    run(0, 60, true, (uint16_t)(D - 1), 86400 - 60, &in);   /* the day before, its last minute */
+    uint32_t t = 60;
+    run(t, t + 3 * 3600, true, D, 0, &in);                  /* 00:00 - 03:00 */
+    t += 3 * 3600;
+    CHECK(s_d.sum.full);
+    run(t, t + 3600, true, D, 4 * 3600, &in);               /* spring: 03:00 -> 04:00 */
+    t += 3600;
+    CHECK(s_d.sum.valid && s_d.sum.full);
+    run(t, t + 3600, true, D, 4 * 3600, &in);               /* autumn: 05:00 -> 04:00 */
+    t += 3600;
+    CHECK(s_d.sum.full);
+    run(t, t + 600, true, D, 5 * 3600 + 30, &in);           /* SNTP: +30 s */
+    t += 600;
+    CHECK(s_d.sum.full);
+    in.t_col = 900;                                         /* a maximum at the right time */
+    run(t, t + 60, true, D, 5 * 3600 + 630, &in);
+    t += 60;
+    CHECK_EQ(s_d.sum.col_max, 900);
+
+    /* the clock set anew by 3 h within the day: the collected part is dropped, the day is partial */
+    in.t_col = 500;
+    run(t, t + 60, true, D, 9 * 3600, &in);
+    t += 60;
+    CHECK(s_d.sum.valid && !s_d.sum.full);
+    CHECK_EQ(s_d.sum.day, D);
+    CHECK_EQ(s_d.sum.col_max, 500);                         /* the 90.0 °C before the jump is gone */
+
+    /* exactly 61 min still goes on, 62 min does not */
+    sh_day_init(&s_d);
+    run(0, 60, true, (uint16_t)(D - 1), 86400 - 60, &in);
+    t = 60;
+    run(t, t + 600, true, D, 0, &in);
+    t += 600;
+    run(t, t + 60, true, D, 9 * 60 + 61 * 60, &in);        /* last step 00:09:59 -> 01:10 */
+    t += 60;
+    CHECK(s_d.sum.full);
+    run(t, t + 60, true, D, 70 * 60 + 62 * 60, &in);        /* last step 01:10:59 -> 02:12 */
+    CHECK(!s_d.sum.full);
 }
 
 /* ---- daily record, ring, CSV ------------------------------------------------------------ */
@@ -594,6 +643,65 @@ static void test_ring(void)
     CHECK_EQ(h9.head, 0);
 }
 
+/* Faults found by the other experiment variant (step 9, PR #35), on this ring. */
+static void test_ring_faults(void)
+{
+    sh_hist_t h, again;
+
+    /* a free place ahead of the head that lost a bit: the records next to it must stay */
+    memset(s_flash, 0xFF, sizeof(s_flash));
+    memset(s_erases, 0, sizeof(s_erases));
+    CHECK(sh_hist_open(&h, &FLASH));
+    for (uint16_t d = 1; d <= 300; d++) {
+        const sh_hist_rec_t r = rec(d);
+        CHECK(sh_hist_append(&h, &r));
+    }
+    s_flash[310 * SH_HIST_REC_SIZE + 3] = 0xFE;
+    memset(s_erases, 0, sizeof(s_erases));               /* the normal erases of the filling are done */
+    CHECK(sh_hist_open(&again, &FLASH));
+    CHECK_EQ(again.head, 300);
+    for (uint16_t d = 301; d <= 320; d++) {
+        const sh_hist_rec_t r = rec(d);
+        sh_hist_append(&again, &r);
+    }
+    CHECK_EQ(walk(&again, false), 320);                  /* nothing lost, the damaged place skipped */
+    CHECK_EQ(s_days.day[0], 1);
+    CHECK_EQ(s_days.day[319], 320);
+    CHECK_EQ(s_erases[2], 0);                            /* its sector (records 256 - 383) kept */
+
+    /* the power failed in the middle of a record (13 bytes written): skipped, the next one follows */
+    uint8_t b[SH_HIST_REC_SIZE];
+    const sh_hist_rec_t r321 = rec(321);
+    sh_hist_encode(&r321, b);
+    const uint32_t at = again.head;
+    memcpy(s_flash + at * SH_HIST_REC_SIZE, b, 13);
+    CHECK(sh_hist_open(&h, &FLASH));
+    CHECK_EQ(h.head, at + 1);
+    const sh_hist_rec_t r322 = rec(322);
+    CHECK(sh_hist_append(&h, &r322));
+    CHECK_EQ(walk(&h, true), 321);
+    CHECK_EQ(s_days.day[0], 322);
+    CHECK_EQ(s_days.day[1], 320);
+
+    /* years on, with a restart after every record: the restart finds what the running firmware has */
+    memset(s_flash, 0xFF, sizeof(s_flash));
+    memset(s_erases, 0, sizeof(s_erases));
+    CHECK(sh_hist_open(&h, &FLASH));
+    int bad = 0;
+    for (uint32_t d = 1; d < 3 * 2048 + 77; d++) {
+        const sh_hist_rec_t r = rec((uint16_t)d);
+        bad += !sh_hist_append(&h, &r);
+        if (!sh_hist_open(&again, &FLASH) || again.head != h.head) {
+            bad++;
+            break;
+        }
+    }
+    CHECK_EQ(bad, 0);
+    const unsigned kept = walk(&h, true);
+    CHECK(kept >= 2048 - 128 && kept <= 2047);
+    CHECK_EQ(s_days.day[0], 3 * 2048 + 76);
+}
+
 static void test_csv(void)
 {
     CHECK(strcmp(sh_hist_csv_header,
@@ -651,8 +759,10 @@ int main(void)
     test_chart_clock();
     test_chart_no_clock();
     test_summary_day();
+    test_clock_jumps();
     test_record();
     test_ring();
+    test_ring_faults();
     test_csv();
     return test_summary("test_clock_history");
 }

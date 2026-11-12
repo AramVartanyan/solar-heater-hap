@@ -16,10 +16,10 @@ int sh_run_kind(bool pump_on, sh_pump_reason_t reason)
     switch (reason) {
     case SH_PUMP_REASON_COL_PROTECT:
     case SH_PUMP_REASON_FROST:
+    case SH_PUMP_REASON_TF_PROBE:   /* the probe at the collector emergency temperature: Hot, orange */
         return SH_RUN_PROTECT;
     case SH_PUMP_REASON_TEST:
     case SH_PUMP_REASON_ANTI_SEIZE:
-    case SH_PUMP_REASON_TF_PROBE:
     case SH_PUMP_REASON_CF_PROBE:
         return SH_RUN_OTHER;
     default:                    /* difference, minimum run time, charging with a faulty sensor */
@@ -127,8 +127,16 @@ bool sh_day_step(sh_day_t *d, const sh_day_in_t *in, const sh_local_t *lt, uint3
     }
 
     if (lt->set) {
+        /* How far the local time moved against the monotonic time since the previous step: up to
+         * 1 h (daylight saving time) and the small SNTP corrections the day goes on; a bigger jump
+         * means the clock was set anew (it was wrong) and the day starts again, partial. */
+        const int32_t local = (int32_t)lt->day * SH_DAY_MIN + lt->min;
+        const int32_t moved = d->last_set ? local - d->last_local - (int32_t)((now_s - d->last_s) / 60) : 0;
+        const bool jump = moved > SH_DAY_JUMP_MIN || moved < -SH_DAY_JUMP_MIN;
         if (!d->sum.valid) {
             start_sum(&d->sum, lt->day, false);         /* the clock was set during the day */
+        } else if (jump && lt->day == d->sum.day) {
+            start_sum(&d->sum, lt->day, false);         /* set anew within the day: the part before is dropped */
         } else if (lt->day != d->sum.day) {
             const bool midnight = lt->day == d->sum.day + 1 && lt->min < 60;
             if (midnight) {
@@ -138,9 +146,11 @@ bool sh_day_step(sh_day_t *d, const sh_day_in_t *in, const sh_local_t *lt, uint3
             start_sum(&d->sum, lt->day, midnight);
         }
         take_temps(&d->sum, in, lt->min);
+        d->last_local = local;
     } else {
         d->sum.valid = false;
     }
+    d->last_set = lt->set;
 
     d->last_s = now_s;
     d->last_kind = kind;
