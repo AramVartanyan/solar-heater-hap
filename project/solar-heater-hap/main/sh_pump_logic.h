@@ -12,8 +12,14 @@
  *   4. collector protection       -> on at once (no minimum off time), also above Tmax
  *   5. frost protection           -> on at once while the collector is below the frost threshold
  *                                    and the tank is at least 5 °C
- *   6. tank Tmax                  -> normal charging off at once
- *   7. difference                 -> on / off; the only rule the minimum times apply to
+ *   6. night cooling              -> while it is allowed (sh_cool: the night after a tank above
+ *                                    Tmax or an E4, the nights of the vacation): on when the
+ *                                    collector is colder than the tank by the switch-on
+ *                                    difference, off below the switch-off difference — the same
+ *                                    thresholds, the other direction, with the minimum times
+ *   7. vacation                   -> normal charging off
+ *   8. tank Tmax                  -> normal charging off at once
+ *   9. difference                 -> on / off, with the minimum times
  * The boiling point, the ceiling of the collector protection and the frost threshold are computed
  * from the installer data (sh_installer) and come in with the parameters.
  */
@@ -52,6 +58,11 @@ typedef enum {
     SH_PUMP_REASON_CF_RUN,          /* on:  collector sensor faulty, the tank rises */
     SH_PUMP_REASON_CF_WAIT,         /* off: collector sensor faulty, waiting for the next probe */
     SH_PUMP_REASON_CF_HEATER,       /* off: collector sensor faulty, heater running, probe postponed */
+    /* group C: night cooling, vacation, air venting */
+    SH_PUMP_REASON_COOL,            /* on:  night cooling of the tank through the collector */
+    SH_PUMP_REASON_VACATION,        /* off: vacation, no normal charging */
+    SH_PUMP_REASON_AIR_RUN,         /* on:  air venting, run phase */
+    SH_PUMP_REASON_AIR_PAUSE,       /* off: air venting, pause phase */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -67,6 +78,8 @@ typedef struct {
     int16_t  col_boiling;           /* boiling point, 0.1 °C: no start at >= this, released below it - 2 K */
     bool     frost_on;              /* frost protection enabled */
     int16_t  frost;                 /* frost threshold, 0.1 °C: on below it, off at >= it + 2 K */
+    bool     cool;                  /* night cooling allowed now (sh_cool) */
+    bool     charge_off;            /* vacation: no normal charging (col_protect is the vacation limit) */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).
@@ -79,6 +92,7 @@ typedef struct {
     bool tank_max;                  /* tank reached Tmax, not yet below it - 2 K */
     bool col_protect;               /* collector protection is running the pump */
     bool frost;                     /* frost protection is running the pump */
+    bool cool;                      /* night cooling is running the pump */
 } sh_pump_state_t;
 
 /* A single-value limit with the 2 K return zone: true at t >= limit, false at t < limit - 2 K,

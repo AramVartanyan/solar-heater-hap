@@ -110,6 +110,15 @@ sh_alarm_t sh_alarm_code_at(uint8_t active, uint32_t ms)
     return SH_ALARM_COUNT;
 }
 
+unsigned sh_alarm_count(uint8_t active)
+{
+    unsigned n = 0;
+    for (int a = 0; a < SH_ALARM_COUNT; a++) {
+        n += (active >> a) & 1u;
+    }
+    return n;
+}
+
 const char *sh_alarm_name(sh_alarm_t a)
 {
     static const char *const names[SH_ALARM_COUNT] = {

@@ -12,6 +12,7 @@ void sh_state_init(void)
     memset(&s_state, 0, sizeof(s_state));
     s_state.t_col = SH_TEMP_INVALID;
     s_state.t_tank = SH_TEMP_INVALID;
+    s_state.modes.sunrise = s_state.modes.sunset = -1;
 }
 
 void sh_state_get(sh_state_t *out)
@@ -60,5 +61,19 @@ void sh_state_set_alarms(uint8_t alarms)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_state.alarms = alarms;
+    xSemaphoreGive(s_lock);
+}
+
+void sh_state_set_vacation(bool on)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.vacation = on;
+    xSemaphoreGive(s_lock);
+}
+
+void sh_state_set_modes(const sh_modes_t *modes)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.modes = *modes;
     xSemaphoreGive(s_lock);
 }

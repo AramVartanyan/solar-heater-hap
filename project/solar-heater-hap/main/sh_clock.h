@@ -22,6 +22,8 @@ typedef struct {
     time_t epoch;
     char tz[SH_TZ_NAME_MAX];
     bool tz_confirmed;
+    bool tz_dst;                /* the zone has daylight saving time ... */
+    bool dst;                   /* ... and it is in force now (with a set clock) */
     sh_peak_t peak;
 } sh_clock_info_t;
 
