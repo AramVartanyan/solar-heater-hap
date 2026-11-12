@@ -292,7 +292,7 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     bool restart = false;               /* the test or the anti-seize run just ended */
 
     /* The test, the air venting and the anti-seize run end when their time is over or when the boiling point or the
-     * tank ceiling stops them; they do not start again by themselves. A test asked for while such a
+     * tank ceiling (with a hot collector, see emergency()) stops them; they do not start again by themselves. A test asked for while such a
      * limit is active ends in the same step (refused). */
     if (c->test) {
         if (now_s < c->test_end_s && !emergency(c, col, tank, &reason)) {
