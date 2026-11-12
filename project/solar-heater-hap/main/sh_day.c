@@ -129,6 +129,9 @@ bool sh_day_step(sh_day_t *d, const sh_day_in_t *in, const sh_local_t *lt, uint3
                 d->sum.run_s[d->last_kind] += dt;
             }
         }
+        if (d->last_heater && d->sum.valid) {
+            d->sum.heater_s += dt;
+        }
         if (interval_key(lt, now_s) != d->key) {
             close_interval(d, in, now_s);
             start_interval(d, lt, now_s);
@@ -169,6 +172,7 @@ bool sh_day_step(sh_day_t *d, const sh_day_in_t *in, const sh_local_t *lt, uint3
 
     d->last_s = now_s;
     d->last_kind = kind;
+    d->last_heater = in->heater;
     return over;
 }
 

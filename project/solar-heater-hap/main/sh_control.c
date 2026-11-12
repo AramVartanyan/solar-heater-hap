@@ -19,6 +19,8 @@
 #include "sh_sun.h"
 #include "sh_season.h"
 #include "sh_cool.h"
+#include "sh_heater.h"
+#include "sh_e8.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -63,13 +65,19 @@ static sh_modes_t s_modes;
 static bool s_modes_done;
 static bool s_vacation;
 
+/* The heater, its leak, E8 (only the control task uses them) */
+static sh_heater_t s_heater;
+static sh_leak_t s_leak;
+static sh_e8_t s_e8;
+
 static QueueHandle_t s_cmds;
 
 /* The menu settings (whole K / °C; the seasonal ones of the current season), Kconfig "Control"
  * (minutes, °C) -> tenths and seconds, and the limits computed from the installer data. Read on
  * every cycle: a change applies at once. In the vacation the collector protection works at the
  * vacation limit and there is no normal charging. */
-static void get_params(sh_pump_params_t *p, const sh_settings_t *s, bool winter, const sh_limits_t *lim)
+static void get_params(sh_pump_params_t *p, const sh_settings_t *s, bool winter, const sh_limits_t *lim,
+                       const sh_installer_t *inst)
 {
     const bool vacation = s->v[SH_SET_VACATION] != 0;
     memset(p, 0, sizeof(*p));       /* padding too: the logged copy is compared by its fields only */
@@ -85,11 +93,13 @@ static void get_params(sh_pump_params_t *p, const sh_settings_t *s, bool winter,
     p->frost_on = sh_settings_frost();
     p->frost = lim->frost;
     p->charge_off = vacation;
+    p->heater_rise = sh_heater_rise(inst->v[SH_INST_HEATER], inst->v[SH_INST_TANK_VOL]);
 }
 
 static void save_learned(void)
 {
-    const sh_learned_t l = { .days = s_sun.days, .cool_offset = s_cool.offset, .cool_quiet = s_cool.quiet };
+    const sh_learned_t l = { .days = s_sun.days, .cool_offset = s_cool.offset, .cool_quiet = s_cool.quiet,
+                             .heater = s_heater.detected, .e8 = s_e8.l };
     sh_learn_save(&l);
 }
 
@@ -153,7 +163,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     }
 
     sh_pump_params_t params;
-    get_params(&params, &set, winter, &lim);
+    get_params(&params, &set, winter, &lim, &inst);
     const uint32_t test_s = (uint32_t)set.v[SH_SET_TEST_S];
     const bool vacation = params.charge_off;
     if (vacation != s_vacation) {
@@ -195,10 +205,68 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     if (s_cool.offset != was_offset) {
         ESP_LOGI(TAG, "night cooling target: learned correction %d K", s_cool.offset);
     }
+    params.cool = s_cool.trigger != SH_COOL_NONE;
+
+    /* the heater: its sign (the tank with the pump stopped, kept by sh_pump_ctl), detection with "0 kW" */
+    const int16_t power = inst.v[SH_INST_HEATER];
+    const bool heater_on = sh_pump_ctl_heater(pump);
+    if (sh_heater_step(&s_heater, power, heater_on)) {
+        ESP_LOGW(TAG, "heater detected although the installer data say 0 kW: tank %s °C",
+                 temp_str(tbuf, sizeof(tbuf), t_tank, false));
+        learned = true;
+    }
+
+    /* the leak of the heater: checks with the pump stopped outside the guaranteed daylight */
+    const int sun_rise = sh_sun_avg(s_sun.days.rise), sun_set = sh_sun_avg(s_sun.days.set);
+    const sh_leak_in_t lin = {
+        .heater = sh_heater_present(&s_heater, power), .reliable = reliable, .min = ci.lt.min,
+        .rise = sun_rise, .set = sun_set, .t_col = t_col, .pump_on = pump->on,
+        .charging = pump->on && pump->mode == SH_PUMP_MODE_NORMAL &&
+                    (pump->reason == SH_PUMP_REASON_DIFF || pump->reason == SH_PUMP_REASON_MIN_RUN),
+        .sunrise = (sun & SH_SUN_EVT_RISE) != 0,
+    };
+    sh_leak_step(&s_leak, &lin, now);
+    if (s_leak.events & SH_LEAK_EVT_CHECK) {
+        ESP_LOGI(TAG, "heater leak check: pump off for %u s, collector %s °C", SH_LEAK_CHECK_S,
+                 temp_str(tbuf, sizeof(tbuf), t_col, false));
+    }
+    if (s_leak.events & (SH_LEAK_EVT_PASS | SH_LEAK_EVT_STOP)) {
+        ESP_LOGI(TAG, "heater leak check: collector %s by %d.%d K -> %s", s_leak.last_drop >= 0 ? "fell" : "rose",
+                 abs(s_leak.last_drop) / 10, abs(s_leak.last_drop) % 10,
+                 s_leak.last_stop ? "leak of the heater stopped" : "the pump goes on");
+    }
+    if (s_leak.events & SH_LEAK_EVT_ABORT) {
+        ESP_LOGI(TAG, "heater leak check given up");
+    }
+    if (s_leak.events & SH_LEAK_EVT_END) {
+        ESP_LOGI(TAG, "heater leak stop ended: collector %s °C", temp_str(tbuf, sizeof(tbuf), t_col, false));
+    }
+    params.leak_check = s_leak.phase == SH_LEAK_CHECK;
+    params.leak_stop = s_leak.phase == SH_LEAK_STOP;
+    params.leak_resume = s_leak.resume;
+
+    /* E8: reverse thermosiphon at night */
+    const sh_e8_in_t ein = {
+        .night = sh_sun_night(&s_sun, &ci.lt, reliable), .t_col = t_col, .t_tank = t_tank, .pump_on = pump->on,
+        .heater = heater_on,
+        .threshold = sh_e8_threshold(inst.v[SH_INST_COL_TYPE] == SH_COL_TUBES, inst.v[SH_INST_COL_AREA],
+                                     inst.v[SH_INST_TANK_VOL]),
+    };
+    sh_e8_step(&s_e8, &ein, now);
+    if (s_e8.events & SH_E8_EVT_SIGN) {
+        ESP_LOGW(TAG, "reverse thermosiphon sign: tank fell %d.%d K in 1 h while the collector rose",
+                 s_e8.last_rate / 10, abs(s_e8.last_rate) % 10);
+    }
+    if (s_e8.events & SH_E8_EVT_NIGHT) {
+        ESP_LOGI(TAG, "night judged: %u night(s) with the reverse thermosiphon sign, %u normal night(s) in a row",
+                 s_e8.l.sign_nights, s_e8.l.normal_nights);
+    }
+    if (s_e8.events & SH_E8_EVT_CHANGED) {
+        learned = true;
+    }
     if (learned || (s_cool.events & SH_COOL_EVT_LEARNED)) {
         save_learned();
     }
-    params.cool = s_cool.trigger != SH_COOL_NONE;
 
     /* the computed limits: at boot and whenever the installer data change them */
     static sh_pump_params_t s_logged = { .col_boiling = INT16_MIN };
@@ -243,8 +311,13 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
             s_sun.set_pending = false;
             s_cool.offset = 0;
             s_cool.quiet = 0;
+            s_heater.detected = false;
+            for (int i = 0; i < SH_E8_DAYS; i++) {
+                s_e8.l.rate[i] = SH_E8_NO_RATE;       /* the E8 counters stay */
+            }
             sh_learn_reset();
-            ESP_LOGW(TAG, "learned values reset (sunrise / sunset, cooling target)");
+            ESP_LOGW(TAG, "learned values reset (sunrise / sunset, cooling target, detected heater, "
+                     "normal night cooling)");
             break;
         }
         if (was_test && pump->test && pump->test_end_s != was_end) {
@@ -304,6 +377,14 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     s_modes.air_on = pump->air;
     s_modes.air_start_s = pump->air ? pump->air_start_s : 0;
     s_modes.air_pause_s = pump->air ? pump->air_pause_s : 0;
+    s_modes.heater_on = heater_on;
+    s_modes.heater_det = s_heater.detected;
+    s_modes.leak = (uint8_t)s_leak.phase;
+    s_modes.leak_start_s = s_leak.phase == SH_LEAK_CHECK ? s_leak.check_s : 0;
+    s_modes.leak_last = s_leak.last;
+    s_modes.leak_last_stop = s_leak.last_stop;
+    s_modes.leak_last_drop = s_leak.last_drop;
+    s_modes.e8_normal = sh_e8_normal(&s_e8.l);
     static sh_modes_t s_published;
     if (!s_modes_done || memcmp(&s_modes, &s_published, sizeof(s_modes)) != 0) {
         sh_state_set_modes(&s_modes);
@@ -316,6 +397,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
         .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = pump->on, .reason = pump->reason,
         .col_boiling = pump->norm.col_boiling, .tank_ceiling = pump->norm.tank_ceiling,
+        .e8 = s_e8.l.active,
     };
     const uint8_t was_alarms = s_alarm.active;
     const uint8_t alarms = sh_alarm_step(&s_alarm, &ALARM_PARAMS, &ain, now);
@@ -357,10 +439,12 @@ static void control_task(void *arg)
     (void)arg;
     static sh_pump_ctl_t pump;      /* zeros: pump off since boot */
     sh_learned_t learned;
-    sh_learn_load(&learned);        /* the learned sunrises / sunsets and cooling target */
+    sh_learn_load(&learned);        /* the learned sunrises / sunsets, cooling target, heater, E8 */
     s_sun.days = learned.days;
     s_cool.offset = learned.cool_offset;
     s_cool.quiet = learned.cool_quiet;
+    s_heater.detected = learned.heater;     /* the heater detected with "0 kW" */
+    s_e8.l = learned.e8;                    /* the normal night cooling, the E8 counters and E8 */
     TickType_t next = xTaskGetTickCount();
 
     for (;;) {

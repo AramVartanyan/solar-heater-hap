@@ -27,9 +27,11 @@ static const sh_installer_t s_defaults = { .v = {
 #endif
     [SH_INST_COL_AREA] = CONFIG_SH_INST_COL_AREA_DM2,
     [SH_INST_TANK_VOL] = CONFIG_SH_INST_TANK_L,
+    [SH_INST_HEATER]   = CONFIG_SH_INST_HEATER_DKW,
 } };
 
 _Static_assert(CONFIG_SH_INST_TANK_L % 10 == 0, "Installer data: the tank volume must be a multiple of 10 l");
+_Static_assert(CONFIG_SH_INST_HEATER_DKW % 5 == 0, "Installer data: the heater power must be a multiple of 0.5 kW");
 
 static sh_installer_t s_data;
 static sh_limits_t s_limits;
@@ -41,12 +43,13 @@ static void use(const sh_installer_t *d)
     s_data = *d;
     sh_limits_calc(&s_data, &s_limits);
     ESP_LOGI(TAG, "%s, glycol %d %%, minimum pressure %d.%d bar, collector maximum %d degC; "
-             "collector: %s, %d.%d m2; tank %d l",
+             "collector: %s, %d.%d m2; tank %d l, heater %d.%d kW",
              s_data.v[SH_INST_FLUID] == SH_FLUID_GLYCOL ? "propylene glycol" : "water",
              s_data.v[SH_INST_GLYCOL], s_data.v[SH_INST_PRESSURE] / 10, s_data.v[SH_INST_PRESSURE] % 10,
              s_data.v[SH_INST_COL_MAX],
              s_data.v[SH_INST_COL_TYPE] == SH_COL_TUBES ? "evacuated tubes" : "flat",
-             s_data.v[SH_INST_COL_AREA] / 10, s_data.v[SH_INST_COL_AREA] % 10, s_data.v[SH_INST_TANK_VOL]);
+             s_data.v[SH_INST_COL_AREA] / 10, s_data.v[SH_INST_COL_AREA] % 10, s_data.v[SH_INST_TANK_VOL],
+             s_data.v[SH_INST_HEATER] / 10, s_data.v[SH_INST_HEATER] % 10);
 }
 
 esp_err_t sh_installer_init(void)

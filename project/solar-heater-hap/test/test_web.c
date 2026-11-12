@@ -11,6 +11,7 @@
 #include "sh_web_api.h"
 #include "sh_tz.h"
 #include "sh_cool.h"
+#include "sh_heater.h"
 #include "sh_pump_ctl.h"
 
 #define CODE    "81084A"
@@ -21,7 +22,7 @@ static sh_web_config_t config(void)
     const sh_web_config_t c = {
         .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } },
         .frost = true,
-        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150 } },
+        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } },
     };
     return c;
 }
@@ -33,7 +34,7 @@ static sh_web_status_t status(void)
         .cfg = config(), .col_protect = 1100,
         .name = "solar-heater", .version = "0.1.0", .serial = "E8F60A810841", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
-        .cool_until = -1, .cool_learned = 663, .sunrise = -1, .sunset = -1,
+        .cool_until = -1, .cool_learned = 663, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
     };
     return s;
 }
@@ -59,11 +60,12 @@ static void test_status(void)
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\"],"
+        "\"vac_limit\",\"heater\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
         "\"air\":{\"on\":0,\"run\":0,\"cycle\":0,\"left\":0,\"cycles\":3,\"work\":5,\"pause\":10},"
+        "\"heat\":{\"on\":0,\"det\":0,\"leak\":0,\"left\":0,\"last\":null,\"e8n\":null},"
         "\"set\":{\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
         "\"c_lo\":{\"v\":25,\"min\":10,\"max\":80,\"step\":1},"
         "\"d_on\":{\"v\":6,\"min\":5,\"max\":20,\"step\":1},"
@@ -78,7 +80,8 @@ static void test_status(void)
         "\"inst\":{\"fluid\":{\"v\":0,\"min\":0,\"max\":1},\"glycol\":{\"v\":0,\"min\":0,\"max\":60},"
         "\"press\":{\"v\":15,\"min\":5,\"max\":60},\"col_max\":{\"v\":120,\"min\":100,\"max\":250},"
         "\"col_type\":{\"v\":0,\"min\":0,\"max\":1},\"col_area\":{\"v\":20,\"min\":5,\"max\":200},"
-        "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10}},"
+        "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10},"
+        "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
@@ -167,13 +170,12 @@ static void test_status_values(void)
     HAS(&s, "\"tank_vol\"");
     HAS(&s, "\"vac_limit\"");
     HAS_NOT(&s, "\"ota\"");
-    HAS_NOT(&s, "\"heater\",");                /* (the key "heater" of the cooling is followed by ':') */
     HAS_NOT(&s, "\"homekit\"");
 
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"vac_limit\",\"history\"],");
+    HAS(&s, "\"vac_limit\",\"heater\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -204,7 +206,7 @@ static void test_status_buffer(void)
     s.test_on = true;
     s.test_left_s = 900;
     s.cfg.settings = (sh_settings_t){ .v = { 85, 80, 20, 15, 900, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };
-    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250, SH_COL_FLAT, 20, 150 } };
+    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250, SH_COL_FLAT, 20, 150, 120 } };
     s.col_protect = 1600;
     s.name = "0123456789012345678901234567890";
     s.version = "0123456789012345678901234567890";
@@ -225,6 +227,13 @@ static void test_status_buffer(void)
     s.air_on = s.air_run = true;
     s.air_cycle = 3;
     s.air_left_s = 99999;
+    s.heater_on = s.heater_det = true;
+    s.leak = SH_LEAK_STOP;
+    s.leak_left_s = 300;
+    s.leak_last = s.leak_last_stop = true;
+    s.leak_last_drop = -1234;
+    s.e8_normal = -1234;
+    s.alarms = 0xFF;
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
 
@@ -392,6 +401,45 @@ static void test_set_group_c(void)
     CHECK_EQ(set("tank_vol=40&code=" CODE, &c, &ch), SH_WEB_BAD);
     CHECK_EQ(set("tank_vol=1010&code=" CODE, &c, &ch), SH_WEB_BAD);
     CHECK_EQ(set("tank_vol=125&code=" CODE, &c, &ch), SH_WEB_BAD);     /* off the 10 l step */
+
+    /* the heater (group D): 0 = none, 0.5 ... 12.0 kW in steps of 0.5, with the code */
+    CHECK_EQ(set("heater=35", &c, &ch), SH_WEB_DENIED);
+    CHECK_EQ(set("heater=35&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_HEATER], 35);
+    CHECK_EQ(set("heater=0&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_HEATER], 0);
+    CHECK_EQ(set("heater=120&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(set("heater=3&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("heater=37&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("heater=125&code=" CODE, &c, &ch), SH_WEB_BAD);
+}
+
+/* The heater, its leak and E8 (group D). */
+static void test_status_group_d(void)
+{
+    sh_web_status_t s = status();
+    HAS(&s, "\"heat\":{\"on\":0,\"det\":0,\"leak\":0,\"left\":0,\"last\":null,\"e8n\":null},");
+    s.heater_on = true;
+    s.heater_det = true;
+    s.leak = SH_LEAK_CHECK;
+    s.leak_left_s = 120;
+    s.leak_last = true;
+    s.leak_last_drop = 19;
+    s.e8_normal = 6;
+    HAS(&s, "\"heat\":{\"on\":1,\"det\":1,\"leak\":1,\"left\":120,\"last\":{\"stop\":0,\"drop\":19},\"e8n\":6},");
+    s.leak = SH_LEAK_STOP;
+    s.leak_last_stop = true;
+    s.leak_last_drop = 23;
+    HAS(&s, "\"leak\":2,\"left\":120,\"last\":{\"stop\":1,\"drop\":23}");
+    /* the reasons */
+    s.pump_on = false;
+    s.reason = SH_PUMP_REASON_LEAK_CHECK;
+    HAS(&s, "\"why\":\"leak_check\"");
+    s.reason = SH_PUMP_REASON_LEAK_STOP;
+    HAS(&s, "\"why\":\"leak_stop\"");
+    /* E8: after E6, before the information */
+    s.alarms = SH_ALARM_BIT(SH_ALARM_HOT) | SH_ALARM_BIT(SH_ALARM_E8) | SH_ALARM_BIT(SH_ALARM_E6);
+    HAS(&s, "\"alarms\":[\"E6\",\"E8\",\"Hot\"]");
 }
 
 /* The status of the season, the night cooling and the air venting. */
@@ -601,6 +649,7 @@ static void test_days(void)
     r[0].run_min[0] = 190;
     r[0].run_min[1] = 4;
     r[0].cool_min = 75;
+    r[0].heater_min = 95;
     r[0].alarms = SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_HOT);
     r[0].peak_min = 790;
     r[0].clock_reliable = true;
@@ -610,9 +659,9 @@ static void test_days(void)
     CHECK(sh_web_days_json(buf, sizeof(buf), true, r, 2) > 0);
     CHECK(strcmp(buf, "{\"on\":1,\"days\":["
                       "{\"d\":\"2026-11-11\",\"cx\":853,\"cn\":-52,\"tx\":611,\"tn\":402,\"run\":[190,4,0],"
-                      "\"cool\":75,\"al\":[\"E1\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
+                      "\"cool\":75,\"heat\":95,\"al\":[\"E1\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
                       "{\"d\":\"2026-11-10\",\"cx\":null,\"cn\":null,\"tx\":null,\"tn\":null,\"run\":[0,0,0],"
-                      "\"cool\":0,\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
+                      "\"cool\":0,\"heat\":0,\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
     CHECK(sh_web_days_json(buf, sizeof(buf), false, r, 0) > 0);
     CHECK(strcmp(buf, "{\"on\":0,\"days\":[]}") == 0);
 
@@ -620,8 +669,8 @@ static void test_days(void)
     for (int i = 0; i < SH_WEB_DAYS; i++) {
         sh_hist_rec_init(&r[i], 0xFFFE);
         r[i].col_max = r[i].col_min = r[i].tank_max = r[i].tank_min = -1234;
-        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = r[i].cool_min = 65535;
-        r[i].alarms = 0x7F;
+        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = r[i].cool_min = r[i].heater_min = 65535;
+        r[i].alarms = 0xFF;
         r[i].peak_min = 1439;
     }
     const int len = sh_web_days_json(buf, sizeof(buf), true, r, SH_WEB_DAYS);
@@ -674,6 +723,7 @@ int main(void)
     test_set_malformed();
     test_set_group_c();
     test_status_group_c();
+    test_status_group_d();
     test_air();
     test_code();
     test_pump_test();

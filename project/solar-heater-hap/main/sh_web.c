@@ -20,6 +20,7 @@
 #include "sh_history.h"
 #include "sh_pump_ctl.h"
 #include "sh_cool.h"
+#include "sh_heater.h"
 #include "sh_web_api.h"
 #include "sh_web.h"
 
@@ -113,7 +114,14 @@ static esp_err_t state_get(httpd_req_t *req)
         .cool = st.modes.cool, .cool_target = st.modes.cool_target,
         .cool_until = st.modes.cool_clock ? SH_COOL_TO_MIN : -1, .cool_heater = st.modes.cool_heater,
         .cool_learned = st.modes.cool_learned, .sunrise = st.modes.sunrise, .sunset = st.modes.sunset,
+        .heater_on = st.modes.heater_on, .heater_det = st.modes.heater_det, .leak = st.modes.leak,
+        .leak_last = st.modes.leak_last, .leak_last_stop = st.modes.leak_last_stop,
+        .leak_last_drop = st.modes.leak_last_drop, .e8_normal = st.modes.e8_normal,
     };
+    if (st.modes.leak == SH_LEAK_CHECK) {
+        const sh_leak_t l = { .phase = SH_LEAK_CHECK, .check_s = st.modes.leak_start_s };
+        s.leak_left_s = sh_leak_left(&l, now_s);
+    }
     if (st.modes.air_on) {
         /* the phase from the published start and pause, as the control task computes it */
         const sh_pump_ctl_t air = { .air = true, .air_start_s = st.modes.air_start_s,

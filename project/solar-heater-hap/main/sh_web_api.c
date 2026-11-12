@@ -19,6 +19,7 @@ static const char *const FEATURES[] = {
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
+    "heater",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -107,9 +108,10 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, "\"pump\":%d,\"why\":\"%s\",", s->pump_on, sh_web_reason_key(s->reason));
     put(&o, "\"alarms\":[");
     bool first = true;
-    for (int a = 0; a < SH_ALARM_COUNT; a++) {      /* the alarms by number, then the information */
+    for (int i = 0; i < SH_ALARM_COUNT; i++) {      /* the alarms by number, then the information */
+        const sh_alarm_t a = sh_alarm_order[i];
         if (s->alarms & SH_ALARM_BIT(a)) {
-            put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+            put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name(a));
             first = false;
         }
     }
@@ -129,6 +131,19 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, "},\"air\":{\"on\":%d,\"run\":%d,\"cycle\":%d,\"left\":%lu,\"cycles\":%u,\"work\":%u,"
         "\"pause\":%lu},", s->air_on, s->air_run, s->air_cycle, (unsigned long)s->air_left_s, SH_AIR_CYCLES,
         SH_AIR_RUN_S / 60u, (unsigned long)((pause_s + 30) / 60));
+
+    /* the heater: the sign now, detected with "0 kW"; the leak (0 none, 1 check, 2 stopped), the
+     * last check; the learned normal night cooling of the tank (E8) */
+    put(&o, "\"heat\":{\"on\":%d,\"det\":%d,\"leak\":%d,\"left\":%lu,\"last\":", s->heater_on, s->heater_det,
+        s->leak, (unsigned long)s->leak_left_s);
+    if (s->leak_last) {
+        put(&o, "{\"stop\":%d,\"drop\":%d}", s->leak_last_stop, s->leak_last_drop);
+    } else {
+        put(&o, "null");
+    }
+    put(&o, ",\"e8n\":");
+    put_or_null(&o, s->e8_normal != INT16_MIN, s->e8_normal);
+    put(&o, "},");
 
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
@@ -236,12 +251,13 @@ int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days,
         put_hist_temp(&o, "cn", r->col_min);
         put_hist_temp(&o, "tx", r->tank_max);
         put_hist_temp(&o, "tn", r->tank_min);
-        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2],
-            r->cool_min);
+        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"heat\":%u,\"al\":[", r->run_min[0], r->run_min[1],
+            r->run_min[2], r->cool_min, r->heater_min);
         bool first = true;
-        for (int a = 0; a < SH_ALARM_COUNT; a++) {
+        for (int i = 0; i < SH_ALARM_COUNT; i++) {
+            const sh_alarm_t a = sh_alarm_order[i];
             if (r->alarms & SH_ALARM_BIT(a)) {
-                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name(a));
                 first = false;
             }
         }
@@ -542,6 +558,8 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_VACATION]     = "vacation",
         [SH_PUMP_REASON_AIR_RUN]      = "air_run",
         [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
+        [SH_PUMP_REASON_LEAK_CHECK]   = "leak_check",
+        [SH_PUMP_REASON_LEAK_STOP]    = "leak_stop",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];

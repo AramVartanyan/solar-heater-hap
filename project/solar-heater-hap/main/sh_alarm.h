@@ -16,17 +16,21 @@
  *          difference collector - tank is >= e6_diff;
  *          cleared when the tank rose >= e6_tank_rise or the difference is < e6_clear_diff.
  *        Otherwise it stays until restart (the pump logic is not changed: E6 is only shown).
+ *   E8   reverse thermosiphon (sh_e8; declared after 3 nights with the sign, cleared after 3 normal
+ *        nights) — only shown
  *   Hot  (information) the pump runs by the collector protection, or by the probe at the collector
  *        emergency temperature while the tank sensor is faulty.
  *   Fro  (information) the pump runs by the frost protection.
- * E8 (A8) follows in a later step. */
+ * The bit of a code (also in the daily records of the history) is its value in sh_alarm_t; E8 came
+ * later, so its bit is after Hot and Fro — the order of the display and of the lists is
+ * sh_alarm_order: the alarms by number, then the information. */
 #pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
 #include "sh_pump_logic.h"
 
-/* In the order of the display: the alarms by number, then the information. */
+/* The bit of each code; the order of the display is sh_alarm_order. */
 typedef enum {
     SH_ALARM_E1 = 0,
     SH_ALARM_E2,
@@ -35,13 +39,17 @@ typedef enum {
     SH_ALARM_E6,
     SH_ALARM_HOT,
     SH_ALARM_FRO,
+    SH_ALARM_E8,                /* group D: the bits before it are kept (history) */
     SH_ALARM_COUNT              /* also "no code" */
 } sh_alarm_t;
+
+/* The order of the display, the web interface and the CSV: the alarms by number, then the information. */
+extern const sh_alarm_t sh_alarm_order[SH_ALARM_COUNT];
 
 #define SH_ALARM_BIT(a)         (1u << (a))
 #define SH_ALARM_OVERHEAT       (SH_ALARM_BIT(SH_ALARM_E4) | SH_ALARM_BIT(SH_ALARM_E5))
 #define SH_ALARM_REPAIR         (SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_E2) | \
-                                 SH_ALARM_BIT(SH_ALARM_E6))
+                                 SH_ALARM_BIT(SH_ALARM_E6) | SH_ALARM_BIT(SH_ALARM_E8))
 #define SH_ALARM_PROTECT        (SH_ALARM_BIT(SH_ALARM_HOT) | SH_ALARM_BIT(SH_ALARM_FRO))
 #define SH_ALARM_CODE_MS        1000u   /* each code on the display */
 #define SH_ALARM_E6_MAX_MIN     30u     /* longest E6 time (Kconfig range) */
@@ -64,6 +72,7 @@ typedef struct {
     sh_pump_reason_t reason;
     bool col_boiling;           /* the limits of sh_pump_ctl (norm.col_boiling, norm.tank_ceiling) */
     bool tank_ceiling;
+    bool e8;                    /* sh_e8: reverse thermosiphon */
 } sh_alarm_in_t;
 
 /* Kept between the steps; all zeros at boot. */
@@ -83,7 +92,7 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
                       uint32_t now_s);
 
 /* Display: the code shown `ms` after the end of the standard cycle (each code 1 s, in the order of
- * sh_alarm_t); SH_ALARM_COUNT when the codes are over. */
+ * sh_alarm_order); SH_ALARM_COUNT when the codes are over. */
 sh_alarm_t sh_alarm_code_at(uint8_t active, uint32_t ms);
 
 /* How many codes are active (the vacation label "HoL" follows them on the display). */
