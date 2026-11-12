@@ -7,6 +7,7 @@
 #include "esp_tm1637.h"
 #include "sh_config.h"
 #include "sh_state.h"
+#include "sh_alarms.h"
 #include "sh_menu.h"
 #include "sh_buttons.h"
 #include "sh_display.h"
@@ -18,8 +19,6 @@ static const char *TAG = "sh_display";
 #define SEG_MINUS       0x40
 #define SEG_DP          0x80
 
-#define LABEL_MS        1000            /* normal screen: label shown */
-#define VALUE_MS        5000            /* normal screen: temperature shown */
 #define TICK_MS         50              /* a change appears within this time */
 
 /* Raw segments (XGFEDCBA) */
@@ -125,18 +124,42 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
     }
 }
 
-/* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector. */
-static void normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
+/* An alarm or information code: the 3 characters of sh_alarm_text(). */
+static void set_code(screen_t *s, sh_alarm_t code)
 {
-    ms %= 2 * (LABEL_MS + VALUE_MS);
-    if (ms < LABEL_MS) {
+    const char *text = sh_alarm_text(code);
+    uint8_t seg[DIGITS];
+    for (int i = 0; i < DIGITS; i++) {
+        const char ch = text[i];
+        seg[i] = ch >= '0' && ch <= '9' ? s_digit[ch - '0'] :
+                 ch == 'E' ? 0x79 : ch == 'H' ? 0x76 : ch == 'o' ? 0x5C : ch == 't' ? 0x78 : 0;
+    }
+    set_seg(s, seg);
+}
+
+/* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
+ * codes. Returns false when the cycle is over. */
+static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
+{
+    sh_alarm_t code = SH_ALARM_E1;
+    switch (sh_alarm_screen(st->alarms, ms, &code)) {
+    case SH_SCREEN_BOIL:
         set_seg(s, s_boil);
-    } else if (ms < LABEL_MS + VALUE_MS) {
+        return true;
+    case SH_SCREEN_T_TANK:
         set_temp(s, st->t_tank, st->tank_fault);
-    } else if (ms < 2 * LABEL_MS + VALUE_MS) {
+        return true;
+    case SH_SCREEN_COL:
         set_seg(s, s_col);
-    } else {
+        return true;
+    case SH_SCREEN_T_COL:
         set_temp(s, st->t_col, st->col_fault);
+        return true;
+    case SH_SCREEN_CODE:
+        set_code(s, code);
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -170,8 +193,9 @@ static void display_task(void *arg)
             }
             if (st.test_on) {
                 test_screen(&scr, &st, now_s);
-            } else {
-                normal_screen(&scr, &st, now_ms - cycle_ms);
+            } else if (!normal_screen(&scr, &st, now_ms - cycle_ms)) {
+                cycle_ms = now_ms;      /* the cycle is over: from "Boil" */
+                normal_screen(&scr, &st, 0);
             }
             was_test = st.test_on;
         }

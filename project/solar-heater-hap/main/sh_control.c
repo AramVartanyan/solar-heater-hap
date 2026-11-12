@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -8,6 +9,7 @@
 #include "sdkconfig.h"
 #include "sh_state.h"
 #include "sh_pump_ctl.h"
+#include "sh_alarms.h"
 #include "sh_settings_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
@@ -19,6 +21,32 @@ static const char *TAG = "sh_control";
 
 _Static_assert(CONFIG_SH_DIFF_OFF_K < CONFIG_SH_DIFF_ON_K,
                "Control: the switch-off difference must be lower than the switch-on difference");
+
+_Static_assert(CONFIG_SH_E6_CLEAR_DIFF_K < CONFIG_SH_E6_DIFF_K,
+               "Control: the difference that clears E6 must be lower than the one that declares it");
+
+/* E6 thresholds: Kconfig "Control" (minutes, K, tenths of K) -> seconds and tenths. */
+static const sh_alarm_params_t ALARM_PARAMS = {
+    .window_s = CONFIG_SH_E6_WINDOW_MIN * 60,
+    .col_rise = CONFIG_SH_E6_COL_RISE_K * 10,
+    .tank_rise = CONFIG_SH_E6_TANK_RISE_DK,
+    .diff = CONFIG_SH_E6_DIFF_K * 10,
+    .clear_diff = CONFIG_SH_E6_CLEAR_DIFF_K * 10,
+};
+
+static const sh_led_params_t LED_PARAMS = {
+    .cold = CONFIG_SH_LED_COLD_C * 10,
+    .hot = CONFIG_SH_LED_HOT_C * 10,
+};
+
+/* Everything the control task keeps between the steps; all zeros at boot. */
+typedef struct {
+    sh_pump_ctl_t pump;         /* pump off since boot */
+    sh_alarms_t alarms;
+    sh_led_mem_t led_mem;
+    sh_led_in_t led_in;         /* the inputs of the last LED decision */
+    bool led_decided;
+} control_t;
 
 static QueueHandle_t s_cmds;
 
@@ -54,9 +82,65 @@ static const char *temp_str(char *buf, size_t size, int16_t t_tenths, bool fault
     return buf;
 }
 
-/* One decision; `cmd` (may be NULL) is a button command applied first. */
-static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
+/* Alarms and information after the pump decision: every code that appears or clears is logged,
+ * the active ones are published. */
+static void alarms_step(control_t *c, const sh_state_t *st, uint32_t now)
 {
+    const uint8_t was = c->alarms.active;
+    const sh_alarm_in_t in = {
+        .t_col = st->t_col, .t_tank = st->t_tank, .col_fault = st->col_fault,
+        .tank_fault = st->tank_fault, .pump_on = c->pump.on, .pump_reason = c->pump.reason,
+    };
+    const uint8_t active = sh_alarms_step(&c->alarms, &ALARM_PARAMS, &in, now);
+    if (active == was) {
+        return;
+    }
+    sh_state_set_alarms(active);
+    char col_buf[12], tank_buf[12];
+    const char *col = temp_str(col_buf, sizeof(col_buf), st->t_col, st->col_fault);
+    const char *tank = temp_str(tank_buf, sizeof(tank_buf), st->t_tank, st->tank_fault);
+    for (int code = 0; code < SH_ALARM_COUNT; code++) {
+        const uint8_t bit = SH_ALARM_BIT(code);
+        if (!((active ^ was) & bit)) {
+            continue;
+        }
+        const char *name = sh_alarm_name((sh_alarm_t)code);
+        const char *desc = sh_alarm_desc((sh_alarm_t)code);
+        if (!(active & bit)) {
+            ESP_LOGI(TAG, "%s cleared (%s): collector %s °C, tank %s °C", name, desc, col, tank);
+        } else if (bit & SH_ALARMS_ERROR) {
+            ESP_LOGW(TAG, "%s active (%s): collector %s °C, tank %s °C", name, desc, col, tank);
+        } else {
+            ESP_LOGI(TAG, "%s active (%s): collector %s °C, tank %s °C", name, desc, col, tank);
+        }
+    }
+}
+
+/* Status LED: decided again only when one of its inputs changed. */
+static void led_step(control_t *c, const sh_state_t *st)
+{
+    sh_led_in_t in;
+    memset(&in, 0, sizeof(in));     /* also the padding: the inputs are compared as bytes */
+    in.alarms = c->alarms.active;
+    in.pump_on = c->pump.on;
+    in.vacation = st->vacation;
+    in.t_col = st->col_fault ? SH_TEMP_INVALID : st->t_col;
+    in.wifi_connected = st->wifi_connected;
+    in.wifi_portal = st->wifi_portal;
+    if (c->led_decided && memcmp(&in, &c->led_in, sizeof(in)) == 0) {
+        return;
+    }
+    c->led_in = in;
+    c->led_decided = true;
+    sh_led_out_t out;
+    sh_led_decide(&LED_PARAMS, &c->led_mem, &in, &out);
+    sh_led_show(out.color, out.pattern);
+}
+
+/* One decision; `cmd` (may be NULL) is a button command applied first. */
+static void control_step(control_t *c, const sh_control_cmd_t *cmd)
+{
+    sh_pump_ctl_t *pump = &c->pump;
     sh_state_t st;
     sh_state_get(&st);              /* the last values published by the measurement task */
     sh_pump_params_t params;
@@ -120,17 +204,18 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
                  temp_str(tank, sizeof(tank), st.t_tank, st.tank_fault));
     }
 
-    sh_led_set(st.wifi_connected ? SH_COLOR_BLUE : SH_COLOR_OFF);
+    alarms_step(c, &st, now);
+    led_step(c, &st);
 }
 
 static void control_task(void *arg)
 {
     (void)arg;
-    static sh_pump_ctl_t pump;      /* zeros: pump off since boot */
+    static control_t ctl;           /* zeros: pump off since boot, no alarm */
     TickType_t next = xTaskGetTickCount();
 
     for (;;) {
-        control_step(&pump, NULL);
+        control_step(&ctl, NULL);
         next += pdMS_TO_TICKS(CONTROL_PERIOD_MS);
         /* until the next cycle: a button command is applied at once */
         for (;;) {
@@ -140,7 +225,7 @@ static void control_task(void *arg)
             if (xQueueReceive(s_cmds, &cmd, wait) != pdTRUE) {
                 break;
             }
-            control_step(&pump, &cmd);
+            control_step(&ctl, &cmd);
         }
     }
 }

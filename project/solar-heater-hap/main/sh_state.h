@@ -22,7 +22,7 @@ typedef struct {
     bool    hap_pair_window;    /* HomeKit pairing window open */
     bool    vacation;
     bool    ota_running;
-    uint8_t alarm;              /* 0 = none, 1 = overheat, 2 = pump failure */
+    uint8_t alarms;             /* active codes: SH_ALARM_BIT() of sh_alarms.h (E1 ... E6, Hot) */
 } sh_state_t;
 
 void sh_state_init(void);
@@ -31,3 +31,4 @@ void sh_state_set_temps(int16_t t_col, int16_t t_tank, bool col_fault, bool tank
 void sh_state_set_pump(bool on, sh_pump_reason_t reason);
 void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s);
 void sh_state_set_wifi(bool connected, bool portal);
+void sh_state_set_alarms(uint8_t alarms);

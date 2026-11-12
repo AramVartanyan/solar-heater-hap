@@ -3,7 +3,8 @@
  *   - the user menu (sh_buttons / sh_menu): item names, the value (blinking while edited);
  *   - the pump test: "tSt" for 3 s, then the seconds left, "tSt" again for 1 s every 7 s;
  *   - the normal screen: "label 1 s -> temperature 5 s" for the tank and the collector ("---" for a
- *     faulty sensor or before the first valid value); it starts again from "Boil" on every return. */
+ *     faulty sensor or before the first valid value), then every active alarm / information code
+ *     for 1 s (" E1" ... " E6", "Hot" — sh_alarms); it starts again from "Boil" on every return. */
 #pragma once
 
 #include "esp_err.h"
