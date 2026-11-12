@@ -66,13 +66,20 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         return;
     }
 
-    /* 3. Tank emergency ceiling: off at once, whatever the collector does. */
+    /* 3. Tank emergency ceiling: off at once — no heat may go into the tank. The night cooling is
+     *    the exception: with the collector colder than the tank the pump takes heat out of it (the
+     *    wanted answer to an E4), so it is decided below; whatever else would run the pump stays
+     *    off (after rule 6). */
+    const bool cool_out = p->cool && t_col < t_tank;
     if (st->tank_ceiling) {
         st->col_protect = false;
         st->frost = false;
-        st->cool = false;
-        decided(st, false, SH_PUMP_REASON_TANK_CEILING);
-        return;
+        if (!cool_out) {
+            st->cool = false;
+            decided(st, false, SH_PUMP_REASON_TANK_CEILING);
+            return;
+        }
+        goto night_cooling;             /* the protections 4 and 5 must not run the pump here */
     }
 
     /* 4. Collector protection: on at once (no minimum off time, also above Tmax); ends below the
@@ -118,6 +125,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
      *    it is not allowed any more (target reached, morning) a pump it runs goes on by the rules
      *    below as a running pump: off at once in the vacation or at Tmax, otherwise after the
      *    minimum run time. */
+night_cooling:;
     const int32_t back = (int32_t)t_tank - t_col;
     if (!p->cool) {
         st->cool = false;
@@ -136,6 +144,15 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
             st->cool = true;
             decided(st, true, SH_PUMP_REASON_COOL);
         }
+        return;
+    }
+
+    /* The ceiling, when the night cooling does not run the pump: off. */
+    if (st->tank_ceiling) {
+        st->col_protect = false;
+        st->frost = false;
+        st->cool = false;
+        decided(st, false, SH_PUMP_REASON_TANK_CEILING);
         return;
     }
 

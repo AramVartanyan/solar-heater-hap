@@ -8,7 +8,8 @@
  * Order of the checks, first match wins:
  *   1. invalid temperature        -> off at once
  *   2. collector at boiling point -> off at once, also a running pump; no start for any reason
- *   3. tank emergency ceiling     -> off at once
+ *   3. tank emergency ceiling     -> off at once; only the night cooling with the collector colder
+ *                                    than the tank goes on (rule 6), it takes heat out of the tank
  *   4. collector protection       -> on at once (no minimum off time), also above Tmax
  *   5. frost protection           -> on at once while the collector is below the frost threshold
  *                                    and the tank is at least 5 °C
