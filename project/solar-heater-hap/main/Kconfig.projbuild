@@ -43,19 +43,21 @@ menu "Device Settings"
                 1 s control loop. No averaging.
 
         config SH_DIFF_ON_K
-            int "Switch-on difference, collector - tank (K)"
+            int "Switch-on difference, collector - tank (K), default of the user setting d.on"
             range 3 20
             default 6
             help
                 The pump starts when the collector is at least this much warmer than the tank.
+                In use until the user changes d.on in the menu, and after a factory reset.
 
         config SH_DIFF_OFF_K
-            int "Switch-off difference, collector - tank (K)"
+            int "Switch-off difference, collector - tank (K), default of the user setting d.oF"
             range 1 15
             default 4
             help
                 The pump stops when the difference falls to this value (after the minimum run
                 time). Must be lower than the switch-on difference (checked at compile time).
+                In use until the user changes d.oF in the menu, and after a factory reset.
 
         config SH_MIN_RUN_MIN
             int "Minimum run time (min)"
@@ -74,21 +76,31 @@ menu "Device Settings"
                 (0 = no minimum). The collector protection ignores it.
 
         config SH_TANK_MAX_C
-            int "Tank Tmax (degC)"
+            int "Tank Tmax (degC), default of the user setting tbo"
             range 30 85
             default 70
             help
                 Normal charging stops at this tank temperature and is allowed again below
                 Tmax - 2 K. The collector protection may charge above it, up to the fixed
                 95 degC emergency ceiling.
+                In use until the user changes tbo in the menu, and after a factory reset.
 
         config SH_COL_MIN_C
-            int "Minimum collector temperature (degC)"
+            int "Minimum collector temperature (degC), default of the user setting C.Lo"
             range 10 80
             default 25
             help
                 The difference does not start the pump while the collector is below this
                 temperature. A running pump is not stopped by it.
+                In use until the user changes C.Lo in the menu, and after a factory reset.
+
+        config SH_PUMP_TEST_S
+            int "Pump test time (s), default of the user setting tSt"
+            range 60 900
+            default 300
+            help
+                A short press of "+" on the normal screen runs the pump for this long.
+                In use until the user changes tSt in the menu, and after a factory reset.
 
         config SH_COL_PROTECT_C
             int "Collector protection (degC)"

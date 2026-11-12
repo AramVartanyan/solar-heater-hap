@@ -8,6 +8,10 @@ idf_component_register(
         "sh_display.c"
         "sh_buttons.c"
         "sh_pump_logic.c"
+        "sh_sensor_logic.c"
+        "sh_settings_logic.c"
+        "sh_settings.c"
+        "sh_menu.c"
         "sh_control.c"
     INCLUDE_DIRS "."
     REQUIRES
