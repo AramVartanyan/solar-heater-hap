@@ -2,7 +2,9 @@
  * settings (sh_settings_store), lets sh_pump_ctl decide (pump test, anti-seize, sensor faults,
  * normal mode — doc/operating-modes.md 2.1), drives the relay, publishes the pump state with its
  * reason and the pump test, and logs every change of the pump or the reason, the start / end of
- * the test and of the anti-seize run. Fixed parameters: Kconfig "Device Settings" -> "Control". */
+ * the test and of the anti-seize run. Then the alarm and information codes (sh_alarm): published,
+ * every appearance and clearing logged; and the status LED (sh_ind -> sh_led), computed when its
+ * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control". */
 #pragma once
 
 #include "esp_err.h"

@@ -7,6 +7,7 @@
 #include "esp_tm1637.h"
 #include "sh_config.h"
 #include "sh_state.h"
+#include "sh_alarm.h"
 #include "sh_menu.h"
 #include "sh_buttons.h"
 #include "sh_display.h"
@@ -20,6 +21,7 @@ static const char *TAG = "sh_display";
 
 #define LABEL_MS        1000            /* normal screen: label shown */
 #define VALUE_MS        5000            /* normal screen: temperature shown */
+#define CYCLE_MS        (2 * (LABEL_MS + VALUE_MS))     /* Boil, tank, Col, collector */
 #define TICK_MS         50              /* a change appears within this time */
 
 /* Raw segments (XGFEDCBA) */
@@ -29,6 +31,16 @@ static const uint8_t s_digit[10] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0
 static const uint8_t s_boil[DIGITS] = { 0x7C /* b */, 0x5C /* o */, 0x16 /* il */ };
 static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ };
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
+
+/* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot" */
+static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
+    [SH_ALARM_E1]  = { 0, 0x79 /* E */, 0x06 /* 1 */ },
+    [SH_ALARM_E2]  = { 0, 0x79 /* E */, 0x5B /* 2 */ },
+    [SH_ALARM_E4]  = { 0, 0x79 /* E */, 0x66 /* 4 */ },
+    [SH_ALARM_E5]  = { 0, 0x79 /* E */, 0x6D /* 5 */ },
+    [SH_ALARM_E6]  = { 0, 0x79 /* E */, 0x7D /* 6 */ },
+    [SH_ALARM_HOT] = { 0x76 /* H */, 0x5C /* o */, 0x78 /* t */ },
+};
 
 /* Menu items, in the order of sh_setting_t, then End */
 static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
@@ -125,11 +137,17 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
     }
 }
 
-/* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector. */
-static void normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
+/* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
+ * codes (1 s each). Returns false when the cycle is over (the caller starts it again). */
+static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
 {
-    ms %= 2 * (LABEL_MS + VALUE_MS);
-    if (ms < LABEL_MS) {
+    if (ms >= CYCLE_MS) {
+        const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
+        if (code == SH_ALARM_COUNT) {
+            return false;
+        }
+        set_seg(s, s_codes[code]);
+    } else if (ms < LABEL_MS) {
         set_seg(s, s_boil);
     } else if (ms < LABEL_MS + VALUE_MS) {
         set_temp(s, st->t_tank, st->tank_fault);
@@ -138,6 +156,7 @@ static void normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
     } else {
         set_temp(s, st->t_col, st->col_fault);
     }
+    return true;
 }
 
 /* Owns the display (esp_tm1637: one task per display); writes only when the screen changes.
@@ -170,8 +189,9 @@ static void display_task(void *arg)
             }
             if (st.test_on) {
                 test_screen(&scr, &st, now_s);
-            } else {
-                normal_screen(&scr, &st, now_ms - cycle_ms);
+            } else if (!normal_screen(&scr, &st, now_ms - cycle_ms)) {
+                cycle_ms = now_ms;      /* the codes are over: from "Boil" again */
+                normal_screen(&scr, &st, 0);
             }
             was_test = st.test_on;
         }

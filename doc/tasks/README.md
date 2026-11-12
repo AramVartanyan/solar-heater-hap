@@ -8,7 +8,7 @@
 |---|---|---|
 | 1 | [step1-control-loop.md](step1-control-loop.md) — основен цикъл на помпата | PR #21 |
 | 2 | [step2-settings-menu-pump-sensors.md](step2-settings-menu-pump-sensors.md) — настройки и меню, тест на помпата, защита от блокиране, повреден датчик | PR #25 |
-| 5 | [step5-alarms-indication.md](step5-alarms-indication.md) — аварии и индикация | — |
+| 5 | [step5-alarms-indication.md](step5-alarms-indication.md) — аварии и индикация | след #27 / #28 |
 
 ## Ред на работа
 

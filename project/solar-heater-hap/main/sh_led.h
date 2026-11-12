@@ -1,19 +1,12 @@
-/* Onboard WS2812 status LED (doc/led-indication.md). Phase 1: plain colours;
- * patterns (blink, breathe, heartbeat) follow with the indication logic. */
+/* Onboard WS2812 status LED (doc/led-indication.md): a colour and a pattern from sh_ind. The
+ * patterns run on one periodic esp_timer (10 ms); the LED is written only when what it shows
+ * changes. Brightness: CONFIG_SH_LED_BRIGHTNESS. */
 #pragma once
 
-#include <stdint.h>
 #include "esp_err.h"
-
-typedef enum {
-    SH_COLOR_OFF = 0,
-    SH_COLOR_BLUE,      /* idle */
-    SH_COLOR_GREEN,     /* pump running */
-    SH_COLOR_WHITE,     /* cold collector / OTA */
-    SH_COLOR_YELLOW,    /* hot collector */
-    SH_COLOR_PURPLE,    /* vacation */
-    SH_COLOR_RED,       /* alarm (blinking only) */
-} sh_color_t;
+#include "sh_ind.h"
 
 esp_err_t sh_led_init(void);
-void sh_led_set(sh_color_t color);  /* updates the LED only when the colour changes */
+/* Shows `color` with `pattern`; a new pattern starts from its beginning, a new colour keeps the
+ * running pattern. */
+void sh_led_show(sh_color_t color, sh_ind_pattern_t pattern);

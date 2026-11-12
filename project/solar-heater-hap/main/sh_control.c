@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -8,6 +9,8 @@
 #include "sdkconfig.h"
 #include "sh_state.h"
 #include "sh_pump_ctl.h"
+#include "sh_alarm.h"
+#include "sh_ind.h"
 #include "sh_settings_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
@@ -19,6 +22,31 @@ static const char *TAG = "sh_control";
 
 _Static_assert(CONFIG_SH_DIFF_OFF_K < CONFIG_SH_DIFF_ON_K,
                "Control: the switch-off difference must be lower than the switch-on difference");
+_Static_assert(CONFIG_SH_E6_CLEAR_DIFF_K < CONFIG_SH_E6_DIFF_K,
+               "Control: the E6 clearing difference must be lower than the E6 difference");
+_Static_assert(CONFIG_SH_LED_COLD_C + 2 < CONFIG_SH_LED_HOT_C - 2,
+               "Status LED: the cold and hot collector zones must not overlap");
+
+/* E6 (Kconfig "Control"): minutes, K -> seconds, tenths */
+static const sh_alarm_params_t ALARM_PARAMS = {
+    .e6_time_s = CONFIG_SH_E6_TIME_MIN * 60,
+    .e6_col_rise = CONFIG_SH_E6_COL_RISE_K * 10,
+    .e6_tank_rise = CONFIG_SH_E6_TANK_RISE_DK,
+    .e6_diff = CONFIG_SH_E6_DIFF_K * 10,
+    .e6_clear_diff = CONFIG_SH_E6_CLEAR_DIFF_K * 10,
+};
+
+/* White / yellow colour of the status LED, °C -> tenths */
+static const sh_ind_params_t IND_PARAMS = {
+    .cold = CONFIG_SH_LED_COLD_C * 10,
+    .hot = CONFIG_SH_LED_HOT_C * 10,
+};
+
+/* Kept between the steps (only the control task uses them) */
+static sh_alarm_state_t s_alarm;
+static sh_ind_state_t s_ind;
+static sh_ind_in_t s_ind_in;
+static bool s_ind_done;
 
 static QueueHandle_t s_cmds;
 
@@ -120,7 +148,44 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
                  temp_str(tank, sizeof(tank), st.t_tank, st.tank_fault));
     }
 
-    sh_led_set(st.wifi_connected ? SH_COLOR_BLUE : SH_COLOR_OFF);
+    /* alarm and information codes: every appearance and clearing in the log */
+    const sh_alarm_in_t ain = {
+        .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .pump_on = pump->on, .reason = pump->reason,
+        .col_boiling = pump->norm.col_boiling, .tank_ceiling = pump->norm.tank_ceiling,
+    };
+    const uint8_t was_alarms = s_alarm.active;
+    const uint8_t alarms = sh_alarm_step(&s_alarm, &ALARM_PARAMS, &ain, now);
+    if (alarms != was_alarms) {
+        sh_state_set_alarms(alarms);
+        char col[12], tank[12];
+        temp_str(col, sizeof(col), st.t_col, st.col_fault);
+        temp_str(tank, sizeof(tank), st.t_tank, st.tank_fault);
+        for (int a = 0; a < SH_ALARM_COUNT; a++) {
+            const uint8_t bit = SH_ALARM_BIT(a);
+            if ((alarms ^ was_alarms) & bit) {
+                ESP_LOGW(TAG, "%s %s: collector %s °C, tank %s °C", sh_alarm_name((sh_alarm_t)a),
+                         (alarms & bit) ? "active" : "cleared", col, tank);
+            }
+        }
+    }
+
+    /* status LED: computed only when its inputs change */
+    sh_ind_in_t iin;
+    memset(&iin, 0, sizeof(iin));   /* padding too: compared with memcmp() */
+    iin.alarms = alarms;
+    iin.pump_on = pump->on;
+    iin.t_col = st.t_col;
+    iin.col_fault = st.col_fault;
+    iin.vacation = st.vacation;
+    iin.wifi_connected = st.wifi_connected;
+    iin.wifi_portal = st.wifi_portal;
+    if (!s_ind_done || memcmp(&iin, &s_ind_in, sizeof(iin)) != 0) {
+        const sh_ind_out_t out = sh_ind_update(&s_ind, &IND_PARAMS, &iin);
+        sh_led_show(out.color, out.pattern);
+        s_ind_in = iin;
+        s_ind_done = true;
+    }
 }
 
 static void control_task(void *arg)
