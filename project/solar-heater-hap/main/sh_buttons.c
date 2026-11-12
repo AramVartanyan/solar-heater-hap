@@ -4,15 +4,13 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
-#include "esp_system.h"
 #include "esp_timer.h"
-#include "nvs_flash.h"
 #include "iot_button.h"
-#include "captive_wifi.h"
 #include "sh_config.h"
 #include "sh_state.h"
 #include "sh_settings_store.h"
 #include "sh_control.h"
+#include "sh_reset.h"
 #include "sh_buttons.h"
 
 static const char *TAG = "sh_buttons";
@@ -57,24 +55,11 @@ static void post(void *arg)
 static void reset_and_restart(bool factory)
 {
     if (factory) {
-        /* Everything in the "nvs" partition: settings, Wi-Fi network (kept there by the driver)
-         * and, with HomeKit, the pairings — what hap_reset_to_factory() erases too; the read-only
-         * factory_nvs (setup code) stays. Wi-Fi is stopped first, so the driver does not write
-         * meanwhile. */
-        ESP_LOGW(TAG, "menu held %d s: factory reset (all settings and the Wi-Fi network), restarting",
-                 CONFIG_SH_FACTORY_RESET_HOLD_S);
-        captive_wifi_stop();
-        esp_err_t err = nvs_flash_erase();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS erase failed: %s", esp_err_to_name(err));
-        }
+        ESP_LOGW(TAG, "menu held %d s: factory reset", CONFIG_SH_FACTORY_RESET_HOLD_S);
     } else {
-        ESP_LOGW(TAG, "menu released after %d s or more: erasing the stored Wi-Fi network, restarting",
-                 CONFIG_SH_NET_RESET_HOLD_S);
-        captive_wifi_clear_credentials();
+        ESP_LOGW(TAG, "menu released after %d s or more: Wi-Fi reset", CONFIG_SH_NET_RESET_HOLD_S);
     }
-    vTaskDelay(pdMS_TO_TICKS(500));
-    esp_restart();
+    sh_reset_now(factory ? SH_RESET_FACTORY : SH_RESET_WIFI);   /* does not return */
 }
 
 static uint32_t now_ms(void)

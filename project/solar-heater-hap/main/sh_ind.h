@@ -4,7 +4,7 @@
  *
  * Colour, by priority (first match wins):
  *   red      any alarm (E1, E2, E4, E5, E6) — blinking only
- *   orange   the pump runs because of a protection (Hot)
+ *   orange   the pump runs because of a protection (Hot, Fro)
  *   purple   vacation (not yet: the input is always off)
  *   yellow   collector > 90 °C (released below 88 °C), pump stopped
  *   green    the pump runs (any other reason: normal charging, test, anti-seize, sensor-fault modes)

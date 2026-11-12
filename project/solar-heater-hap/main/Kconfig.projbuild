@@ -99,10 +99,18 @@ menu "Device Settings"
             default 110
             help
                 The pump starts at once at this collector temperature, also above Tmax, and
-                stops below it - 2 K after the minimum run time. Values above 115 degC are
-                limited to 115 degC and a warning is logged at boot (fixed in this version:
-                min(collector maximum 120 - 5, boiling point 127 - 10), the defaults of
-                doc/operating-modes.md).
+                stops below it - 2 K after the minimum run time. It is limited to
+                min(collector maximum - 5 K, boiling point - 10 K), computed from the installer
+                data; the limit is logged and shown in the web interface ("Service").
+
+        config SH_FROST_PROTECT
+            bool "Frost protection"
+            default y
+            help
+                Default of the web interface switch (stored in NVS). While the collector is below
+                the frost threshold (computed from the heat transfer fluid) and the tank is at
+                least 5 degC, the pump runs; it stops at the threshold + 2 K after the minimum
+                run time.
 
         config SH_PUMP_TEST_S
             int "Pump test time (s)"
@@ -152,6 +160,40 @@ menu "Device Settings"
             help
                 E6 is cleared when the difference falls below this (there is flow). Must be lower
                 than the E6 difference (checked at compile time). Otherwise E6 stays until restart.
+
+    endmenu
+
+    menu "Installer data"
+
+        config SH_INST_GLYCOL
+            bool "Heat transfer fluid: propylene glycol (off: water)"
+            default n
+            help
+                Defaults of the installer data (stored in NVS, changed in the "Service" section
+                of the web interface). The boiling point, the ceiling of the collector protection
+                and the frost threshold are computed from them.
+
+        config SH_INST_GLYCOL_PCT
+            int "Propylene glycol (% by volume)"
+            depends on SH_INST_GLYCOL
+            range 0 60
+            default 0
+
+        config SH_INST_PRESSURE_DBAR
+            int "Minimum pressure on the gauge, cold system (0.1 bar)"
+            range 5 60
+            default 15
+            help
+                Tenths of bar: 15 = 1.5 bar. The firmware adds 1.013 bar for the absolute
+                pressure.
+
+        config SH_INST_COL_MAX_C
+            int "Maximum collector temperature (degC)"
+            range 100 250
+            default 120
+            help
+                What the collector withstands (manufacturer data). The collector protection is
+                kept at least 5 K below it.
 
     endmenu
 

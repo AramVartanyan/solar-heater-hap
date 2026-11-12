@@ -4,10 +4,16 @@
  * reason and the pump test, and logs every change of the pump or the reason, the start / end of
  * the test and of the anti-seize run. Then the alarm and information codes (sh_alarm): published,
  * every appearance and clearing logged; and the status LED (sh_ind -> sh_led), computed when its
- * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control". */
+ * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control"; the boiling point, the
+ * ceiling of the collector protection and the frost threshold come from the installer data
+ * (sh_installer_store) and are logged at boot and when they change. */
 #pragma once
 
 #include "esp_err.h"
+#include "sdkconfig.h"
+
+/* Collector protection setting (Kconfig), tenths of °C; limited by the computed ceiling. */
+#define SH_CONTROL_COL_PROTECT      (CONFIG_SH_COL_PROTECT_C * 10)
 
 /* Pump test commands from the buttons (normal screen), applied at once by the control task. */
 typedef enum {

@@ -86,6 +86,7 @@ static void enter_mode(sh_pump_ctl_t *c, sh_pump_mode_t mode, uint32_t now_s)
     c->cf_ceiling = false;
     c->cf_next_s = now_s;           /* the first probe at once (the minimum off time applies) */
     c->norm.col_protect = false;
+    c->norm.frost = false;
 }
 
 static bool normal_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t col, int16_t tank,
@@ -93,7 +94,8 @@ static bool normal_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t col
 {
     c->norm.on = was_on;
     if (!was_on) {
-        c->norm.col_protect = false;    /* set only while the pump runs by it */
+        c->norm.col_protect = false;    /* set only while the pump runs by them */
+        c->norm.frost = false;
     }
     sh_pump_decide(p, &c->norm, col, tank, elapsed_s);
     *reason = c->norm.reason;
