@@ -159,7 +159,18 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         return;
     }
 
-    /* 9. Difference, with the minimum times and the minimum collector temperature (it only blocks
+    /* 9. Heater leak (sh_heater): during a check and after a leak was found the pump does not
+     *    charge by the difference; the protections and the cooling above are not touched. */
+    if (p->leak_hold) {
+        decided(st, false, SH_PUMP_REASON_LEAK_CHECK);
+        return;
+    }
+    if (p->leak_block) {
+        decided(st, false, SH_PUMP_REASON_LEAK_STOP);
+        return;
+    }
+
+    /* 10. Difference, with the minimum times and the minimum collector temperature (it only blocks
      *    the start, a running pump is stopped by the difference). */
     const int32_t diff = (int32_t)t_col - t_tank;
     if (st->on) {
@@ -212,6 +223,8 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_VACATION]     = "vacation: no charging",
         [SH_PUMP_REASON_AIR_RUN]      = "air venting: run",
         [SH_PUMP_REASON_AIR_PAUSE]    = "air venting: pause",
+        [SH_PUMP_REASON_LEAK_CHECK]   = "heater leak check",
+        [SH_PUMP_REASON_LEAK_STOP]    = "heater leak stopped",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && names[reason] != NULL) {
         return names[reason];

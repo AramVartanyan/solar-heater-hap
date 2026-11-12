@@ -48,13 +48,14 @@ static const uint8_t s_on_off[2][DIGITS] = {
     { 0, 0x5C /* o */, 0x54 /* n */ },
 };
 
-/* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot", "Fro" */
+/* Alarm and information codes: "E1" ... right-aligned, "Hot", "Fro" */
 static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
     [SH_ALARM_E1]  = { 0, 0x79 /* E */, 0x06 /* 1 */ },
     [SH_ALARM_E2]  = { 0, 0x79 /* E */, 0x5B /* 2 */ },
     [SH_ALARM_E4]  = { 0, 0x79 /* E */, 0x66 /* 4 */ },
     [SH_ALARM_E5]  = { 0, 0x79 /* E */, 0x6D /* 5 */ },
     [SH_ALARM_E6]  = { 0, 0x79 /* E */, 0x7D /* 6 */ },
+    [SH_ALARM_E8]  = { 0, 0x79 /* E */, 0x7F /* 8 */ },
     [SH_ALARM_HOT] = { 0x76 /* H */, 0x5C /* o */, 0x78 /* t */ },
     [SH_ALARM_FRO] = { 0x71 /* F */, 0x50 /* r */, 0x5C /* o */ },
 };

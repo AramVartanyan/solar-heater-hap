@@ -8,6 +8,7 @@
 #include "test_util.h"
 #include "sh_state.h"
 #include "sh_alarm.h"
+#include "sh_heater.h"
 #include "sh_web_api.h"
 #include "sh_tz.h"
 #include "sh_cool.h"
@@ -59,11 +60,13 @@ static void test_status(void)
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\"],"
+        "\"vac_limit\",\"heater\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
         "\"air\":{\"on\":0,\"run\":0,\"cycle\":0,\"left\":0,\"cycles\":3,\"work\":5,\"pause\":10},"
+        "\"heater\":{\"kw\":0,\"has\":0,\"on\":0,\"found\":0,\"rise\":5},"
+        "\"leak\":{\"st\":0,\"info\":0,\"last\":0,\"ago\":null},"
         "\"set\":{\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
         "\"c_lo\":{\"v\":25,\"min\":10,\"max\":80,\"step\":1},"
         "\"d_on\":{\"v\":6,\"min\":5,\"max\":20,\"step\":1},"
@@ -78,7 +81,8 @@ static void test_status(void)
         "\"inst\":{\"fluid\":{\"v\":0,\"min\":0,\"max\":1},\"glycol\":{\"v\":0,\"min\":0,\"max\":60},"
         "\"press\":{\"v\":15,\"min\":5,\"max\":60},\"col_max\":{\"v\":120,\"min\":100,\"max\":250},"
         "\"col_type\":{\"v\":0,\"min\":0,\"max\":1},\"col_area\":{\"v\":20,\"min\":5,\"max\":200},"
-        "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10}},"
+        "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10},"
+        "\"heater\":{\"v\":0,\"min\":0,\"max\":120,\"step\":5}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
@@ -167,13 +171,14 @@ static void test_status_values(void)
     HAS(&s, "\"tank_vol\"");
     HAS(&s, "\"vac_limit\"");
     HAS_NOT(&s, "\"ota\"");
-    HAS_NOT(&s, "\"heater\",");                /* (the key "heater" of the cooling is followed by ':') */
+    HAS(&s, "\"vac_limit\",\"heater\"],");     /* group D */
+    HAS_NOT(&s, "\"mount\"");
     HAS_NOT(&s, "\"homekit\"");
 
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"vac_limit\",\"history\"],");
+    HAS(&s, "\"heater\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -200,11 +205,11 @@ static void test_status_buffer(void)
     s.t_col = -1234;
     s.t_tank = -1234;
     s.reason = SH_PUMP_REASON_BOTH_FAULT;
-    s.alarms = 0x7F;
+    s.alarms = 0xFF;
     s.test_on = true;
     s.test_left_s = 900;
     s.cfg.settings = (sh_settings_t){ .v = { 85, 80, 20, 15, 900, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } };
-    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250, SH_COL_FLAT, 20, 150 } };
+    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250, SH_COL_FLAT, 20, 1000, 120 } };
     s.col_protect = 1600;
     s.name = "0123456789012345678901234567890";
     s.version = "0123456789012345678901234567890";
@@ -225,6 +230,10 @@ static void test_status_buffer(void)
     s.air_on = s.air_run = true;
     s.air_cycle = 3;
     s.air_left_s = 99999;
+    s.heater_on = s.heater_found = s.leak_info = true;
+    s.leak = SH_LEAK_STOPPED;
+    s.leak_last = SH_LEAK_RES_LEAK;
+    s.leak_ago_s = 0xFFFFFFFFu;
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
 
@@ -443,6 +452,66 @@ static void test_status_group_c(void)
     CHECK(strcmp(sh_web_reason_key(SH_PUMP_REASON_AIR_PAUSE), "air_pause") == 0);
 }
 
+/* Group D (doc/tasks/step12-heater-leak-e8.md 3.1, 3.5): the heater power, the heater and its
+ * leak in the status, E8. */
+static void test_group_d(void)
+{
+    /* the heater power: 0 or 0.5 - 12.0 kW in steps of 0.5, with the access code */
+    sh_web_config_t c = status().cfg;
+    unsigned ch = 0;
+    CHECK_EQ(sh_web_set("heater=20", CODE, &c, &ch), SH_WEB_DENIED);
+    CHECK_EQ(sh_web_set("heater=20&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_HEATER], 20);
+    CHECK_EQ(ch, SH_WEB_CH_INSTALLER);
+    CHECK_EQ(sh_web_set("heater=0&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(sh_web_set("heater=5&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(sh_web_set("heater=120&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_HEATER], 120);
+    CHECK_EQ(sh_web_set("heater=125&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(sh_web_set("heater=-5&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(sh_web_set("heater=3&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);     /* off the 0.5 kW step */
+    CHECK_EQ(c.inst.v[SH_INST_HEATER], 120);
+
+    /* the status: 2.0 kW with 150 l -> the sign is 1.0 K in 10 min; not working, no leak */
+    sh_web_status_t s = status();
+    s.cfg.inst.v[SH_INST_HEATER] = 20;
+    HAS(&s, "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5}");
+    HAS(&s, "\"heater\":{\"kw\":20,\"has\":1,\"on\":0,\"found\":0,\"rise\":10},"
+            "\"leak\":{\"st\":0,\"info\":0,\"last\":0,\"ago\":null},");
+    s.heater_on = true;
+    HAS(&s, "\"heater\":{\"kw\":20,\"has\":1,\"on\":1,\"found\":0,\"rise\":10},");
+    /* a found heater is shown only with "0 kW" */
+    s.heater_found = true;
+    HAS(&s, "\"heater\":{\"kw\":20,\"has\":1,\"on\":1,\"found\":0,\"rise\":10},");
+    s.cfg.inst.v[SH_INST_HEATER] = 0;
+    HAS(&s, "\"heater\":{\"kw\":0,\"has\":1,\"on\":1,\"found\":1,\"rise\":5},");
+    s.heater_found = s.heater_on = false;
+    HAS(&s, "\"heater\":{\"kw\":0,\"has\":0,\"on\":0,\"found\":0,\"rise\":5},");
+
+    /* the leak: the check, its result and how long ago (whole minutes), the information */
+    s.leak = SH_LEAK_CHECK;
+    s.reason = SH_PUMP_REASON_LEAK_CHECK;
+    s.pump_on = false;
+    HAS(&s, "\"pump\":0,\"why\":\"leak_check\",");
+    HAS(&s, "\"leak\":{\"st\":1,\"info\":0,\"last\":0,\"ago\":null},");
+    s.leak = SH_LEAK_IDLE;
+    s.leak_last = SH_LEAK_RES_SUN;
+    s.leak_ago_s = 125;
+    HAS(&s, "\"leak\":{\"st\":0,\"info\":0,\"last\":1,\"ago\":2},");
+    s.leak = SH_LEAK_STOPPED;
+    s.leak_info = true;
+    s.leak_last = SH_LEAK_RES_LEAK;
+    s.leak_ago_s = 59;
+    s.reason = SH_PUMP_REASON_LEAK_STOP;
+    HAS(&s, "\"why\":\"leak_stop\",");
+    HAS(&s, "\"leak\":{\"st\":2,\"info\":1,\"last\":2,\"ago\":0},");
+
+    /* E8 among the alarms: by number, before the information */
+    s.alarms = SH_ALARM_BIT(SH_ALARM_E8) | SH_ALARM_BIT(SH_ALARM_FRO) | SH_ALARM_BIT(SH_ALARM_E6) |
+               SH_ALARM_BIT(SH_ALARM_HOT);
+    HAS(&s, "\"alarms\":[\"E6\",\"E8\",\"Hot\",\"Fro\"],");
+}
+
 static void test_air(void)
 {
     sh_web_air_t cmd;
@@ -601,7 +670,8 @@ static void test_days(void)
     r[0].run_min[0] = 190;
     r[0].run_min[1] = 4;
     r[0].cool_min = 75;
-    r[0].alarms = SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_HOT);
+    r[0].heater_min = 48;
+    r[0].alarms = SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_HOT) | SH_ALARM_BIT(SH_ALARM_E8);
     r[0].peak_min = 790;
     r[0].clock_reliable = true;
     sh_hist_rec_init(&r[1], sh_day_number(2026, 11, 10));
@@ -610,9 +680,9 @@ static void test_days(void)
     CHECK(sh_web_days_json(buf, sizeof(buf), true, r, 2) > 0);
     CHECK(strcmp(buf, "{\"on\":1,\"days\":["
                       "{\"d\":\"2026-11-11\",\"cx\":853,\"cn\":-52,\"tx\":611,\"tn\":402,\"run\":[190,4,0],"
-                      "\"cool\":75,\"al\":[\"E1\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
+                      "\"cool\":75,\"heat\":48,\"al\":[\"E1\",\"E8\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
                       "{\"d\":\"2026-11-10\",\"cx\":null,\"cn\":null,\"tx\":null,\"tn\":null,\"run\":[0,0,0],"
-                      "\"cool\":0,\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
+                      "\"cool\":0,\"heat\":0,\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
     CHECK(sh_web_days_json(buf, sizeof(buf), false, r, 0) > 0);
     CHECK(strcmp(buf, "{\"on\":0,\"days\":[]}") == 0);
 
@@ -620,8 +690,8 @@ static void test_days(void)
     for (int i = 0; i < SH_WEB_DAYS; i++) {
         sh_hist_rec_init(&r[i], 0xFFFE);
         r[i].col_max = r[i].col_min = r[i].tank_max = r[i].tank_min = -1234;
-        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = r[i].cool_min = 65535;
-        r[i].alarms = 0x7F;
+        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = r[i].cool_min = r[i].heater_min = 65535;
+        r[i].alarms = 0xFF;
         r[i].peak_min = 1439;
     }
     const int len = sh_web_days_json(buf, sizeof(buf), true, r, SH_WEB_DAYS);
@@ -674,6 +744,7 @@ int main(void)
     test_set_malformed();
     test_set_group_c();
     test_status_group_c();
+    test_group_d();
     test_air();
     test_code();
     test_pump_test();

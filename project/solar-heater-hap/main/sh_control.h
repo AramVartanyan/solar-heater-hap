@@ -10,7 +10,11 @@
  * Group C (doc/tasks/step10-cooling-vacation-seasons.md): before the pump decision — sunrise and
  * sunset (sh_sun), the season (sh_season; the seasonal values of sh_settings), the night cooling
  * sessions (sh_cool) and the vacation (collector protection at the vacation limit, no charging);
- * the air venting is a command like the pump test. The learned values are kept by sh_learn_store. */
+ * the air venting is a command like the pump test. The learned values are kept by sh_learn_store.
+ * Group D (doc/tasks/step12-heater-leak-e8.md): before the pump decision — the heater sign and the
+ * heater found with "0 kW" (sh_heater), the checks for its heat leaking to the collector (they stop
+ * the pump that charges, or keep it off); after it — the nights of the reverse thermosiphon
+ * (sh_e8), whose E8 goes to the alarm codes. */
 #pragma once
 
 #include "esp_err.h"
@@ -26,7 +30,7 @@ typedef enum {
     SH_CONTROL_TEST_STOP,       /* stop (not earlier than 1 min after the start) */
     SH_CONTROL_AIR_START,       /* air venting (web interface) */
     SH_CONTROL_AIR_STOP,        /* its stop (web interface, short "menu") */
-    SH_CONTROL_RESET_LEARNED,   /* forget the learned sunrise / sunset and cooling target */
+    SH_CONTROL_RESET_LEARNED,   /* forget the learned values (sunrise / sunset, cooling target, heater, E8) */
 } sh_control_cmd_t;
 
 esp_err_t sh_control_start(void);

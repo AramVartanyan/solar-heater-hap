@@ -3,14 +3,14 @@
  * host test as well. sh_led drives the LED.
  *
  * Colour, by priority (first match wins):
- *   red      any alarm (E1, E2, E4, E5, E6) — blinking only
+ *   red      any alarm (E1, E2, E4, E5, E6, E8) — blinking only
  *   orange   the pump runs because of a protection (Hot, Fro) or cools the tank at night
  *   purple   vacation
  *   yellow   collector > 90 °C (released below 88 °C), pump stopped
  *   green    the pump runs (any other reason: normal charging, test, anti-seize, sensor-fault modes)
  *   white    collector < 20 °C (released above 22 °C)
  *   blue     idle
- * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
+ * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 / E8 at the same time) or double (E1, E2, E6, E8);
  * other colours -> steady with Wi-Fi, heartbeat without it (or while the setup portal is open).
  * Temperatures are tenths of °C, times ms. */
 #pragma once
@@ -45,7 +45,7 @@ typedef enum {
     SH_IND_STEADY = 0,  /* Wi-Fi connected */
     SH_IND_HEARTBEAT,   /* no Wi-Fi / setup portal */
     SH_IND_FAST,        /* E4, E5 */
-    SH_IND_DOUBLE,      /* E1, E2, E6 */
+    SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
 } sh_ind_pattern_t;
 
 typedef struct {

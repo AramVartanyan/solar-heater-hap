@@ -9,6 +9,7 @@
 #include "sh_tz.h"
 #include "sh_pump_ctl.h"        /* SH_AIR_* */
 #include "sh_cool.h"
+#include "sh_heater.h"
 #include "sh_web_api.h"
 
 /* The functions this firmware has. A step that adds a function adds its name here and wires its
@@ -19,6 +20,7 @@ static const char *const FEATURES[] = {
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
+    "heater",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -107,9 +109,10 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, "\"pump\":%d,\"why\":\"%s\",", s->pump_on, sh_web_reason_key(s->reason));
     put(&o, "\"alarms\":[");
     bool first = true;
-    for (int a = 0; a < SH_ALARM_COUNT; a++) {      /* the alarms by number, then the information */
+    for (int pos = 0; pos < SH_ALARM_COUNT; pos++) {    /* the alarms by number, then the information */
+        const sh_alarm_t a = sh_alarm_at(pos);
         if (s->alarms & SH_ALARM_BIT(a)) {
-            put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+            put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name(a));
             first = false;
         }
     }
@@ -129,6 +132,17 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, "},\"air\":{\"on\":%d,\"run\":%d,\"cycle\":%d,\"left\":%lu,\"cycles\":%u,\"work\":%u,"
         "\"pause\":%lu},", s->air_on, s->air_run, s->air_cycle, (unsigned long)s->air_left_s, SH_AIR_CYCLES,
         SH_AIR_RUN_S / 60u, (unsigned long)((pause_s + 30) / 60));
+
+    /* heater: the setting (tenths of kW), is there one (set or found), does it work, found with
+     * "0 kW", the tank rise in 10 min that is its sign; its leak: 0 none / 1 check / 2 stopped, the
+     * information, the last check (1 no leak / 2 leak) and how many minutes ago */
+    const int16_t heater_kw = s->cfg.inst.v[SH_INST_HEATER];
+    put(&o, "\"heater\":{\"kw\":%d,\"has\":%d,\"on\":%d,\"found\":%d,\"rise\":%d},", heater_kw,
+        sh_heater_present(heater_kw, s->heater_found), s->heater_on, s->heater_found && heater_kw == 0,
+        sh_heater_rise(heater_kw, s->cfg.inst.v[SH_INST_TANK_VOL]));
+    put(&o, "\"leak\":{\"st\":%d,\"info\":%d,\"last\":%d,\"ago\":", s->leak, s->leak_info, s->leak_last);
+    put_or_null(&o, s->leak_last != SH_LEAK_RES_NONE, (int)(s->leak_ago_s / 60));
+    put(&o, "},");
 
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
@@ -236,12 +250,13 @@ int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days,
         put_hist_temp(&o, "cn", r->col_min);
         put_hist_temp(&o, "tx", r->tank_max);
         put_hist_temp(&o, "tn", r->tank_min);
-        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2],
-            r->cool_min);
+        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"heat\":%u,\"al\":[", r->run_min[0], r->run_min[1],
+            r->run_min[2], r->cool_min, r->heater_min);
         bool first = true;
-        for (int a = 0; a < SH_ALARM_COUNT; a++) {
+        for (int pos = 0; pos < SH_ALARM_COUNT; pos++) {
+            const sh_alarm_t a = sh_alarm_at(pos);
             if (r->alarms & SH_ALARM_BIT(a)) {
-                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name(a));
                 first = false;
             }
         }
@@ -542,6 +557,8 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_VACATION]     = "vacation",
         [SH_PUMP_REASON_AIR_RUN]      = "air_run",
         [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
+        [SH_PUMP_REASON_LEAK_CHECK]   = "leak_check",
+        [SH_PUMP_REASON_LEAK_STOP]    = "leak_stop",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];

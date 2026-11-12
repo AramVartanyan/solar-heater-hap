@@ -7,7 +7,8 @@
 
 #define SH_TEMP_INVALID     (-1000)     /* tenths of °C: sensor missing or read error */
 
-/* Season, night cooling, sunrise / sunset and air venting, published by the control task. */
+/* Season, night cooling, sunrise / sunset, air venting, heater and its leak, published by the
+ * control task. */
 typedef struct {
     bool    winter;             /* the current season */
     uint8_t cool;               /* night cooling session: sh_cool_trigger_t, 0 none */
@@ -20,6 +21,12 @@ typedef struct {
     bool    air_on;             /* air venting running */
     uint32_t air_start_s;       /* its start, monotonic s */
     uint32_t air_pause_s;       /* the pause of its cycles, s */
+    bool    heater_on;          /* the heater sign is active (sh_heater) */
+    bool    heater_found;       /* a heater was found with the setting "0 kW" */
+    uint8_t leak;               /* heater leak: sh_leak_state_t */
+    bool    leak_info;          /* "the heater leak is stopped" */
+    uint8_t leak_last;          /* the result of the last check: sh_leak_result_t, 0 none ... */
+    uint32_t leak_last_s;       /* ... and when, monotonic s */
 } sh_modes_t;
 
 typedef struct {

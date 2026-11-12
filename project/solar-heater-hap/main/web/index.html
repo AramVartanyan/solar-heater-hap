@@ -57,7 +57,7 @@ td select,.v select{font:inherit}
 .chart text{font-size:9px;fill:var(--sub)}.chart .ax{stroke:var(--sep);stroke-width:.5}
 .lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub);padding:2px 8px 4px}
 .lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-.days td,.days th{padding:8px 6px;font-size:14px}.days td:first-child,.days th:first-child{text-align:left}
+.days td,.days th{padding:8px 3px;font-size:13px}.days td:first-child,.days th:first-child{text-align:left}
 .v a{color:var(--blue);text-decoration:none}
 .hide{display:none!important}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:.5px solid var(--sep);display:flex;justify-content:center}
@@ -109,12 +109,13 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v" id="mode-v">—</span></div>
   <div class="row" data-f="season"><span data-t="season"></span><span class="v" id="season-v">—</span></div>
-  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
+  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v" id="heat-v" style="white-space:normal">—</span></div>
+  <div class="row hide" data-f="heater" id="leak-row"><span data-t="leak"></span><span class="v" id="leak-v" style="white-space:normal">—</span></div>
   <div class="row" data-f="clock"><span data-t="clock"></span><span class="v" id="clock-v">—</span></div>
  </div>
  <h2 data-t="last7" data-f="history"></h2>
  <div class="grp" style="padding:4px 6px" data-f="history">
-  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th></tr></thead><tbody id="days"></tbody></table>
+  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th><th data-t="heat_h"></th></tr></thead><tbody id="days"></tbody></table>
  </div>
  <p class="note" data-f="history" data-t="days_note"></p>
 </section>
@@ -182,7 +183,7 @@ section{display:none}section.on{display:block}
   <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
-  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
   <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
  </div>
  <h2 data-t="calc"></h2>
@@ -263,12 +264,17 @@ k_charge:'зареждане',k_prot:'защита / охлаждане',k_other
 chart_24:'Температурите през последните 24 часа (часовникът не е сверен).\nЦветната лента отдолу показва кога е работила помпата.',
 c_unset:'не е сверен',c_tz:'зоната не е потвърдена',c_bad:'ненадежден',c_ok:'надежден',
 last7:'Последните 7 дни',date:'Дата',no_days:'Още няма записан ден.',
-cool_h:'Охл.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
+cool_h:'Охл.',heat_h:'Нагр.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\nНагр.: минутите, в които нагревателят е топлил бойлера при спряна помпа.\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора ({vac} °C) и не зарежда бойлера, нощем охлажда бойлера. Изключва се само ръчно.',
 m_normal:'Нормален',m_vac:'Ваканция',s_auto:'Автоматичен',s_is_auto:'автоматично',s_hand:'ръчно',
 cool_1:'бойлерът е над Tmax',cool_2:'E4 през деня',cool_3:'ваканция',cool_to:'цел {t} °C',cool_eq:'до изравняване',
 cool_until:'до {h}',cool_rise:'до изгрев',
+heater_kw:'Нагревател (0 = няма)',h_on:'работи',h_off:'не работи',h_none:'няма',h_found:'засечен (в „Сервизни“: 0 kW)',
+leak:'Теч от нагревателя',lk_check:'проверка — помпата е спряна за 5 min',lk_stop:'спрян — помпата чака колектора да се затопли сам',
+lk_sun:'няма теч',lk_leak:'теч',lk_last:'последната проверка преди {m}: {r}',
+a_leak:'Течът от нагревателя е спрян',d_leak:'При проверката колекторът изстина с поне 2 K за 5 min — топлината идваше от бойлера (нагревателя). Помпата не зарежда, докато колекторът не се затопли сам.',
+a_hfound:'Засечен е нагревател',d_hfound:'Бойлерът се топли при спряна помпа, а в „Сервизни“ нагревателят е 0 kW. Контролерът приема, че има нагревател. Въведете мощността му.',
 a_heat:'Нощното охлаждане е спряно',d_heat:'Бойлерът се топли, докато помпата го охлажда — работи нагревателят. Охлаждането е спряно до следващата нощ.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
 test_note:'Тестът спира сам, когато времето изтече; „Спри“ действа не по-рано от 1 min след пускането.',
@@ -306,6 +312,7 @@ a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът 
 a_E4:'Бойлерът е на аварийния таван',d_E4:'Бойлерът е стигнал 95 °C — помпата не вкарва повече топлина: стои, докато колекторът е горещ (до под 93 °C); с по-студен колектор може да охлажда бойлера. Източете топла вода.',
 a_E5:'Колекторът е над точката на кипене',d_E5:'Колекторът е стигнал {boil} °C — помпата не тръгва, докато не изстине с 2 K.',
 a_E6:'Повреда на помпата / няма поток',d_E6:'Помпата работи, колекторът се загрява бързо, а бойлерът — не. Проверете помпата и дали няма въздух в системата.',
+a_E8:'Обратен термосифон',d_E8:'Три поредни нощи при спряна помпа колекторът се топли, а бойлерът изстива по-бързо от обичайното — топлината се връща към колектора. Проверете гравитационния спирачен (възвратния) клапан.',
 a_Hot:'Защита на колектора',d_Hot:'Колекторът е над {prot} °C — помпата пренася топлина към бойлера.',
 a_Fro:'Защита от замръзване',d_Fro:'Колекторът е под {frost} °C — помпата го топли с течност от бойлера.',
 r_none:'—',r_diff_on:'зареждане',r_diff_off:'малка темп. разлика',r_min_run:'минимално време на работа',r_min_off:'минимален престой',
@@ -316,7 +323,8 @@ r_tf_run:'зареждане по колектора (повреден датч�
 r_tf_hot:'колекторът е горещ (повреден датчик на бойлера)',r_tf_probe:'проба при горещ колектор (повреден датчик на бойлера)',
 r_cf_probe:'проба (повреден датчик на колектора)',r_cf_run:'бойлерът се топли (повреден датчик на колектора)',
 r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена',
-r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой'
+r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой',
+r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян'
 },en:{
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
@@ -326,12 +334,17 @@ k_charge:'charging',k_prot:'protection / cooling',k_other:'other',chart_day:'Tod
 chart_24:'The temperatures of the last 24 hours (the clock is not set).\nThe coloured band below shows when the pump ran.',
 c_unset:'not set',c_tz:'time zone not confirmed',c_bad:'not reliable',c_ok:'reliable',
 last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
-cool_h:'Cool.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
+cool_h:'Cool.',heat_h:'Heat.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\nHeat.: minutes in which the heater warmed the tank with the pump stopped.\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'By day protects the collector ({vac} °C) and does not charge the tank, at night cools the tank. Switched off by hand only.',
 m_normal:'Normal',m_vac:'Vacation',s_auto:'Automatic',s_is_auto:'automatic',s_hand:'by hand',
 cool_1:'tank above Tmax',cool_2:'E4 during the day',cool_3:'vacation',cool_to:'target {t} °C',cool_eq:'until equal',
 cool_until:'until {h}',cool_rise:'until sunrise',
+heater_kw:'Heater (0 = none)',h_on:'working',h_off:'not working',h_none:'none',h_found:'found (in "Service": 0 kW)',
+leak:'Heater leak',lk_check:'check — the pump is stopped for 5 min',lk_stop:'stopped — the pump waits for the collector to warm up by itself',
+lk_sun:'no leak',lk_leak:'leak',lk_last:'last check {m} ago: {r}',
+a_leak:'Heater leak stopped',d_leak:'During the check the collector cooled by at least 2 K in 5 min — the heat came from the tank (the heater). The pump does not charge until the collector warms up by itself.',
+a_hfound:'A heater was found',d_hfound:'The tank warms up with the pump stopped, but the heater in "Service" is 0 kW. The controller takes it that there is a heater. Enter its power.',
 a_heat:'Night cooling stopped',d_heat:'The tank warms up while the pump cools it — the heater is on. The cooling is stopped until the next night.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
 test_note:'The test stops by itself when the time is over; "Stop" acts not earlier than 1 min after the start.',
@@ -369,6 +382,7 @@ a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the 
 a_E4:'Tank at the emergency ceiling',d_E4:'The tank reached 95 °C — the pump adds no more heat: it stays off while the collector is hot (until below 93 °C); with a colder collector it may cool the tank. Draw off hot water.',
 a_E5:'Collector above the boiling point',d_E5:'The collector reached {boil} °C — the pump does not start until it cools by 2 K.',
 a_E6:'Pump failure / no flow',d_E6:'The pump runs, the collector heats up quickly, the tank does not. Check the pump and for air in the system.',
+a_E8:'Reverse thermosiphon',d_E8:'Three nights in a row, with the pump stopped, the collector warmed up while the tank cooled faster than usual — the heat flows back to the collector. Check the gravity brake (non-return valve).',
 a_Hot:'Collector protection',d_Hot:'The collector is above {prot} °C — the pump carries heat to the tank.',
 a_Fro:'Frost protection',d_Fro:'The collector is below {frost} °C — the pump warms it with liquid from the tank.',
 r_none:'—',r_diff_on:'charging',r_diff_off:'difference too small',r_min_run:'minimum run time',r_min_off:'minimum off time',
@@ -379,7 +393,8 @@ r_tf_run:'charging by the collector (tank sensor fault)',r_tf_cold:'collector co
 r_tf_hot:'collector hot (tank sensor fault)',r_tf_probe:'probe at a hot collector (tank sensor fault)',
 r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector sensor fault)',
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed',
-r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause'
+r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause',
+r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
@@ -444,6 +459,12 @@ function render(){
   d.className='alarm'+cls;b.textContent=head;p.textContent=text;d.append(b,p);al.append(d)};
  S.alarms.forEach(c=>card(info.includes(c)?' info':'',c+' — '+t('a_'+c),fill('d_'+c,sub)));
  if(co.heater)card(' info',t('a_heat'),t('d_heat'));     /* information, after the alarms */
+ const he=S.heater,lk=S.leak;
+ if(lk.info)card(' info',t('a_leak'),t('d_leak'));
+ if(he.found)card(' info',t('a_hfound'),t('d_hfound'));
+ $('#heat-v').textContent=he.has?(he.found?t('h_found')+' · ':'')+t(he.on?'h_on':'h_off'):t('h_none');
+ $('#leak-row').classList.toggle('hide',!he.has);
+ $('#leak-v').textContent=lk.st==1?t('lk_check'):lk.st==2?t('lk_stop'):lk.last?fill('lk_last',{m:dur(lk.ago),r:t(lk.last==2?'lk_leak':'lk_sun')}):'—';
  const ssn=t(S.winter?'winter':'summer');
  $('#hd-season').textContent=ssn;
  $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
@@ -521,10 +542,10 @@ function drawChart(){
 }
 function drawDays(){
  const b=$('#days');if(!D)return;b.textContent='';
- if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=5;c.textContent=t('no_days');return}
+ if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=6;c.textContent=t('no_days');return}
  const tv=v=>v==null?'—':deg(v)+'°';
  D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool?d.cool+' min':'—'].forEach(x=>r.insertCell().textContent=x)});
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool?d.cool+' min':'—',d.heat?d.heat+' min':'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}

@@ -85,6 +85,9 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
     if (st->e6) {
         a |= SH_ALARM_BIT(SH_ALARM_E6);
     }
+    if (in->e8) {
+        a |= SH_ALARM_BIT(SH_ALARM_E8);
+    }
     if (in->pump_on &&
         (in->reason == SH_PUMP_REASON_COL_PROTECT || in->reason == SH_PUMP_REASON_TF_PROBE)) {
         a |= SH_ALARM_BIT(SH_ALARM_HOT);
@@ -96,13 +99,23 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
     return a;
 }
 
+sh_alarm_t sh_alarm_at(int pos)
+{
+    static const sh_alarm_t order[SH_ALARM_COUNT] = {
+        SH_ALARM_E1, SH_ALARM_E2, SH_ALARM_E4, SH_ALARM_E5, SH_ALARM_E6, SH_ALARM_E8,
+        SH_ALARM_HOT, SH_ALARM_FRO,
+    };
+    return pos >= 0 && pos < SH_ALARM_COUNT ? order[pos] : SH_ALARM_COUNT;
+}
+
 sh_alarm_t sh_alarm_code_at(uint8_t active, uint32_t ms)
 {
     uint32_t idx = ms / SH_ALARM_CODE_MS;
-    for (int a = 0; a < SH_ALARM_COUNT; a++) {
+    for (int pos = 0; pos < SH_ALARM_COUNT; pos++) {
+        const sh_alarm_t a = sh_alarm_at(pos);
         if (active & SH_ALARM_BIT(a)) {
             if (idx == 0) {
-                return (sh_alarm_t)a;
+                return a;
             }
             idx--;
         }
@@ -124,7 +137,7 @@ const char *sh_alarm_name(sh_alarm_t a)
     static const char *const names[SH_ALARM_COUNT] = {
         [SH_ALARM_E1] = "E1", [SH_ALARM_E2] = "E2", [SH_ALARM_E4] = "E4",
         [SH_ALARM_E5] = "E5", [SH_ALARM_E6] = "E6", [SH_ALARM_HOT] = "Hot",
-        [SH_ALARM_FRO] = "Fro",
+        [SH_ALARM_FRO] = "Fro", [SH_ALARM_E8] = "E8",
     };
     return (unsigned)a < SH_ALARM_COUNT ? names[a] : "?";
 }

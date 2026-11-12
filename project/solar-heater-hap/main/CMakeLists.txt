@@ -28,6 +28,8 @@ idf_component_register(
         "sh_hist.c"
         "sh_history.c"
         "sh_sun.c"
+        "sh_heater.c"
+        "sh_e8.c"
         "sh_season.c"
         "sh_cool.c"
         "sh_learn_store.c"

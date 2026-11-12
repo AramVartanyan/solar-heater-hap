@@ -21,7 +21,9 @@
  *                                    thresholds, the other direction, with the minimum times
  *   7. vacation                   -> normal charging off
  *   8. tank Tmax                  -> normal charging off at once
- *   9. difference                 -> on / off, with the minimum times
+ *   9. heater leak (sh_heater)    -> off during a check and after a check that found a leak; they
+ *                                    only take the place of the difference
+ *  10. difference                 -> on / off, with the minimum times
  * The boiling point, the ceiling of the collector protection and the frost threshold are computed
  * from the installer data (sh_installer) and come in with the parameters.
  */
@@ -65,6 +67,9 @@ typedef enum {
     SH_PUMP_REASON_VACATION,        /* off: vacation, no normal charging */
     SH_PUMP_REASON_AIR_RUN,         /* on:  air venting, run phase */
     SH_PUMP_REASON_AIR_PAUSE,       /* off: air venting, pause phase */
+    /* group D: the heat of the heater leaking to the collector */
+    SH_PUMP_REASON_LEAK_CHECK,      /* off: heater leak check (5 min) */
+    SH_PUMP_REASON_LEAK_STOP,       /* off: heater leak found, no start by the difference */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -82,6 +87,10 @@ typedef struct {
     int16_t  frost;                 /* frost threshold, 0.1 °C: on below it, off at >= it + 2 K */
     bool     cool;                  /* night cooling allowed now (sh_cool) */
     bool     charge_off;            /* vacation: no normal charging (col_protect is the vacation limit) */
+    int16_t  heater_rise;           /* tank rise in 10 min, pump off, that means "heater", 0.1 K (sh_heater_rise) */
+    bool     leak_hold;             /* heater leak check: the pump does not charge by the difference */
+    bool     leak_block;            /* heater leak found: likewise, until it is released */
+    bool     leak_resume;           /* the check found no leak: sh_pump_ctl decides as for a running pump */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).

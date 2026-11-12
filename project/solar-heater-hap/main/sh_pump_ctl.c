@@ -50,15 +50,18 @@ static void track_history(sh_pump_ctl_t *c, int16_t tank, uint32_t now_s)
     c->hist_next_s = now_s + 60;
 }
 
-bool sh_pump_ctl_heater(const sh_pump_ctl_t *c)
+bool sh_pump_ctl_heater(const sh_pump_ctl_t *c, int16_t rise)
 {
+    if (rise < SH_CF_RISE) {
+        rise = SH_CF_RISE;          /* never less than 0.5 K */
+    }
     if (c->hist_n < SH_CF_HISTORY) {
         return false;               /* the pump has not been off for 10 min yet */
     }
     /* full ring: hist_head is the oldest sample (10 min ago), the one before it the newest */
     const int16_t oldest = c->hist[c->hist_head];
     const int16_t newest = c->hist[(c->hist_head + SH_CF_HISTORY - 1) % SH_CF_HISTORY];
-    return newest - oldest >= SH_CF_RISE;
+    return newest - oldest >= rise;
 }
 
 static sh_pump_mode_t mode_of(const sh_pump_temps_t *t)
@@ -241,7 +244,7 @@ static bool col_fault_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t 
         *reason = SH_PUMP_REASON_CF_WAIT;
         return false;
     }
-    if (sh_pump_ctl_heater(c)) {
+    if (sh_pump_ctl_heater(c, p->heater_rise)) {
         *reason = SH_PUMP_REASON_CF_HEATER;
         return false;
     }
@@ -330,7 +333,13 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     bool on;
     switch (c->mode) {
     case SH_PUMP_MODE_NORMAL:
-        on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
+        if (p->leak_resume && !was_on) {
+            /* a heater leak check found no leak: the pump goes on at once, as if it had not been
+             * stopped — a running pump whose minimum run time is over */
+            on = normal_mode(c, p, col, tank, true, LONG_AGO_S, &reason);
+        } else {
+            on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
+        }
         break;
     case SH_PUMP_MODE_TANK_FAULT:
         on = tank_fault_mode(c, p, col, was_on, elapsed_s, now_s, &reason);

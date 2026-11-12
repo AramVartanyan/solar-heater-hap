@@ -9,7 +9,8 @@
  *                     set c_lo_w, d_on_w, d_of_w — the checks of the button menu; ssn 0 / 1 / 2
  *                     season, hol 0 / 1 vacation, nc / nc_w 0 / 1 night cooling above Tmax in
  *                     summer / winter), fro (0 / 1), installer data (fluid, glycol, press,
- *                     col_max, col_type, col_area, tank_vol — only with the access code)
+ *                     col_max, col_type, col_area, tank_vol, heater — tenths of kW — only with the
+ *                     access code)
  *              test   cmd=start | plus | minus | stop
  *              air    cmd=start | stop: the air venting
  *              reset  what=wifi | defaults | factory | history | learned (only with the access
@@ -85,6 +86,13 @@ typedef struct {
     bool air_on, air_run;
     uint8_t air_cycle;
     uint32_t air_left_s;
+    /* heater and its leak */
+    bool heater_on;             /* the heater sign is active */
+    bool heater_found;          /* found with the setting "0 kW" */
+    uint8_t leak;               /* sh_leak_state_t */
+    bool leak_info;             /* "the heater leak is stopped" */
+    uint8_t leak_last;          /* the result of the last check: sh_leak_result_t, 0 none ... */
+    uint32_t leak_ago_s;        /* ... and how long ago */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */
@@ -97,8 +105,8 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s);
 int sh_web_chart_json(char *buf, size_t size, const sh_day_t *d, const sh_local_t *lt, uint32_t now_s);
 
 /* The last daily summaries, newest first: {"on":1,"days":[{"d":"2026-11-11","cx":..,"cn":..,
- * "tx":..,"tn":..,"run":[c,p,o],"cool":..,"al":["E1"],"pk":..,"rel":1,"part":0},...]}; `on`: the
- * history partition is there. */
+ * "tx":..,"tn":..,"run":[c,p,o],"cool":..,"heat":..,"al":["E1"],"pk":..,"rel":1,"part":0},...]};
+ * `on`: the history partition is there; `heat`: the minutes of the heater. */
 #define SH_WEB_DAYS             7
 #define SH_WEB_DAYS_MAX         2048
 int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days, unsigned n);

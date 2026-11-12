@@ -1017,7 +1017,7 @@ static void test_cf_heater(void)
         temps(&s, 300, ++tank);
         run(&s, 120);
     }
-    CHECK(sh_pump_ctl_heater(&s.c));
+    CHECK(sh_pump_ctl_heater(&s.c, SH_CF_RISE));
     faults(&s, true, false);
     run(&s, 1);
     OFF(s, CF_HEATER);
@@ -1045,7 +1045,7 @@ static void test_cf_heater(void)
         temps(&s, 300, ++tank);
         run(&s, 150);
     }
-    CHECK(!sh_pump_ctl_heater(&s.c));
+    CHECK(!sh_pump_ctl_heater(&s.c, SH_CF_RISE));
     faults(&s, true, false);
     run(&s, 1);
     ON(s, CF_PROBE);
@@ -1063,9 +1063,9 @@ static void test_cf_heater_needs_10_min_off(void)
     run(&s, 1);                     /* the first sample after the stop: 40.0 °C */
     temps(&s, 400, 410);            /* +1 K: not judged before 10 min of samples */
     run_to(&s, stopped + 600);
-    CHECK(!sh_pump_ctl_heater(&s.c));
+    CHECK(!sh_pump_ctl_heater(&s.c, SH_CF_RISE));
     run(&s, 1);
-    CHECK(sh_pump_ctl_heater(&s.c));
+    CHECK(sh_pump_ctl_heater(&s.c, SH_CF_RISE));
 }
 
 static void test_cf_enter_and_recover(void)

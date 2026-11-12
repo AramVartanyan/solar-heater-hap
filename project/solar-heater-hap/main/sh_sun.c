@@ -65,6 +65,7 @@ uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, co
         /* full ring: head is the sample of 10 min ago */
         rise = s->n == SH_SUN_RISE_SAMPLES && t_col - s->hist[s->head] >= SH_SUN_RISE_K;
     }
+    s->warming = rise;
     if (rise && !s->rise_done) {
         s->rise_done = true;
         s->rise_day = lt->set ? lt->day : SH_DAY_NONE;

@@ -10,8 +10,8 @@
  *            temperature with a faulty tank sensor — Hot) / other (pump test, anti-seize run, the
  *            probe with a faulty collector sensor, air venting) / cooling (night cooling)
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
- *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
- *            day, the minute of the collector maximum (the first one). At the first step of the
+ *            and of the tank (faulty sensor: not taken), run time by kind, the time with the
+ *            heater sign active, the alarm codes of the day, the minute of the collector maximum (the first one). At the first step of the
  *            next day (a normal midnight: the next date, before 01:00) the day is handed over to
  *            be written; it is full when it was collected with a set clock from midnight to
  *            midnight, otherwise partial. Any other change of the date (the clock was set to
@@ -57,6 +57,7 @@ typedef struct {
     sh_pump_reason_t reason;
     uint16_t alarms;            /* SH_ALARM_BIT() of the active codes */
     uint16_t sunrises, sunsets; /* how many were detected since boot (sh_sun, counted by sh_control) */
+    bool heater;                /* the heater sign is active (sh_heater) */
 } sh_day_in_t;
 
 /* One finished interval. */
@@ -78,6 +79,7 @@ typedef struct {
     int16_t peak_min;           /* local minute of col_max, -1: none */
     bool col_fault;             /* the collector sensor was faulty at some time */
     uint32_t run_s[SH_RUN_KINDS];
+    uint32_t heater_s;          /* the heater sign was active this long */
     uint16_t alarms;
     int16_t sunrise, sunset;    /* local minutes of the detected ones (the last sunset), -1: none */
 } sh_day_sum_t;
@@ -95,6 +97,7 @@ typedef struct {
     bool last_set;              /* the clock was set at the previous step */
     int32_t last_local;         /* its local time, minutes since 2020-01-01 */
     int last_kind;              /* the pump kind since the previous step, -1 off */
+    bool last_heater;           /* the heater sign at the previous step */
     uint16_t sunrises, sunsets; /* the counters at the previous step */
     sh_day_sum_t sum;           /* today */
 } sh_day_t;

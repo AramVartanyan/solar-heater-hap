@@ -237,6 +237,15 @@ menu "Device Settings"
             help
                 A multiple of 10 l (checked at compile time).
 
+        config SH_INST_HEATER_HW
+            int "Heater in the tank (0.1 kW, 0 = none)"
+            range 0 120
+            default 20
+            help
+                Tenths of a kilowatt: 20 = 2.0 kW; 0 = no heater, otherwise 0.5 - 12.0 kW in
+                steps of 0.5 kW (checked at compile time). With the tank volume: how fast the
+                tank rises while the heater works (its sign).
+
     endmenu
 
     config SH_INTERNAL_PULLUPS

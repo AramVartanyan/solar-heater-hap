@@ -14,16 +14,19 @@
 #                     sh_tz, sh_day, sh_hist)
 #   test_group_c      night cooling, sunrise / sunset, vacation, seasons, air venting (sh_cool,
 #                     sh_sun, sh_season, sh_pump_logic, sh_pump_ctl, sh_installer, sh_ind, sh_day)
+#   test_group_d      heater sign and power, heater leak (daylight, check schedule, check result),
+#                     reverse thermosiphon E8 (sh_heater, sh_e8, sh_pump_logic, sh_pump_ctl, sh_sun,
+#                     sh_alarm, sh_ind, sh_installer, sh_day, sh_hist)
 
 CC      := gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O1
 MAIN    := ../main
 BUILD   := build
 TESTS   := test_pump_logic test_pump_ctl test_meas test_settings test_menu test_alarm test_ind \
-           test_installer test_web test_clock_history test_group_c
+           test_installer test_web test_clock_history test_group_c test_group_d
 HIST_SRC := $(MAIN)/sh_clock_rules.c $(MAIN)/sh_tz.c $(MAIN)/sh_day.c $(MAIN)/sh_hist.c $(MAIN)/sh_alarm.c
 WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
-           $(HIST_SRC)
+           $(MAIN)/sh_heater.c $(HIST_SRC)
 GROUP_C_SRC := $(MAIN)/sh_cool.c $(MAIN)/sh_sun.c $(MAIN)/sh_season.c
 HDRS    := $(wildcard $(MAIN)/sh_*.h) test_util.h
 
@@ -44,7 +47,9 @@ $(BUILD)/test_web:        test_web.c $(WEB_SRC) $(HDRS)
 $(BUILD)/test_clock_history: test_clock_history.c $(HIST_SRC) $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_group_c:    test_group_c.c $(GROUP_C_SRC) $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c \
                           $(MAIN)/sh_installer.c $(MAIN)/sh_ind.c $(HIST_SRC) $(HDRS)
-$(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(MAIN)/sh_pump_ctl.c $(HDRS)
+$(BUILD)/test_group_d:    test_group_d.c $(MAIN)/sh_heater.c $(MAIN)/sh_e8.c $(MAIN)/sh_sun.c $(MAIN)/sh_pump_ctl.c \
+                          $(MAIN)/sh_pump_logic.c $(MAIN)/sh_installer.c $(MAIN)/sh_ind.c $(HIST_SRC) $(HDRS)
+$(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(MAIN)/sh_e8.c $(MAIN)/sh_pump_ctl.c $(HDRS)
 
 $(BUILD)/%:
 	@mkdir -p $(BUILD)

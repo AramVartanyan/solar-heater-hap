@@ -2,7 +2,8 @@
  * (doc/tasks/step6-installer-web.md 3.5, step9-clock-history.md 3.4): serves main/web/index.html
  * and the API of main/sh_web.c with the same plain-C code (sh_web_api, sh_installer, sh_settings,
  * sh_pump_ctl, sh_alarm; sh_clock_rules, sh_tz, sh_day, sh_hist; sh_sun, sh_season, sh_cool —
- * doc/tasks/step10-cooling-vacation-seasons.md 3.6). Nothing is stored; the values
+ * doc/tasks/step10-cooling-vacation-seasons.md 3.6; sh_heater, sh_e8 —
+ * doc/tasks/step12-heater-leak-e8.md 3.5). Nothing is stored; the values
  * start at the Kconfig defaults. The clock is the one of the computer (set "by SNTP", zone
  * Europe/Sofia confirmed); the chart starts with a made-up day and the history with 40 made-up
  * days (in a RAM "flash").
@@ -22,6 +23,14 @@
  *   http://localhost:8080/sim?hhmm=0330              the local time becomes 03:30 (the clock is moved)
  *   http://localhost:8080/sim?e4=1                   an E4 "during the day": cooling from 03:00
  *   http://localhost:8080/sim?heater=1               the heater works against the cooling (information)
+ *   http://localhost:8080/sim?hsign=1                the heater works (its sign; hsign=0: by the tank
+ *                                                    temperatures again); with "0 kW" it is found
+ *   http://localhost:8080/sim?hfound=0               the found heater is forgotten
+ *   http://localhost:8080/sim?leak=1                 a heater leak check starts now (the pump stops
+ *                                                    for 5 min; lower the collector by >= 2 K
+ *                                                    meanwhile for a leak); leak=2: a leak was found
+ *                                                    (the pump stays off); leak=0: released
+ *   http://localhost:8080/sim?e8=1                   E8 (reverse thermosiphon) declared; e8=0 cleared
  * Night cooling in the browser: /sim?col=150&tank=720 and /sim?hhmm=0400 (tank above Tmax), or
  * /sim?e4=1 and /sim?hhmm=0300; the vacation at night: switch it on and /sim?hhmm=2300 (the learned
  * sunset is 16:50); the season follows the daylight saving time of the zone (Aut) or the choice.
@@ -49,13 +58,15 @@
 #include "sh_sun.h"
 #include "sh_season.h"
 #include "sh_cool.h"
+#include "sh_heater.h"
+#include "sh_e8.h"
 
 #define CODE    "810841"
 
 static sh_web_config_t s_cfg = {
     .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } },
     .frost = true,
-    .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150 } },
+    .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } },
 };
 static sh_pump_temps_t s_temps = { .t_col = 523, .t_tank = 418 };
 static sh_pump_ctl_t s_pump;
@@ -66,6 +77,10 @@ static sh_cool_t s_cool;
 static bool s_winter, s_dst;
 static uint16_t s_sunrises, s_sunsets;
 static int16_t s_cool_target;
+static bool s_heater_on, s_heater_found;
+static int s_heater_sign = -1;          /* /sim?hsign=: -1 by the temperatures */
+static sh_leak_t s_leak;
+static sh_e8_t s_e8;
 static const sh_alarm_params_t ALARM = {
     .e6_time_s = 600, .e6_col_rise = 100, .e6_tank_rise = 5, .e6_diff = 200, .e6_clear_diff = 100,
 };
@@ -156,6 +171,7 @@ static void day_over(const sh_day_sum_t *d)
         r.run_min[k] = (uint16_t)((d->run_s[k] + 30) / 60);
     }
     r.cool_min = (uint16_t)((d->run_s[SH_RUN_COOL] + 30) / 60);
+    r.heater_min = (uint16_t)((d->heater_s + 30) / 60);
     r.sunrise = d->sunrise >= 0 ? (uint16_t)d->sunrise : SH_HIST_NO_TIME;
     r.sunset = d->sunset >= 0 ? (uint16_t)d->sunset : SH_HIST_NO_TIME;
     r.cool_target = (uint8_t)((s_cool_target + 5) / 10);
@@ -193,6 +209,7 @@ static void made_up(int min, sh_day_in_t *in, int16_t *tank)
         in->pump_on = true;
         in->reason = SH_PUMP_REASON_COOL;
     }
+    in->heater = min >= 120 && min < 165;                   /* the heater, 02:00 - 02:45 */
     in->sunrises = min >= 415 ? 1 : 0;
     in->sunsets = min >= 1010 ? 1 : 0;
 }
@@ -220,6 +237,7 @@ static void made_up_start(void)
         s_sun.days.set[i] = (uint16_t)(1013 - i);
     }
     s_cool.offset = -1;
+    sh_e8_keep_reset(&s_e8.keep);
     /* 40 made-up days before today; 3 days ago partial, 10 days ago E1 */
     sh_hist_open(&s_hist, &FLASH);
     sh_local_t lt;
@@ -235,13 +253,14 @@ static void made_up_start(void)
         r.run_min[SH_RUN_PROTECT] = (uint16_t)(r.col_max > 1100 ? 25 : 0);
         r.run_min[SH_RUN_OTHER] = (uint16_t)(d % 7 == 0 ? 1 : 0);
         r.cool_min = (uint16_t)(d % 5 == 0 ? 35 + d : 0);
+        r.heater_min = (uint16_t)(d % 3 == 0 ? 0 : 40 + (d * 7) % 50);
         r.sunrise = (uint16_t)(415 - d);
         r.sunset = (uint16_t)(1010 + d);
         r.cool_target = 65;
         r.peak_min = (int16_t)(13 * 60 + (d * 11) % 120);
         r.clock_reliable = true;
         r.partial = d == 3;
-        r.alarms = (uint16_t)((d == 10 ? SH_ALARM_BIT(SH_ALARM_E1) : 0) |
+        r.alarms = (uint16_t)((d == 10 ? SH_ALARM_BIT(SH_ALARM_E1) : 0) | (d == 5 ? SH_ALARM_BIT(SH_ALARM_E8) : 0) |
                               (r.run_min[SH_RUN_PROTECT] ? SH_ALARM_BIT(SH_ALARM_HOT) : 0));
         sh_hist_append(&s_hist, &r);
     }
@@ -294,13 +313,48 @@ static void control(void)
         printf("night cooling started (%d), target %d\n", s_cool.trigger, s_cool_target);
     }
     p.cool = s_cool.trigger != SH_COOL_NONE;
+
+    /* the heater, its leak — in the order of sh_control */
+    const int16_t heater_kw = s_cfg.inst.v[SH_INST_HEATER];
+    p.heater_rise = sh_heater_rise(heater_kw, s_cfg.inst.v[SH_INST_TANK_VOL]);
+    s_heater_on = s_heater_sign >= 0 ? s_heater_sign != 0 : sh_pump_ctl_heater(&s_pump, p.heater_rise);
+    if (sh_heater_found(&s_heater_found, heater_kw, s_heater_on)) {
+        printf("heater found with 0 kW\n");
+    }
+    const sh_leak_in_t lin = {
+        .heater = sh_heater_present(heater_kw, s_heater_found), .reliable = reliable, .min = lt.min,
+        .rise = sh_sun_avg(s_sun.days.rise), .set = sh_sun_avg(s_sun.days.set), .pump_on = s_pump.on,
+        .charging = s_pump.on && s_pump.mode == SH_PUMP_MODE_NORMAL &&
+                    (s_pump.reason == SH_PUMP_REASON_DIFF || s_pump.reason == SH_PUMP_REASON_MIN_RUN),
+        .t_col = col, .warming = s_sun.warming, .sunrise = (sun & SH_SUN_EVT_RISE) != 0,
+    };
+    sh_leak_step(&s_leak, &lin, now);
+    if (s_leak.events) {
+        printf("heater leak: events 0x%02x, state %d, collector fell %d\n", s_leak.events, s_leak.state, s_leak.drop);
+    }
+    p.leak_hold = s_leak.hold;
+    p.leak_block = s_leak.block;
+    p.leak_resume = s_leak.resume;
+
     sh_pump_ctl_step(&s_pump, &p, &s_temps, now);
     s_pump.events = 0;
+
+    const sh_e8_in_t ein = {
+        .night = cin.night, .pump_on = s_pump.on, .t_col = col, .t_tank = tank, .heater = s_heater_on,
+        .fall = sh_e8_fall(s_cfg.inst.v[SH_INST_COL_TYPE] == SH_COL_TUBES, s_cfg.inst.v[SH_INST_COL_AREA],
+                           s_cfg.inst.v[SH_INST_TANK_VOL]),
+    };
+    sh_e8_step(&s_e8, &ein, now);
+    if (s_e8.events) {
+        printf("E8: events 0x%02x, nights with the sign %d, normal %d\n", s_e8.events, s_e8.keep.sign_nights,
+               s_e8.keep.normal_nights);
+    }
     const sh_alarm_in_t in = {
         .t_col = s_temps.t_col, .t_tank = s_temps.t_tank,
         .col_fault = s_temps.col_fault, .tank_fault = s_temps.tank_fault,
         .pump_on = s_pump.on, .reason = s_pump.reason,
         .col_boiling = s_pump.norm.col_boiling, .tank_ceiling = s_pump.norm.tank_ceiling,
+        .e8 = s_e8.keep.active,
     };
     sh_alarm_step(&s_alarm, &ALARM, &in, now);
 
@@ -308,7 +362,7 @@ static void control(void)
     const sh_day_in_t din = {
         .t_col = s_temps.t_col, .t_tank = s_temps.t_tank, .col_fault = s_temps.col_fault,
         .tank_fault = s_temps.tank_fault, .pump_on = s_pump.on, .reason = s_pump.reason,
-        .alarms = s_alarm.active, .sunrises = s_sunrises, .sunsets = s_sunsets,
+        .alarms = s_alarm.active, .sunrises = s_sunrises, .sunsets = s_sunsets, .heater = s_heater_on,
     };
     sh_day_sum_t done;
     if (sh_day_step(&s_day, &din, &lt, now, &done)) {
@@ -367,6 +421,9 @@ static void reply_state(int fd)
         .cool_until = trust() == SH_CLOCK_RELIABLE && s_cool.trigger != SH_COOL_VACATION ? SH_COOL_TO_MIN : -1,
         .cool_heater = s_cool.heater, .cool_learned = s_cool_target,
         .sunrise = (int16_t)sh_sun_avg(s_sun.days.rise), .sunset = (int16_t)sh_sun_avg(s_sun.days.set),
+        .heater_on = s_heater_on, .heater_found = s_heater_found,
+        .leak = (uint8_t)s_leak.state, .leak_info = s_leak.info, .leak_last = (uint8_t)s_leak.last,
+        .leak_ago_s = now - s_leak.last_s,
     };
     sh_air_view_t air;
     sh_pump_ctl_air(&s_pump, now, &air);
@@ -425,6 +482,27 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "heater=")) && sscanf(p + 7, "%d", &v) == 1) {
         s_cool.heater = v != 0;
+    }
+    if ((p = strstr(query, "hsign=")) && sscanf(p + 6, "%d", &v) == 1) {
+        s_heater_sign = v ? 1 : -1;
+    }
+    if ((p = strstr(query, "hfound=")) && sscanf(p + 7, "%d", &v) == 1) {
+        s_heater_found = v != 0;
+    }
+    if ((p = strstr(query, "leak=")) && sscanf(p + 5, "%d", &v) == 1) {
+        s_leak.state = v == 1 ? SH_LEAK_CHECK : v == 2 ? SH_LEAK_STOPPED : SH_LEAK_IDLE;
+        s_leak.check_s = now_s();
+        s_leak.check_ref = s_temps.t_col;
+        s_leak.block = v == 2;
+        if (v == 2) {
+            s_leak.last = SH_LEAK_RES_LEAK;
+            s_leak.last_s = now_s();
+            s_leak.info = true;
+        }
+    }
+    if ((p = strstr(query, "e8=")) && sscanf(p + 3, "%d", &v) == 1) {
+        sh_e8_keep_reset(&s_e8.keep);
+        s_e8.keep.active = v != 0;
     }
 }
 
@@ -585,9 +663,11 @@ static void handle(int fd, const char *page, size_t page_len)
             sh_sun_days_reset(&s_sun.days);
             s_cool.offset = 0;
             s_cool.quiet = 0;
+            s_heater_found = false;
+            sh_e8_keep_reset(&s_e8.keep);
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
-                                       .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150 } } };
+                                       .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {

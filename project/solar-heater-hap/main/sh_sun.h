@@ -48,6 +48,7 @@ typedef struct {
     uint32_t next_s;
     bool above;                 /* the collector has been above the tank since the last sunset */
     bool dark;                  /* sunset detected, no sunrise since */
+    bool warming;               /* in the last step: the collector rose >= 2 K in 10 min, pump stopped */
     uint32_t sunset_s;          /* when (valid while dark) */
     bool rise_done;             /* the sunrise of this day / of this night is taken */
     uint16_t rise_day;          /* its local date (with a set clock) */

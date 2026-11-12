@@ -8,7 +8,7 @@
  *   2   collector max, min; tank max, min, 0.1 °C         4 x i16 (0x8000: no data)
  *   10  pump run minutes: charging, protection, other     3 x u16
  *   16  night cooling minutes (group C, 0 until then)     u16
- *   18  heater minutes (group D, 0 until then)            u16
+ *   18  heater minutes (the heater sign active)           u16
  *   20  alarm codes of the day, SH_ALARM_BIT()            u16
  *   22  collector peak, local minute (bits 0-10, 0x7FF: none); clock reliable (bit 15)   u16
  *   24  learned: sunrise, sunset (local minutes, 0xFFFF: no data)                        2 x u16

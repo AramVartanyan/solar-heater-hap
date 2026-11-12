@@ -19,6 +19,8 @@
 #include "sh_sun.h"
 #include "sh_season.h"
 #include "sh_cool.h"
+#include "sh_heater.h"
+#include "sh_e8.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -63,6 +65,11 @@ static sh_modes_t s_modes;
 static bool s_modes_done;
 static bool s_vacation;
 
+/* Heater, its leak, reverse thermosiphon (only the control task uses them) */
+static bool s_heater_on, s_heater_found;
+static sh_leak_t s_leak;
+static sh_e8_t s_e8;
+
 static QueueHandle_t s_cmds;
 
 /* The menu settings (whole K / °C; the seasonal ones of the current season), Kconfig "Control"
@@ -89,7 +96,10 @@ static void get_params(sh_pump_params_t *p, const sh_settings_t *s, bool winter,
 
 static void save_learned(void)
 {
-    const sh_learned_t l = { .days = s_sun.days, .cool_offset = s_cool.offset, .cool_quiet = s_cool.quiet };
+    const sh_learned_t l = {
+        .days = s_sun.days, .cool_offset = s_cool.offset, .cool_quiet = s_cool.quiet,
+        .heater_found = s_heater_found, .e8 = s_e8.keep,
+    };
     sh_learn_save(&l);
 }
 
@@ -200,6 +210,54 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     }
     params.cool = s_cool.trigger != SH_COOL_NONE;
 
+    /* the heater: its sign (the tank rises with the pump stopped) by the samples of the steps so
+     * far; found with the setting "0 kW" */
+    const int16_t heater_kw = inst.v[SH_INST_HEATER];
+    params.heater_rise = sh_heater_rise(heater_kw, inst.v[SH_INST_TANK_VOL]);
+    const bool heater_on = sh_pump_ctl_heater(pump, params.heater_rise);
+    if (heater_on != s_heater_on) {
+        s_heater_on = heater_on;
+        char rise[12];
+        ESP_LOGI(TAG, "heater %s: tank %s °C (sign: >= %s K in 10 min with the pump stopped)",
+                 heater_on ? "works" : "off", temp_str(tbuf, sizeof(tbuf), t_tank, false),
+                 temp_str(rise, sizeof(rise), params.heater_rise, false));
+    }
+    if (sh_heater_found(&s_heater_found, heater_kw, heater_on)) {
+        ESP_LOGW(TAG, "heater found although the installer data say 0 kW: taken as present");
+        save_learned();
+    }
+
+    /* the heat of the heater leaking to the collector: checks of the pump that charges */
+    const sh_leak_in_t lin = {
+        .heater = sh_heater_present(heater_kw, s_heater_found), .reliable = reliable, .min = ci.lt.min,
+        .rise = sh_sun_avg(s_sun.days.rise), .set = sh_sun_avg(s_sun.days.set), .pump_on = pump->on,
+        .charging = pump->on && pump->mode == SH_PUMP_MODE_NORMAL &&
+                    (pump->reason == SH_PUMP_REASON_DIFF || pump->reason == SH_PUMP_REASON_MIN_RUN),
+        .t_col = t_col, .warming = s_sun.warming, .sunrise = (sun & SH_SUN_EVT_RISE) != 0,
+    };
+    sh_leak_step(&s_leak, &lin, now);
+    if (s_leak.events & SH_LEAK_EVT_CHECK) {
+        ESP_LOGI(TAG, "heater leak check: pump stopped for %u s, collector %s °C", SH_LEAK_CHECK_S,
+                 temp_str(tbuf, sizeof(tbuf), t_col, false));
+    }
+    if (s_leak.events & SH_LEAK_EVT_SUN) {
+        ESP_LOGI(TAG, "heater leak check: collector %s K lower — no leak, the pump goes on",
+                 temp_str(tbuf, sizeof(tbuf), s_leak.drop, false));
+    }
+    if (s_leak.events & SH_LEAK_EVT_LEAK) {
+        ESP_LOGW(TAG, "heater leak check: collector %s K lower — heater leak stopped, no start by the "
+                 "difference until the collector warms up by itself", temp_str(tbuf, sizeof(tbuf), s_leak.drop, false));
+    }
+    if (s_leak.events & SH_LEAK_EVT_ABORT) {
+        ESP_LOGI(TAG, "heater leak check ended without a result");
+    }
+    if (s_leak.events & SH_LEAK_EVT_RELEASED) {
+        ESP_LOGI(TAG, "heater leak: the pump may start by the difference again");
+    }
+    params.leak_hold = s_leak.hold;
+    params.leak_block = s_leak.block;
+    params.leak_resume = s_leak.resume;
+
     /* the computed limits: at boot and whenever the installer data change them */
     static sh_pump_params_t s_logged = { .col_boiling = INT16_MIN };
     if (params.col_boiling != s_logged.col_boiling || params.col_protect_cap != s_logged.col_protect_cap ||
@@ -243,8 +301,10 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
             s_sun.set_pending = false;
             s_cool.offset = 0;
             s_cool.quiet = 0;
+            s_heater_found = false;
+            sh_e8_keep_reset(&s_e8.keep);
             sh_learn_reset();
-            ESP_LOGW(TAG, "learned values reset (sunrise / sunset, cooling target)");
+            ESP_LOGW(TAG, "learned values reset (sunrise / sunset, cooling target, heater found, E8)");
             break;
         }
         if (was_test && pump->test && pump->test_end_s != was_end) {
@@ -304,6 +364,12 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     s_modes.air_on = pump->air;
     s_modes.air_start_s = pump->air ? pump->air_start_s : 0;
     s_modes.air_pause_s = pump->air ? pump->air_pause_s : 0;
+    s_modes.heater_on = heater_on;
+    s_modes.heater_found = s_heater_found;
+    s_modes.leak = (uint8_t)s_leak.state;
+    s_modes.leak_info = s_leak.info;
+    s_modes.leak_last = (uint8_t)s_leak.last;
+    s_modes.leak_last_s = s_leak.last_s;
     static sh_modes_t s_published;
     if (!s_modes_done || memcmp(&s_modes, &s_published, sizeof(s_modes)) != 0) {
         sh_state_set_modes(&s_modes);
@@ -311,11 +377,37 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
         s_modes_done = true;
     }
 
+    /* reverse thermosiphon: the nights with its sign, with the pump as this step left it */
+    const sh_e8_in_t ein = {
+        .night = cin.night, .pump_on = pump->on, .t_col = t_col, .t_tank = t_tank, .heater = heater_on,
+        .fall = sh_e8_fall(inst.v[SH_INST_COL_TYPE] == SH_COL_TUBES, inst.v[SH_INST_COL_AREA],
+                           inst.v[SH_INST_TANK_VOL]),
+    };
+    sh_e8_step(&s_e8, &ein, now);
+    if (s_e8.events & SH_E8_EVT_SIGN) {
+        ESP_LOGW(TAG, "reverse thermosiphon sign: collector %s °C rises, the tank falls >= %d.%d K/h; "
+                 "%u night(s) in a row", temp_str(tbuf, sizeof(tbuf), t_col, false), ein.fall / 10, ein.fall % 10,
+                 s_e8.keep.sign_nights);
+    }
+    if (s_e8.events & SH_E8_EVT_NORMAL) {
+        const int learned_rate = sh_e8_normal(&s_e8.keep);
+        const int normal = learned_rate < 0 ? 0 : learned_rate;
+        ESP_LOGI(TAG, "night without a thermosiphon sign: %u in a row; normal tank cooling %d.%d K/h",
+                 s_e8.keep.normal_nights, normal / 10, normal % 10);
+    }
+    if (s_e8.events & SH_E8_EVT_SKIPPED) {
+        ESP_LOGI(TAG, "night not counted for E8 (no full hour with the pump stopped)");
+    }
+    if (s_e8.events & SH_E8_EVT_STORE) {
+        save_learned();
+    }
+
     /* alarm and information codes: every appearance and clearing in the log */
     const sh_alarm_in_t ain = {
         .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = pump->on, .reason = pump->reason,
         .col_boiling = pump->norm.col_boiling, .tank_ceiling = pump->norm.tank_ceiling,
+        .e8 = s_e8.keep.active,
     };
     const uint8_t was_alarms = s_alarm.active;
     const uint8_t alarms = sh_alarm_step(&s_alarm, &ALARM_PARAMS, &ain, now);
@@ -361,6 +453,8 @@ static void control_task(void *arg)
     s_sun.days = learned.days;
     s_cool.offset = learned.cool_offset;
     s_cool.quiet = learned.cool_quiet;
+    s_heater_found = learned.heater_found;
+    s_e8.keep = learned.e8;
     TickType_t next = xTaskGetTickCount();
 
     for (;;) {

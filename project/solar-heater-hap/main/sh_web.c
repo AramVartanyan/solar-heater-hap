@@ -113,6 +113,9 @@ static esp_err_t state_get(httpd_req_t *req)
         .cool = st.modes.cool, .cool_target = st.modes.cool_target,
         .cool_until = st.modes.cool_clock ? SH_COOL_TO_MIN : -1, .cool_heater = st.modes.cool_heater,
         .cool_learned = st.modes.cool_learned, .sunrise = st.modes.sunrise, .sunset = st.modes.sunset,
+        .heater_on = st.modes.heater_on, .heater_found = st.modes.heater_found,
+        .leak = st.modes.leak, .leak_info = st.modes.leak_info, .leak_last = st.modes.leak_last,
+        .leak_ago_s = now_s - st.modes.leak_last_s,
     };
     if (st.modes.air_on) {
         /* the phase from the published start and pause, as the control task computes it */
