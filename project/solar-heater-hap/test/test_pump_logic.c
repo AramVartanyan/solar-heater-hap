@@ -297,6 +297,30 @@ static void test_tank_ceiling_threshold(void)
     EXPECT_OFF(s, TANK_CEILING);
 }
 
+/* The ceiling stops the pump only while the collector is hot too: >= 95 °C, until below 93 °C (the
+ * pump could only take heat out of the tank with a colder collector). */
+static void test_tank_ceiling_collector(void)
+{
+    sim_t s = sim_off();
+    step(&s, LONG_AGO, 950, 960);   /* the collector at 95.0 °C: off */
+    EXPECT_OFF(s, TANK_CEILING);
+    step(&s, LONG_AGO, 931, 960);   /* not below 93 °C yet */
+    EXPECT_OFF(s, TANK_CEILING);
+    step(&s, LONG_AGO, 930, 960);   /* exactly 93.0 °C: not yet below */
+    EXPECT_OFF(s, TANK_CEILING);
+    step(&s, LONG_AGO, 929, 960);   /* 92.9 °C: the ceiling no longer stops; Tmax stops charging */
+    EXPECT_OFF(s, TANK_MAX);
+    step(&s, LONG_AGO, 949, 960);   /* rising again, below 95 °C: still allowed */
+    EXPECT_OFF(s, TANK_MAX);
+    step(&s, LONG_AGO, 950, 960);
+    EXPECT_OFF(s, TANK_CEILING);
+
+    /* a collector that was never hot: allowed from the start (the general rule of the limits) */
+    s = sim_off();
+    step(&s, LONG_AGO, 940, 960);
+    EXPECT_OFF(s, TANK_MAX);
+}
+
 static void test_tank_ceiling_return_zone(void)
 {
     sim_t s = sim_off();
@@ -672,17 +696,18 @@ static void test_frost_switch(void)
 
 static void test_frost_priority(void)
 {
-    /* tank ceiling > frost protection */
+    /* the tank ceiling does not stop the frost protection: the cold collector takes heat out of the
+     * tank (the ceiling stops the pump only while the collector is hot too) */
     sim_t s = sim_frost_off();
     step(&s, 1, 20, 950);
-    EXPECT_OFF(s, TANK_CEILING);
+    EXPECT_ON(s, FROST);
 
-    /* running frost protection is stopped by the tank ceiling at once */
+    /* running frost protection goes on when the tank reaches the ceiling */
     s = sim_frost_off();
     step(&s, 0, 20, 940);
     EXPECT_ON(s, FROST);
     step(&s, 1, 20, 950);
-    EXPECT_OFF(s, TANK_CEILING);
+    EXPECT_ON(s, FROST);
 
     /* frost protection > Tmax (and the difference: the collector is far below the tank) */
     s = sim_frost_off();
@@ -872,6 +897,7 @@ int main(void)
     test_tank_max_restart_waits_min_off_time();
 
     test_tank_ceiling_threshold();
+    test_tank_ceiling_collector();
     test_tank_ceiling_return_zone();
     test_tank_ceiling_wins_over_tank_max();
 

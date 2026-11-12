@@ -21,6 +21,11 @@ static void decided(sh_pump_state_t *st, bool on, sh_pump_reason_t reason)
     st->reason = reason;
 }
 
+bool sh_pump_ceiling_stop(const sh_pump_state_t *st)
+{
+    return st->tank_ceiling && st->col_hot;
+}
+
 int16_t sh_pump_col_protect(const sh_pump_params_t *p)
 {
     return p->col_protect < p->col_protect_cap ? p->col_protect : p->col_protect_cap;
@@ -30,6 +35,7 @@ void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_
 {
     if (t_col != SH_TEMP_INVALID) {
         st->col_boiling = sh_pump_latch(st->col_boiling, t_col, p->col_boiling);
+        st->col_hot = sh_pump_latch(st->col_hot, t_col, SH_PUMP_TANK_CEILING);
     }
     if (t_tank != SH_TEMP_INVALID) {
         st->tank_ceiling = sh_pump_latch(st->tank_ceiling, t_tank, SH_PUMP_TANK_CEILING);
@@ -66,20 +72,15 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         return;
     }
 
-    /* 3. Tank emergency ceiling: off at once — no heat may go into the tank. The night cooling is
-     *    the exception: with the collector colder than the tank the pump takes heat out of it (the
-     *    wanted answer to an E4), so it is decided below; whatever else would run the pump stays
-     *    off (after rule 6). */
-    const bool cool_out = p->cool && t_col < t_tank;
-    if (st->tank_ceiling) {
+    /* 3. Tank emergency ceiling: no more heat into the tank — off at once while the collector is hot
+     *    too (>= 95 °C, until below 93 °C). With the collector below that the pump can only take heat
+     *    out of the tank (the wanted answer to an E4): the rules below decide as usual. */
+    if (sh_pump_ceiling_stop(st)) {
         st->col_protect = false;
         st->frost = false;
-        if (!cool_out) {
-            st->cool = false;
-            decided(st, false, SH_PUMP_REASON_TANK_CEILING);
-            return;
-        }
-        goto night_cooling;             /* the protections 4 and 5 must not run the pump here */
+        st->cool = false;
+        decided(st, false, SH_PUMP_REASON_TANK_CEILING);
+        return;
     }
 
     /* 4. Collector protection: on at once (no minimum off time, also above Tmax); ends below the
@@ -125,7 +126,6 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
      *    it is not allowed any more (target reached, morning) a pump it runs goes on by the rules
      *    below as a running pump: off at once in the vacation or at Tmax, otherwise after the
      *    minimum run time. */
-night_cooling:;
     const int32_t back = (int32_t)t_tank - t_col;
     if (!p->cool) {
         st->cool = false;
@@ -144,15 +144,6 @@ night_cooling:;
             st->cool = true;
             decided(st, true, SH_PUMP_REASON_COOL);
         }
-        return;
-    }
-
-    /* The ceiling, when the night cooling does not run the pump: off. */
-    if (st->tank_ceiling) {
-        st->col_protect = false;
-        st->frost = false;
-        st->cool = false;
-        decided(st, false, SH_PUMP_REASON_TANK_CEILING);
         return;
     }
 

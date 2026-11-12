@@ -534,8 +534,8 @@ static void test_pump_cooling(void)
     CHECK(!st.on);
     CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_MAX);
 
-    /* the emergency ceiling: the cooling goes on with the collector colder than the tank (it takes
-     * heat out of the tank — the answer to an E4); otherwise the ceiling holds */
+    /* the emergency ceiling stops the pump only while the collector is hot too (>= 95 °C, until below
+     * 93 °C): with a colder collector the cooling takes heat out of the tank — the answer to an E4 */
     p.cool = true;
     st = (sh_pump_state_t){ 0 };
     sh_pump_decide(&p, &st, 300, 940, 1000);
@@ -544,14 +544,25 @@ static void test_pump_cooling(void)
     CHECK(st.on);
     CHECK_EQ(st.reason, SH_PUMP_REASON_COOL);
     CHECK(st.tank_ceiling);
-    sh_pump_decide(&p, &st, 951, 950, 10);          /* the collector not colder: off at once */
+    sh_pump_decide(&p, &st, 950, 1000, 10);         /* the collector at 95 °C: off at once */
     CHECK(!st.on);
     CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
     CHECK(!st.cool);
+    sh_pump_decide(&p, &st, 930, 1000, 1000);       /* 7 K colder, but not below 93 °C yet */
+    CHECK(!st.on);
+    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
+    sh_pump_decide(&p, &st, 929, 1000, 1000);       /* 92.9 °C: the cooling starts */
+    CHECK(st.on);
+    CHECK_EQ(st.reason, SH_PUMP_REASON_COOL);
+    sh_pump_decide(&p, &st, 949, 1000, 10);         /* rising, below 95 °C: goes on */
+    CHECK(st.on);
+    sh_pump_decide(&p, &st, 950, 1000, 10);         /* 95 °C: off at once (minimum run time or not) */
+    CHECK(!st.on);
+    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
     st = (sh_pump_state_t){ 0 };                    /* a stopped pump at the ceiling, at night */
     sh_pump_decide(&p, &st, 900, 955, 1000);        /* 5.5 K: below the switch-on difference */
     CHECK(!st.on);
-    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
+    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_MAX);
     sh_pump_decide(&p, &st, 895, 955, 100);         /* 6 K, minimum off time not over */
     CHECK(!st.on);
     sh_pump_decide(&p, &st, 895, 955, 180);         /* 6 K: the cooling starts above the ceiling */
@@ -561,22 +572,18 @@ static void test_pump_cooling(void)
     CHECK(!st.on);
     CHECK_EQ(st.reason, SH_PUMP_REASON_DIFF);
     CHECK(!st.cool);
-    sh_pump_decide(&p, &st, 920, 955, 10);          /* the next step: the ceiling */
-    CHECK(!st.on);
-    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
-    /* at the ceiling the collector and frost protections do not run the pump — only the cooling */
+    /* at the ceiling with a cold collector the frost protection runs as usual (it is above) */
     st = (sh_pump_state_t){ 0 };
-    sh_pump_decide(&p, &st, 30, 955, 1000);         /* frost threshold, but 92.5 K colder: cooling */
+    sh_pump_decide(&p, &st, 30, 955, 1000);
     CHECK(st.on);
-    CHECK_EQ(st.reason, SH_PUMP_REASON_COOL);
-    CHECK(!st.frost);
-    p.cool = false;                                 /* no cooling allowed: the ceiling holds */
+    CHECK_EQ(st.reason, SH_PUMP_REASON_FROST);
+    p.cool = false;                                 /* no cooling allowed: Tmax, no charging */
     st = (sh_pump_state_t){ 0 };
     sh_pump_decide(&p, &st, 300, 950, 1000);
     CHECK(!st.on);
-    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_CEILING);
+    CHECK_EQ(st.reason, SH_PUMP_REASON_TANK_MAX);
     p.cool = true;
-    sh_pump_decide(&p, &st, 300, 931, 1000);        /* allowed now: goes, the ceiling still active */
+    sh_pump_decide(&p, &st, 300, 931, 1000);
     CHECK(st.on);
     CHECK_EQ(st.reason, SH_PUMP_REASON_COOL);
     sh_pump_decide(&p, &st, 300, 929, 1000);
@@ -1120,7 +1127,11 @@ static void test_air_venting(void)
     const sh_pump_temps_t above_tmax = { .t_col = 300, .t_tank = 800 };
     sh_pump_ctl_step(&c, &P, &above_tmax, 100);     /* Tmax does not matter */
     CHECK(c.on);
-    const sh_pump_temps_t ceiling = { .t_col = 300, .t_tank = 950 };
+    const sh_pump_temps_t ceiling_cold = { .t_col = 300, .t_tank = 950 };
+    sh_pump_ctl_step(&c, &P, &ceiling_cold, 130);   /* the collector cold: goes on */
+    CHECK(c.on);
+    CHECK(c.air);
+    const sh_pump_temps_t ceiling = { .t_col = 950, .t_tank = 950 };
     c.events = 0;
     sh_pump_ctl_step(&c, &P, &ceiling, 160);
     CHECK(!c.on);
@@ -1201,8 +1212,8 @@ static void test_ctl_priorities(void)
     /* the collector protection (also the one of the vacation) is above the cooling */
     c = (sh_pump_ctl_t){ 0 };
     const sh_pump_temps_t hot = { .t_col = 1100, .t_tank = 1200 };     /* (not real: both at once) */
-    sh_pump_ctl_step(&c, &p, &hot, 4000);           /* at the ceiling only the cooling: the collector */
-    CHECK_EQ(c.reason, SH_PUMP_REASON_COOL);        /* is colder, the pump takes heat out of the tank */
+    sh_pump_ctl_step(&c, &p, &hot, 4000);           /* the ceiling with the collector hot */
+    CHECK_EQ(c.reason, SH_PUMP_REASON_TANK_CEILING);
     const sh_pump_temps_t hot2 = { .t_col = 1210, .t_tank = 1200 };
     c = (sh_pump_ctl_t){ 0 };
     sh_pump_ctl_step(&c, &p, &hot2, 4000);
