@@ -16,6 +16,10 @@ static const sh_pump_params_t P = {
     .tank_max = 700,
     .col_min = 250,
     .col_protect = 1100,
+    .col_protect_cap = 1150,    /* water, 1.5 bar, collector maximum 120 °C */
+    .col_boiling = 1270,
+    .frost_on = false,          /* the frost protection has its own tests */
+    .frost = 40,
 };
 
 #define H       3600u
@@ -1094,6 +1098,61 @@ static void test_no_value_until_fault(void)
     ON(s, CF_PROBE);
 }
 
+/* ---- Frost protection (the rule itself: test_pump_logic) -------------------------------- */
+
+static void test_frost_normal_mode_only(void)
+{
+    sim_t s = sim(20, 100);         /* collector 2.0 °C, below the 4.0 °C threshold */
+    s.p.frost_on = true;
+    run(&s, 1);
+    ON(s, FROST);                   /* at once, 1 s after boot: no minimum off time */
+
+    /* a faulty sensor: the frost protection is not checked */
+    faults(&s, false, true);        /* tank */
+    run(&s, 1);
+    ON(s, MIN_RUN);                 /* the tank-fault mode takes the running pump over */
+    run(&s, 200);
+    OFF(s, TF_COLD);
+    faults(&s, true, false);        /* collector: only its probes */
+    run(&s, 1);
+    CHECK(s.c.reason != SH_PUMP_REASON_FROST);
+    faults(&s, true, true);
+    run(&s, 1);
+    OFF(s, BOTH_FAULT);
+
+    /* both back: checked again; it starts at once, whatever the minimum off time */
+    faults(&s, false, false);
+    run(&s, 1);
+    ON(s, FROST);
+}
+
+static void test_frost_with_test_and_seize(void)
+{
+    /* the pump test runs as before, the frost protection goes on after it */
+    sim_t s = sim(20, 100);
+    s.p.frost_on = true;
+    run(&s, 10);
+    ON(s, FROST);
+    plus(&s);
+    ON(s, TEST);
+    run(&s, 300);
+    ON(s, FROST);                   /* the test ended, the collector is still cold */
+    CHECK(events(&s) & SH_PUMP_EVT_TEST_END);
+    temps(&s, 60, 100);             /* threshold + 2 K; the minimum run time counts from the test end */
+    run(&s, 179);
+    ON(s, FROST);
+    run(&s, 1);
+    OFF(s, DIFF);
+
+    /* tank below 5 °C: no frost protection, the anti-seize run still comes after 24 h */
+    s = sim(20, 40);
+    s.p.frost_on = true;
+    run(&s, 100);
+    OFF(s, DIFF);
+    run_to(&s, 36 * H);
+    ON(s, ANTI_SEIZE);
+}
+
 static void test_settings_apply_at_once(void)
 {
     sim_t s = sim(800, 650);
@@ -1153,6 +1212,8 @@ int main(void)
 
     test_both_faulty();
     test_no_value_until_fault();
+    test_frost_normal_mode_only();
+    test_frost_with_test_and_seize();
     test_settings_apply_at_once();
 
     return test_summary("test_pump_ctl");

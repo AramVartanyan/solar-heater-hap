@@ -2,10 +2,11 @@
  *
  * Boot order:
  *   1. pump relay forced off (before anything that can take time)
- *   2. NVS, shared state, user settings
+ *   2. NVS, shared state, user settings, installer data
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task
- *   5. Wi-Fi (captive-wifi); HomeKit follows in a later phase
+ *   5. Wi-Fi (captive-wifi) and the web interface (while connected to the router); HomeKit
+ *      follows in a later phase
  */
 
 #include "freertos/FreeRTOS.h"
@@ -18,12 +19,14 @@
 #include "sh_config.h"
 #include "sh_state.h"
 #include "sh_settings_store.h"
+#include "sh_installer_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_sensors.h"
 #include "sh_display.h"
 #include "sh_buttons.h"
 #include "sh_control.h"
+#include "sh_web.h"
 
 static const char *TAG = "app_main";
 
@@ -33,14 +36,17 @@ static void wifi_event(captive_wifi_event_t evt, void *ctx)
     switch (evt) {
     case CAPTIVE_WIFI_EVT_STA_CONNECTED:
         sh_state_set_wifi(true, false);
+        sh_web_enable(true);
         break;
     case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
         sh_state_set_wifi(false, captive_wifi_portal_active());
+        sh_web_enable(false);
         break;
     case CAPTIVE_WIFI_EVT_PORTAL_STARTED:
         ESP_LOGI(TAG, "Wi-Fi setup: join %s, open http://%s", captive_wifi_ap_ssid(),
                  captive_wifi_portal_ip());
         sh_state_set_wifi(false, true);
+        sh_web_enable(false);       /* the portal has its own server on port 80 */
         break;
     case CAPTIVE_WIFI_EVT_PORTAL_STOPPED:
         sh_state_set_wifi(captive_wifi_is_connected(), false);
@@ -62,6 +68,7 @@ void app_main(void)
     ESP_ERROR_CHECK(err);
     sh_state_init();
     ESP_ERROR_CHECK(sh_settings_init());
+    ESP_ERROR_CHECK(sh_installer_init());
 
     ESP_LOGI(TAG, "solar-heater-hap %s", esp_app_get_description()->version);
 
@@ -73,6 +80,7 @@ void app_main(void)
     sh_sensors_start();                             /* 4. measurement, control */
     sh_control_start();
 
-    ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi */
+    ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi, web */
+    ESP_ERROR_CHECK(sh_web_init());
     ESP_ERROR_CHECK(captive_wifi_start());
 }

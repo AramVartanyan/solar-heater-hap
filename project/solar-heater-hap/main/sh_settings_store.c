@@ -8,6 +8,13 @@
 static const char *TAG = "sh_settings";
 
 #define NVS_NAMESPACE   "sh_settings"
+#define KEY_FROST       "fro"
+
+#ifdef CONFIG_SH_FROST_PROTECT
+#define FROST_DEFAULT   true
+#else
+#define FROST_DEFAULT   false
+#endif
 
 _Static_assert(CONFIG_SH_PUMP_TEST_S % 30 == 0, "Control: the pump test time must be a multiple of 30 s");
 
@@ -21,6 +28,7 @@ static const sh_settings_t s_defaults = { .v = {
 } };
 
 static sh_settings_t s_settings;
+static bool s_frost;
 static SemaphoreHandle_t s_lock;
 
 esp_err_t sh_settings_init(void)
@@ -30,6 +38,7 @@ esp_err_t sh_settings_init(void)
         return ESP_ERR_NO_MEM;
     }
     s_settings = s_defaults;
+    s_frost = FROST_DEFAULT;
 
     nvs_handle_t h;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &h);
@@ -39,6 +48,10 @@ esp_err_t sh_settings_init(void)
             if (nvs_get_i16(h, sh_setting_info[id].key, &v) == ESP_OK) {
                 s_settings.v[id] = v;
             }
+        }
+        uint8_t frost;
+        if (nvs_get_u8(h, KEY_FROST, &frost) == ESP_OK && frost <= 1) {
+            s_frost = frost;
         }
         nvs_close(h);
     } else if (err != ESP_ERR_NVS_NOT_FOUND) {      /* not found: nothing stored yet */
@@ -51,9 +64,9 @@ esp_err_t sh_settings_init(void)
             ESP_LOGW(TAG, "%s: stored value invalid, default used", sh_setting_info[id].key);
         }
     }
-    ESP_LOGI(TAG, "tbo %d degC, C.Lo %d degC, d.on %d K, d.oF %d K, tSt %d s",
+    ESP_LOGI(TAG, "tbo %d degC, C.Lo %d degC, d.on %d K, d.oF %d K, tSt %d s, frost protection %s",
              s_settings.v[SH_SET_TANK_MAX], s_settings.v[SH_SET_COL_MIN], s_settings.v[SH_SET_DIFF_ON],
-             s_settings.v[SH_SET_DIFF_OFF], s_settings.v[SH_SET_TEST_S]);
+             s_settings.v[SH_SET_DIFF_OFF], s_settings.v[SH_SET_TEST_S], s_frost ? "on" : "off");
     return ESP_OK;
 }
 
@@ -94,6 +107,99 @@ esp_err_t sh_settings_set(sh_setting_t id, int16_t value)
         ESP_LOGI(TAG, "%s = %d saved", sh_setting_info[id].key, value);
     } else {
         ESP_LOGE(TAG, "%s = %d: %s", sh_setting_info[id].key, value, esp_err_to_name(err));
+    }
+    return err;
+}
+
+esp_err_t sh_settings_put(const sh_settings_t *s)
+{
+    sh_settings_t checked = *s;
+    if (sh_settings_sanitize(&checked, &s_defaults) != 0) {
+        return ESP_ERR_INVALID_ARG;         /* a value out of range, or d.oF not below d.on */
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    nvs_handle_t h = 0;
+    for (int id = 0; id < SH_SET_COUNT; id++) {
+        if (s->v[id] == s_settings.v[id]) {
+            continue;
+        }
+        if (!h && err == ESP_OK) {
+            err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+        }
+        if (err == ESP_OK) {
+            err = nvs_set_i16(h, sh_setting_info[id].key, s->v[id]);
+        }
+        ESP_LOGI(TAG, "%s = %d", sh_setting_info[id].key, s->v[id]);
+        s_settings.v[id] = s->v[id];        /* used at once, also if the write failed */
+    }
+    if (h) {
+        if (err == ESP_OK) {
+            err = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+    xSemaphoreGive(s_lock);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "settings not saved: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
+bool sh_settings_frost(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const bool on = s_frost;
+    xSemaphoreGive(s_lock);
+    return on;
+}
+
+esp_err_t sh_settings_set_frost(bool on)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    if (on != s_frost) {
+        nvs_handle_t h;
+        err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+        if (err == ESP_OK) {
+            err = nvs_set_u8(h, KEY_FROST, on);
+            if (err == ESP_OK) {
+                err = nvs_commit(h);
+            }
+            nvs_close(h);
+        }
+        s_frost = on;
+    }
+    xSemaphoreGive(s_lock);
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "frost protection %s", on ? "on" : "off");
+    } else {
+        ESP_LOGE(TAG, "frost protection %s: %s", on ? "on" : "off", esp_err_to_name(err));
+    }
+    return err;
+}
+
+esp_err_t sh_settings_reset(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+    if (err == ESP_OK) {
+        err = nvs_erase_all(h);
+        if (err == ESP_OK) {
+            err = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+    s_settings = s_defaults;
+    s_frost = FROST_DEFAULT;
+    xSemaphoreGive(s_lock);
+
+    if (err == ESP_OK) {
+        ESP_LOGW(TAG, "user settings reset to the defaults");
+    } else {
+        ESP_LOGE(TAG, "user settings reset: %s", esp_err_to_name(err));
     }
     return err;
 }
