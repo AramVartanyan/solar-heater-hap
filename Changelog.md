@@ -8,6 +8,16 @@
 ## [Unreleased]
 
 ### Added
+- **Аварии и индикация** (стъпка 5, [doc/tasks/step5-alarms-indication.md](doc/tasks/step5-alarms-indication.md)):
+  `sh_alarm` — кодовете `E1`, `E2` (повреден датчик), `E4` (бойлерът на аварийния таван), `E5` (колекторът над
+  точката на кипене), `E6` (повреда на помпата / няма поток — по скоростите на нарастване след първите 10 min
+  работа по нормалното управление, праговете в Kconfig „Control“) и `Hot` (помпата работи по защитата на
+  колектора); публикуват се в `sh_state` (`alarms` вместо `alarm`), всяка поява и отпадане — в лога; дисплей —
+  кодовете по 1 s след стандартния цикъл. `sh_ind` — светодиодът: състояние → (цвят, шаблон) по
+  [doc/led-indication.md](doc/led-indication.md) (червен бързо / двойно мигане, оранжев, жълт / бял с праговете
+  20 / 90 °C в Kconfig и зона 2 K, зелен, син; постоянно с Wi-Fi, проблясък без връзка); `sh_led` — шаблоните с
+  един `esp_timer`, нов оранжев цвят. Тестове на компютъра `test_alarm`, `test_ind`. Документация:
+  [doc/firmware.md](doc/firmware.md).
 - **Настройки и меню, тест на помпата, защита от блокиране, повреден датчик** (стъпка 2,
   [doc/tasks/step2-settings-menu-pump-sensors.md](doc/tasks/step2-settings-menu-pump-sensors.md)):
   `sh_settings` / `sh_settings_store` — `tbo`, `C.Lo`, `d.on`, `d.oF`, `tSt` в дял `nvs` (стойности по
