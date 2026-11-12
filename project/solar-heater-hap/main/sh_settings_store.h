@@ -1,0 +1,11 @@
+/* User settings in the "nvs" partition (namespace "sh_settings"): read at boot, a missing or
+ * invalid value -> its default (Kconfig "Control"); written only when a value changes. The factory
+ * reset erases the partition, so the defaults come back. Table and checks: sh_settings. */
+#pragma once
+
+#include "esp_err.h"
+#include "sh_settings.h"
+
+esp_err_t sh_settings_init(void);                       /* after nvs_flash_init() */
+void sh_settings_get(sh_settings_t *out);               /* consistent copy */
+esp_err_t sh_settings_set(sh_setting_t id, int16_t value);  /* checked; no write if unchanged */
