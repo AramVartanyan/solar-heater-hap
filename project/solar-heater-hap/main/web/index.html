@@ -380,11 +380,17 @@ async function post(url,data,quiet){
  catch(e){offline(true);return false}
 }
 function offline(on){$('#offline').classList.toggle('hide',!on)}
+let fails=0;
 async function refresh(){
  try{const c=new AbortController(),id=setTimeout(()=>c.abort(),4000);
   const r=await fetch('/api/state',{signal:c.signal});clearTimeout(id);
-  S=await r.json();leftAt=Date.now();offline(false);render()}
- catch(e){offline(true)}
+  if(!r.ok)throw 0;
+  S=await r.json();leftAt=Date.now();fails=0;offline(false);render()}
+ catch(e){
+  /* one lost answer is not a lost connection: try again in 1 s, show it after 2 in a row */
+  if(++fails>=2)offline(true);
+  if(fails===1)setTimeout(refresh,1000);
+ }
 }
 function testText(){
  if(!S)return;
