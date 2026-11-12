@@ -99,10 +99,18 @@ menu "Device Settings"
             default 110
             help
                 The pump starts at once at this collector temperature, also above Tmax, and
-                stops below it - 2 K after the minimum run time. Values above 115 degC are
-                limited to 115 degC and a warning is logged at boot (fixed in this version:
-                min(collector maximum 120 - 5, boiling point 127 - 10), the defaults of
-                doc/operating-modes.md).
+                stops below it - 2 K after the minimum run time. It is limited to
+                min(collector maximum - 5 K, boiling point - 10 K), computed from the installer
+                data (115 degC with the defaults); the limit is logged at boot and on every
+                change of the installer data and shown in the web interface ("Service").
+
+        config SH_FROST_PROTECT
+            bool "Frost protection (default)"
+            default y
+            help
+                Default of the frost protection on / off (web interface "Settings", stored in
+                NVS). The pump starts at once when the collector is below the threshold computed
+                from the coolant (water: 4 degC) and the tank is at least 5 degC.
 
         config SH_PUMP_TEST_S
             int "Pump test time (s)"
@@ -152,6 +160,40 @@ menu "Device Settings"
             help
                 E6 is cleared when the difference falls below this (there is flow). Must be lower
                 than the E6 difference (checked at compile time). Otherwise E6 stays until restart.
+
+    endmenu
+
+    menu "Installer data"
+
+        config SH_COOLANT_GLYCOL
+            bool "Coolant: propylene glycol (default: water)"
+            default n
+            help
+                Default of the coolant (web interface "Service", stored in NVS). The boiling
+                point and the frost protection threshold are computed from it.
+
+        config SH_GLYCOL_PCT
+            int "Propylene glycol share (% by volume)"
+            range 0 60
+            default 0
+            help
+                Default of the glycol share; 0 with water (checked at compile time).
+
+        config SH_P_MIN_DBAR
+            int "Minimum system pressure, gauge, cold system (0.1 bar)"
+            range 5 60
+            default 15
+            help
+                Default of the minimum pressure on the gauge, in tenths of bar (15 = 1.5 bar).
+                The boiling point is computed at this pressure + 1.013 bar.
+
+        config SH_COL_MAX_C
+            int "Collector maximum temperature (degC)"
+            range 100 250
+            default 120
+            help
+                Default of what the collector withstands (manufacturer data). The collector
+                protection is limited to this - 5 K.
 
     endmenu
 

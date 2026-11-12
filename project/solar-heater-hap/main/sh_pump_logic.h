@@ -10,8 +10,15 @@
  *   2. collector at boiling point -> off at once, also a running pump; no start for any reason
  *   3. tank emergency ceiling     -> off at once
  *   4. collector protection       -> on at once (no minimum off time), also above Tmax
- *   5. tank Tmax                  -> normal charging off at once
- *   6. difference                 -> on / off; the only rule the minimum times apply to
+ *   5. frost protection           -> on at once when the collector is below the threshold and the
+ *                                    tank is at least 5 °C; off at collector >= threshold + 2 K
+ *                                    after the minimum run time, at once when the tank is below 5 °C
+ *                                    (then, and while the collector stays below the threshold with
+ *                                    the pump off, the reason is FROST_TANK)
+ *   6. tank Tmax                  -> normal charging off at once
+ *   7. difference                 -> on / off; the only rule the minimum times apply to
+ * The boiling point, the cap of the collector protection and the frost threshold are computed from
+ * the installer data (sh_installer) and passed in the parameters: a change applies at once.
  */
 #pragma once
 
@@ -21,8 +28,7 @@
 /* Firmware constants, tenths of °C */
 #define SH_PUMP_RETURN_ZONE         20      /* return zone of every single-value limit, 2 K */
 #define SH_PUMP_TANK_CEILING        950     /* off at >= 95 °C, released below 93 °C */
-#define SH_PUMP_COL_PROTECT_CAP     1150    /* min(collector max 120 - 5, boiling point 127 - 10) */
-#define SH_PUMP_COL_BOILING         1270    /* boiling point, defaults: water, 1.5 bar; released below 125 °C */
+#define SH_PUMP_FROST_TANK_MIN      50      /* frost protection: no start, and off at once, below 5 °C */
 
 /* The rule that decided the pump output. */
 typedef enum {
@@ -31,6 +37,8 @@ typedef enum {
     SH_PUMP_REASON_COL_BOILING,     /* off: collector at the boiling point */
     SH_PUMP_REASON_TANK_CEILING,    /* off: tank at the emergency ceiling */
     SH_PUMP_REASON_COL_PROTECT,     /* on:  collector protection */
+    SH_PUMP_REASON_FROST,           /* on:  frost protection */
+    SH_PUMP_REASON_FROST_TANK,      /* off: frost protection needed, but the tank is below 5 °C */
     SH_PUMP_REASON_TANK_MAX,        /* off: tank at Tmax */
     SH_PUMP_REASON_DIFF,            /* on / off: collector - tank difference */
     SH_PUMP_REASON_MIN_RUN,         /* on:  difference low, minimum run time not over */
@@ -58,7 +66,11 @@ typedef struct {
     uint32_t min_off_s;             /* minimum off time, s (0 = none) */
     int16_t  tank_max;              /* tank Tmax, 0.1 °C */
     int16_t  col_min;               /* no start by the difference below this, 0.1 °C */
-    int16_t  col_protect;           /* collector protection, 0.1 °C; capped at SH_PUMP_COL_PROTECT_CAP */
+    int16_t  col_protect;           /* collector protection, 0.1 °C; capped at col_protect_cap */
+    int16_t  col_protect_cap;       /* min(collector max - 5 K, boiling point - 10 K), 0.1 °C */
+    int16_t  col_boiling;           /* boiling point = start ban, 0.1 °C; released below it - 2 K */
+    bool     frost_on;              /* frost protection enabled */
+    int16_t  frost;                 /* frost protection threshold, 0.1 °C */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).
@@ -70,6 +82,7 @@ typedef struct {
     bool tank_ceiling;              /* tank reached the ceiling, not yet below it - 2 K */
     bool tank_max;                  /* tank reached Tmax, not yet below it - 2 K */
     bool col_protect;               /* collector protection is running the pump */
+    bool frost;                     /* frost protection is running the pump */
 } sh_pump_state_t;
 
 /* A single-value limit with the 2 K return zone: true at t >= limit, false at t < limit - 2 K,

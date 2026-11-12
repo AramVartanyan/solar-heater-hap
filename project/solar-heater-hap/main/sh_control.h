@@ -1,5 +1,6 @@
-/* Control loop: every second takes the last published measurement from sh_state and the current
- * settings (sh_settings_store), lets sh_pump_ctl decide (pump test, anti-seize, sensor faults,
+/* Control loop: every second takes the last published measurement from sh_state, the current
+ * settings (sh_settings_store) and the limits computed from the installer data (sh_installer_store),
+ * lets sh_pump_ctl decide (pump test, anti-seize, sensor faults,
  * normal mode — doc/operating-modes.md 2.1), drives the relay, publishes the pump state with its
  * reason and the pump test, and logs every change of the pump or the reason, the start / end of
  * the test and of the anti-seize run. Then the alarm and information codes (sh_alarm): published,
@@ -9,7 +10,8 @@
 
 #include "esp_err.h"
 
-/* Pump test commands from the buttons (normal screen), applied at once by the control task. */
+/* Pump test commands from the buttons (normal screen) and the web interface, applied at once by the
+ * control task. */
 typedef enum {
     SH_CONTROL_TEST_PLUS,       /* start the test, or +60 s */
     SH_CONTROL_TEST_MINUS,      /* -60 s */

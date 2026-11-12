@@ -89,6 +89,9 @@ uint8_t sh_alarm_step(sh_alarm_state_t *st, const sh_alarm_params_t *p, const sh
         (in->reason == SH_PUMP_REASON_COL_PROTECT || in->reason == SH_PUMP_REASON_TF_PROBE)) {
         a |= SH_ALARM_BIT(SH_ALARM_HOT);
     }
+    if (in->pump_on && in->reason == SH_PUMP_REASON_FROST) {
+        a |= SH_ALARM_BIT(SH_ALARM_FRO);
+    }
     st->active = a;
     return a;
 }
@@ -111,7 +114,7 @@ const char *sh_alarm_name(sh_alarm_t a)
 {
     static const char *const names[SH_ALARM_COUNT] = {
         [SH_ALARM_E1] = "E1", [SH_ALARM_E2] = "E2", [SH_ALARM_E4] = "E4",
-        [SH_ALARM_E5] = "E5", [SH_ALARM_E6] = "E6", [SH_ALARM_HOT] = "Hot",
+        [SH_ALARM_E5] = "E5", [SH_ALARM_E6] = "E6", [SH_ALARM_HOT] = "Hot", [SH_ALARM_FRO] = "Fro",
     };
     return (unsigned)a < SH_ALARM_COUNT ? names[a] : "?";
 }

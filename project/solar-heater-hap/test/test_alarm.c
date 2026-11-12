@@ -11,10 +11,15 @@
 #define BIT(a)  SH_ALARM_BIT(a)
 #define MIN     60u
 
+/* Limits computed from the installer data (sh_installer): round values for the tests (the defaults,
+ * water at 1.5 bar, give a boiling point of 127.7 °C and a cap of 115 °C); the frost protection is
+ * off except in its own tests. */
+#define LIMITS  .col_protect_cap = 1150, .col_boiling = 1270, .frost_on = false, .frost = 40
+
 /* Defaults of Kconfig "Control" */
 static const sh_pump_params_t P = {
     .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
-    .tank_max = 700, .col_min = 250, .col_protect = 1100,
+    .tank_max = 700, .col_min = 250, .col_protect = 1100, LIMITS,
 };
 static const sh_alarm_params_t A = {
     .e6_time_s = 600, .e6_col_rise = 100, .e6_tank_rise = 5, .e6_diff = 200, .e6_clear_diff = 100,
@@ -424,10 +429,44 @@ static void test_e6_window_param(void)
     CHECK_EQ(first, 1 + 10 * MIN);      /* the run started at 1 s */
 }
 
+static void test_fro(void)
+{
+    sim_t s;
+    sh_pump_params_t p = P;
+    p.frost_on = true;
+    sim_init(&s, 100, 300);
+    s.now++;
+    sh_pump_ctl_step(&s.c, &p, &s.t, s.now);
+    CHECK(!s.c.on);
+    /* the frost protection runs the pump: Fro (information) */
+    s.t.t_col = 39;
+    s.now++;
+    sh_pump_ctl_step(&s.c, &p, &s.t, s.now);
+    CHECK_EQ(s.c.reason, SH_PUMP_REASON_FROST);
+    const sh_alarm_in_t on = {
+        .t_col = 39, .t_tank = 300, .pump_on = true, .reason = SH_PUMP_REASON_FROST,
+    };
+    CHECK_EQ(sh_alarm_step(&s.a, &A, &on, s.now), BIT(SH_ALARM_FRO));
+    /* not with the pump off (cold tank) */
+    const sh_alarm_in_t cold = {
+        .t_col = 39, .t_tank = 40, .pump_on = false, .reason = SH_PUMP_REASON_FROST_TANK,
+    };
+    CHECK_EQ(sh_alarm_step(&s.a, &A, &cold, s.now + 1), 0);
+    /* E6 is not checked while the frost protection runs (not the normal charging) */
+    for (uint32_t t = 0; t < 40 * MIN; t++) {
+        const sh_alarm_in_t in = {
+            .t_col = (int16_t)(39 + t / 6), .t_tank = 300, .pump_on = true,
+            .reason = SH_PUMP_REASON_FROST,
+        };
+        CHECK_EQ(sh_alarm_step(&s.a, &A, &in, s.now + 2 + t) & BIT(SH_ALARM_E6), 0);
+    }
+    CHECK(strcmp(sh_alarm_name(SH_ALARM_FRO), "Fro") == 0);
+}
+
 static void test_display_order(void)
 {
     const uint8_t all = BIT(SH_ALARM_E1) | BIT(SH_ALARM_E2) | BIT(SH_ALARM_E4) | BIT(SH_ALARM_E5) |
-                        BIT(SH_ALARM_E6) | BIT(SH_ALARM_HOT);
+                        BIT(SH_ALARM_E6) | BIT(SH_ALARM_HOT) | BIT(SH_ALARM_FRO);
     CHECK_EQ(sh_alarm_code_at(all, 0), SH_ALARM_E1);
     CHECK_EQ(sh_alarm_code_at(all, 999), SH_ALARM_E1);
     CHECK_EQ(sh_alarm_code_at(all, 1000), SH_ALARM_E2);
@@ -435,7 +474,14 @@ static void test_display_order(void)
     CHECK_EQ(sh_alarm_code_at(all, 3000), SH_ALARM_E5);
     CHECK_EQ(sh_alarm_code_at(all, 4000), SH_ALARM_E6);
     CHECK_EQ(sh_alarm_code_at(all, 5999), SH_ALARM_HOT);
-    CHECK_EQ(sh_alarm_code_at(all, 6000), SH_ALARM_COUNT);
+    CHECK_EQ(sh_alarm_code_at(all, 6000), SH_ALARM_FRO);    /* Fro after Hot */
+    CHECK_EQ(sh_alarm_code_at(all, 6999), SH_ALARM_FRO);
+    CHECK_EQ(sh_alarm_code_at(all, 7000), SH_ALARM_COUNT);
+
+    const uint8_t info = BIT(SH_ALARM_FRO) | BIT(SH_ALARM_E1);
+    CHECK_EQ(sh_alarm_code_at(info, 0), SH_ALARM_E1);
+    CHECK_EQ(sh_alarm_code_at(info, 1000), SH_ALARM_FRO);
+    CHECK_EQ(sh_alarm_code_at(info, 2000), SH_ALARM_COUNT);
 
     /* the information after the alarms, the alarms by number */
     const uint8_t some = BIT(SH_ALARM_HOT) | BIT(SH_ALARM_E6) | BIT(SH_ALARM_E2);
@@ -458,6 +504,7 @@ int main(void)
     test_e4();
     test_e5();
     test_hot();
+    test_fro();
     test_e6_declare();
     test_e6_first_minutes();
     test_e6_exceptions();

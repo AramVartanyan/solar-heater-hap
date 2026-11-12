@@ -12,6 +12,7 @@
 #include "sh_alarm.h"
 #include "sh_ind.h"
 #include "sh_settings_store.h"
+#include "sh_installer_store.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -50,19 +51,26 @@ static bool s_ind_done;
 
 static QueueHandle_t s_cmds;
 
-/* The menu settings (whole K / °C) and Kconfig "Control" (minutes, °C) -> tenths and seconds.
- * Read on every cycle: a changed setting applies at once. */
+/* The menu settings (whole K / °C), the frost protection on / off, the limits computed from the
+ * installer data (tenths) and Kconfig "Control" (minutes, °C) -> tenths and seconds.
+ * Read on every cycle: a changed setting or installer value applies at once. */
 static void get_params(sh_pump_params_t *p, uint32_t *test_s)
 {
     sh_settings_t s;
     sh_settings_get(&s);
+    sh_limits_t lim;
+    sh_installer_get(NULL, &lim);
     p->diff_on = (int16_t)(s.v[SH_SET_DIFF_ON] * 10);
     p->diff_off = (int16_t)(s.v[SH_SET_DIFF_OFF] * 10);
     p->min_run_s = CONFIG_SH_MIN_RUN_MIN * 60;
     p->min_off_s = CONFIG_SH_MIN_OFF_MIN * 60;
     p->tank_max = (int16_t)(s.v[SH_SET_TANK_MAX] * 10);
     p->col_min = (int16_t)(s.v[SH_SET_COL_MIN] * 10);
-    p->col_protect = CONFIG_SH_COL_PROTECT_C * 10;
+    p->col_protect = sh_installer_col_protect();
+    p->col_protect_cap = lim.protect_cap;
+    p->col_boiling = lim.boiling;
+    p->frost_on = sh_settings_frost_get();
+    p->frost = lim.frost;
     *test_s = (uint32_t)s.v[SH_SET_TEST_S];
 }
 
@@ -219,10 +227,6 @@ void sh_control_cmd(sh_control_cmd_t cmd)
 
 esp_err_t sh_control_start(void)
 {
-#if CONFIG_SH_COL_PROTECT_C * 10 > SH_PUMP_COL_PROTECT_CAP
-    ESP_LOGW(TAG, "collector protection %d °C is limited to %d °C", CONFIG_SH_COL_PROTECT_C,
-             SH_PUMP_COL_PROTECT_CAP / 10);
-#endif
     s_cmds = xQueueCreate(4, sizeof(sh_control_cmd_t));
     if (!s_cmds || xTaskCreate(control_task, "sh_control", 4096, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "control task not created");

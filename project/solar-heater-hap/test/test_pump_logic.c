@@ -11,6 +11,11 @@
 #include "sh_state.h"
 #include "sh_pump_logic.h"
 
+/* Limits computed from the installer data (sh_installer): round values for the tests (the defaults,
+ * water at 1.5 bar, give a boiling point of 127.7 °C and a cap of 115 °C); the frost protection is
+ * off except in its own tests. */
+#define LIMITS  .col_protect_cap = 1150, .col_boiling = 1270, .frost_on = false, .frost = 40
+
 /* Defaults of the task (Kconfig menu "Control") */
 static const sh_pump_params_t P = {
     .diff_on = 60,
@@ -20,6 +25,7 @@ static const sh_pump_params_t P = {
     .tank_max = 700,
     .col_min = 250,
     .col_protect = 1100,
+    LIMITS,
 };
 
 #define LONG_AGO    100000u     /* s: every minimum time is over */
@@ -118,7 +124,7 @@ static void test_diff_negative_temperatures(void)
 {
     sim_t s = sim_off();
     s.p = &(sh_pump_params_t){ .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
-                               .tank_max = 700, .col_min = -300, .col_protect = 1100 };
+                               .tank_max = 700, .col_min = -300, .col_protect = 1100, LIMITS };
     step(&s, 1, -41, -100);         /* 5.9 K */
     EXPECT_OFF(s, DIFF);
     step(&s, 1, -40, -100);         /* 6.0 K */
@@ -180,7 +186,7 @@ static void test_min_off_time_zero_disables_it(void)
 {
     sim_t s = sim_running();
     s.p = &(sh_pump_params_t){ .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 0,
-                               .tank_max = 700, .col_min = 250, .col_protect = 1100 };
+                               .tank_max = 700, .col_min = 250, .col_protect = 1100, LIMITS };
     step(&s, 1, 430, 400);
     EXPECT_OFF(s, DIFF);
     step(&s, 0, 500, 400);
@@ -398,7 +404,7 @@ static void test_col_protect_cap(void)
 {
     sim_t s = sim_off();
     s.p = &(sh_pump_params_t){ .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
-                               .tank_max = 700, .col_min = 250, .col_protect = 1600 };
+                               .tank_max = 700, .col_min = 250, .col_protect = 1600, LIMITS };
     step(&s, 1, 1149, 800);         /* 114.9 °C */
     EXPECT_OFF(s, TANK_MAX);
     step(&s, 1, 1150, 800);         /* the 115 °C cap, not the 160 °C that was set */
@@ -413,7 +419,7 @@ static void test_col_protect_below_cap_is_used_as_set(void)
 {
     sim_t s = sim_off();
     s.p = &(sh_pump_params_t){ .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
-                               .tank_max = 700, .col_min = 250, .col_protect = 900 };
+                               .tank_max = 700, .col_min = 250, .col_protect = 900, LIMITS };
     step(&s, 1, 899, 800);
     EXPECT_OFF(s, TANK_MAX);
     step(&s, 1, 900, 800);
@@ -487,6 +493,221 @@ static void test_col_boil_before_tank_ceiling(void)
     EXPECT_OFF(s, TANK_CEILING);
     step(&s, 1, 1300, 950);         /* ...then the collector passes the boiling point */
     EXPECT_OFF(s, COL_BOILING);
+}
+
+/* ---- Limits computed from the installer data ------------------------------------------- */
+
+static void test_computed_limits_from_params(void)
+{
+    /* ~9 % PG, 2.2 bar, collector max 150 °C: boiling point 136.5 °C, cap 126.5 °C */
+    const sh_pump_params_t pg = { .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
+                                  .tank_max = 700, .col_min = 250, .col_protect = 1600,
+                                  .col_protect_cap = 1265, .col_boiling = 1365 };
+    sim_t s = { .p = &pg, .elapsed_s = LONG_AGO };
+    step(&s, 1, 1264, 800);
+    EXPECT_OFF(s, TANK_MAX);
+    step(&s, 1, 1265, 800);         /* the cap */
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 1364, 800);
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 1365, 800);         /* the boiling point: off at once */
+    EXPECT_OFF(s, COL_BOILING);
+    step(&s, LONG_AGO, 1345, 800);  /* exactly boiling - 2 K: not yet released */
+    EXPECT_OFF(s, COL_BOILING);
+    step(&s, 1, 1344, 800);
+    EXPECT_ON(s, COL_PROTECT);
+}
+
+static void test_computed_limits_change_at_once(void)
+{
+    sh_pump_params_t p = P;
+    sim_t s = { .p = &p, .elapsed_s = LONG_AGO };
+    step(&s, 1, 1240, 800);         /* below the 127.0 °C of the test parameters */
+    EXPECT_ON(s, COL_PROTECT);
+    p.col_boiling = 1240;           /* lower pressure entered: the new boiling point at once */
+    step(&s, 1, 1240, 800);
+    EXPECT_OFF(s, COL_BOILING);
+    p.col_boiling = 1300;           /* higher again: 124.0 °C is far below it - 2 K */
+    p.col_protect_cap = 1100;
+    step(&s, LONG_AGO, 1240, 800);
+    EXPECT_ON(s, COL_PROTECT);
+    p.col_protect_cap = 1050;       /* the cap moves: the protection threshold with it */
+    step(&s, 180, 1040, 800);       /* below the new threshold, but not yet - 2 K */
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 1029, 800);
+    EXPECT_OFF(s, TANK_MAX);
+}
+
+/* ---- Frost protection ------------------------------------------------------------------ */
+
+static const sh_pump_params_t PF = {
+    .diff_on = 60, .diff_off = 40, .min_run_s = 180, .min_off_s = 120,
+    .tank_max = 700, .col_min = 250, .col_protect = 1100,
+    .col_protect_cap = 1150, .col_boiling = 1270, .frost_on = true, .frost = 40,
+};
+
+static sim_t sim_frost(void)
+{
+    sim_t s = { .p = &PF, .elapsed_s = LONG_AGO };
+    return s;
+}
+
+static void test_frost_threshold(void)
+{
+    sim_t s = sim_frost();
+    step(&s, 1, 40, 300);           /* exactly the threshold: no start */
+    EXPECT_OFF(s, DIFF);
+    step(&s, 1, 39, 300);           /* below: on at once */
+    EXPECT_ON(s, FROST);
+
+    s = sim_frost();
+    step(&s, 1, -150, 300);
+    EXPECT_ON(s, FROST);
+}
+
+static void test_frost_ignores_min_off_time(void)
+{
+    sim_t s = sim_frost();
+    step(&s, 0, 300, 200);          /* running by the difference */
+    EXPECT_ON(s, DIFF);
+    step(&s, 180, 240, 200);        /* stopped by the difference */
+    EXPECT_OFF(s, DIFF);
+    step(&s, 1, 39, 300);           /* 1 s later: the minimum off time does not apply */
+    EXPECT_ON(s, FROST);
+
+    s = (sim_t){ .p = &PF };        /* right after the start too */
+    step(&s, 0, 39, 300);
+    EXPECT_ON(s, FROST);
+}
+
+static void test_frost_needs_tank(void)
+{
+    sim_t s = sim_frost();
+    step(&s, 1, 0, 49);             /* tank 4.9 °C: no start */
+    EXPECT_OFF(s, FROST_TANK);
+    step(&s, 1, 0, 50);             /* exactly 5.0 °C */
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 0, 49);             /* below 5 °C while running: off at once (no minimum run time) */
+    EXPECT_OFF(s, FROST_TANK);
+    step(&s, 1, 0, 49);
+    EXPECT_OFF(s, FROST_TANK);
+    step(&s, 1, 0, 50);             /* again 5 °C: on at once */
+    EXPECT_ON(s, FROST);
+
+    /* in the zone above the threshold, within the minimum run time: off at once too */
+    step(&s, 1, 50, 300);
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 50, 40);
+    EXPECT_OFF(s, FROST_TANK);
+    step(&s, 1, 50, 40);            /* collector above the threshold, pump off: the difference */
+    EXPECT_OFF(s, DIFF);
+
+    /* a cold tank does not change the difference rules when no frost protection is needed */
+    s = sim_frost();
+    step(&s, 0, 500, 40);
+    EXPECT_ON(s, DIFF);
+}
+
+static void test_frost_stop(void)
+{
+    sim_t s = sim_frost();
+    step(&s, 1, 30, 300);
+    EXPECT_ON(s, FROST);
+    step(&s, 10, 60, 300);          /* threshold + 2 K, but within the minimum run time */
+    EXPECT_ON(s, FROST);
+    step(&s, 169, 70, 300);         /* 179 s */
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 59, 300);           /* 180 s, collector 5.9 °C: below threshold + 2 K */
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 40, 300);           /* between threshold and + 2 K: keeps running */
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 60, 300);           /* exactly threshold + 2 K after the minimum run time: off */
+    EXPECT_OFF(s, DIFF);
+    step(&s, 1, 50, 300);           /* in the zone with the pump off: no start */
+    EXPECT_OFF(s, DIFF);
+    step(&s, 1, 39, 300);
+    EXPECT_ON(s, FROST);
+}
+
+static void test_frost_disabled(void)
+{
+    sim_t s = sim_off();            /* P: frost protection off */
+    step(&s, 1, -100, 300);
+    EXPECT_OFF(s, DIFF);
+
+    sh_pump_params_t p = PF;
+    s = (sim_t){ .p = &p, .elapsed_s = LONG_AGO };
+    step(&s, 1, 0, 300);
+    EXPECT_ON(s, FROST);
+    p.frost_on = false;             /* switched off while running: back to the difference */
+    step(&s, 1, 0, 300);
+    EXPECT_ON(s, MIN_RUN);
+    step(&s, 180, 0, 300);
+    EXPECT_OFF(s, DIFF);
+}
+
+static void test_frost_glycol_threshold(void)
+{
+    sh_pump_params_t p = PF;
+    p.frost = -150;                 /* e.g. 30 % glycol: -14 + 4 = -10 °C ... any computed value */
+    sim_t s = { .p = &p, .elapsed_s = LONG_AGO };
+    step(&s, 1, -100, 300);
+    EXPECT_OFF(s, DIFF);
+    step(&s, 1, -151, 300);
+    EXPECT_ON(s, FROST);
+    step(&s, 180, -130, 300);       /* threshold + 2 K */
+    EXPECT_OFF(s, DIFF);
+}
+
+static void test_frost_priority(void)
+{
+    /* the boiling point and the tank ceiling stop it (a collector below the threshold cannot be at
+     * the boiling point, but the tank ceiling is possible) */
+    sim_t s = sim_frost();
+    step(&s, 1, 0, 300);
+    EXPECT_ON(s, FROST);
+    step(&s, 1, 0, 950);            /* tank ceiling: off at once */
+    EXPECT_OFF(s, TANK_CEILING);
+    step(&s, LONG_AGO, 0, 929);     /* released below 93 °C: on at once */
+    EXPECT_ON(s, FROST);
+
+    /* above Tmax: the frost protection runs (it is before Tmax) */
+    s = sim_frost();
+    step(&s, 1, 0, 750);
+    EXPECT_ON(s, FROST);
+
+    /* the collector protection is before it (a frost threshold above the protection is only
+     * possible with test parameters) */
+    sh_pump_params_t p = PF;
+    p.frost = 1200;
+    s = (sim_t){ .p = &p, .elapsed_s = LONG_AGO };
+    step(&s, 1, 1100, 300);
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 1000, 300);         /* the protection keeps it (minimum run time) */
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 180, 1000, 300);       /* protection over: the frost protection holds it */
+    EXPECT_ON(s, FROST);
+
+    /* before the difference: a collector below the threshold never starts by the difference, and
+     * a running pump keeps running by the frost protection */
+    s = sim_frost();
+    step(&s, 0, 500, 400);
+    EXPECT_ON(s, DIFF);
+    step(&s, 1, 30, 400);
+    EXPECT_ON(s, FROST);
+}
+
+static void test_frost_not_with_invalid_sensor(void)
+{
+    sim_t s = sim_frost();
+    step(&s, 1, 0, SH_TEMP_INVALID);
+    EXPECT_OFF(s, SENSOR);
+    step(&s, 1, SH_TEMP_INVALID, 300);
+    EXPECT_OFF(s, SENSOR);
+    step(&s, 1, 0, 300);
+    EXPECT_ON(s, FROST);
+    step(&s, 1, SH_TEMP_INVALID, 300);      /* invalid while running: off at once */
+    EXPECT_OFF(s, SENSOR);
 }
 
 /* ---- Invalid temperature ------------------------------------------------------------- */
@@ -680,6 +901,18 @@ int main(void)
     test_col_boil_return_zone();
     test_col_boil_stops_running_pump();
     test_col_boil_before_tank_ceiling();
+
+    test_computed_limits_from_params();
+    test_computed_limits_change_at_once();
+
+    test_frost_threshold();
+    test_frost_ignores_min_off_time();
+    test_frost_needs_tank();
+    test_frost_stop();
+    test_frost_disabled();
+    test_frost_glycol_threshold();
+    test_frost_priority();
+    test_frost_not_with_invalid_sensor();
 
     test_sensor_invalid_no_start();
     test_sensor_invalid_stops_at_once();

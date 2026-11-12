@@ -7,6 +7,11 @@
 #include "sh_state.h"
 #include "sh_pump_ctl.h"
 
+/* Limits computed from the installer data (sh_installer): round values for the tests (the defaults,
+ * water at 1.5 bar, give a boiling point of 127.7 °C and a cap of 115 °C); the frost protection is
+ * off except in its own tests. */
+#define LIMITS  .col_protect_cap = 1150, .col_boiling = 1270, .frost_on = false, .frost = 40
+
 /* Defaults of the task (Kconfig menu "Control") */
 static const sh_pump_params_t P = {
     .diff_on = 60,
@@ -16,6 +21,7 @@ static const sh_pump_params_t P = {
     .tank_max = 700,
     .col_min = 250,
     .col_protect = 1100,
+    LIMITS,
 };
 
 #define H       3600u
@@ -1108,6 +1114,90 @@ static void test_settings_apply_at_once(void)
     OFF(s, DIFF);
 }
 
+/* ---- Frost protection: only in the normal mode; the test and the anti-seize as before ---------- */
+
+static sim_t sim_frost(int16_t col, int16_t tank)
+{
+    sim_t s = sim(col, tank);
+    s.p.frost_on = true;
+    return s;
+}
+
+static void test_frost_normal_mode(void)
+{
+    sim_t s = sim_frost(100, 300);
+    run(&s, 1);
+    OFF(s, DIFF);
+    temps(&s, 39, 300);             /* below 4 °C: on at once */
+    run(&s, 1);
+    ON(s, FROST);
+    temps(&s, 60, 300);             /* threshold + 2 K: off after the minimum run time */
+    run(&s, P.min_run_s - 1);
+    ON(s, FROST);
+    run(&s, 1);
+    OFF(s, DIFF);
+}
+
+static void test_frost_not_with_faulty_sensor(void)
+{
+    /* tank sensor faulty: the collector decides, no frost protection */
+    sim_t s = sim_frost(0, 300);
+    faults(&s, false, true);
+    run(&s, 1);
+    OFF(s, TF_COLD);
+
+    /* collector sensor faulty: probes by the tank, no frost protection */
+    s = sim_frost(0, 300);
+    run(&s, 1);
+    ON(s, FROST);
+    faults(&s, true, false);        /* the fault while running by the frost protection */
+    run(&s, 1);
+    ON(s, CF_PROBE);                /* the probe takes over the running pump */
+    CHECK(!s.c.norm.frost);
+
+    /* recovery: the normal mode with the frost protection again */
+    faults(&s, false, false);
+    run(&s, 1);
+    ON(s, FROST);
+}
+
+static void test_frost_and_test(void)
+{
+    sim_t s = sim_frost(0, 300);
+    run(&s, 1);
+    ON(s, FROST);
+    plus(&s);                       /* the test takes over */
+    ON(s, TEST);
+    run_to(&s, s.c.test_end_s);     /* end: the frost protection at once (no minimum off time) */
+    ON(s, FROST);
+
+    /* the frost protection stopped by a cold tank does not stop the test */
+    s = sim_frost(0, 40);
+    run(&s, 1);
+    OFF(s, FROST_TANK);
+    plus(&s);
+    ON(s, TEST);
+    run(&s, 100);
+    ON(s, TEST);
+}
+
+static void test_frost_and_anti_seize(void)
+{
+    /* the frost protection counts as running: no anti-seize run after it */
+    sim_t s = sim_frost(0, 300);
+    run(&s, 1);
+    ON(s, FROST);
+    temps(&s, 100, 300);
+    run(&s, P.min_run_s);
+    OFF(s, DIFF);
+    const uint32_t stopped = s.now;
+    temps(&s, 300, 300);
+    run_to(&s, stopped + SH_SEIZE_IDLE_S - 1);
+    OFF(s, DIFF);
+    run(&s, 1);
+    ON(s, ANTI_SEIZE);
+}
+
 int main(void)
 {
     test_test_starts_at_once();
@@ -1154,6 +1244,11 @@ int main(void)
     test_both_faulty();
     test_no_value_until_fault();
     test_settings_apply_at_once();
+
+    test_frost_normal_mode();
+    test_frost_not_with_faulty_sensor();
+    test_frost_and_test();
+    test_frost_and_anti_seize();
 
     return test_summary("test_pump_ctl");
 }

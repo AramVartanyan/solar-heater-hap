@@ -23,13 +23,13 @@ static void decided(sh_pump_state_t *st, bool on, sh_pump_reason_t reason)
 
 int16_t sh_pump_col_protect(const sh_pump_params_t *p)
 {
-    return p->col_protect < SH_PUMP_COL_PROTECT_CAP ? p->col_protect : SH_PUMP_COL_PROTECT_CAP;
+    return p->col_protect < p->col_protect_cap ? p->col_protect : p->col_protect_cap;
 }
 
 void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank)
 {
     if (t_col != SH_TEMP_INVALID) {
-        st->col_boiling = sh_pump_latch(st->col_boiling, t_col, SH_PUMP_COL_BOILING);
+        st->col_boiling = sh_pump_latch(st->col_boiling, t_col, p->col_boiling);
     }
     if (t_tank != SH_TEMP_INVALID) {
         st->tank_ceiling = sh_pump_latch(st->tank_ceiling, t_tank, SH_PUMP_TANK_CEILING);
@@ -46,10 +46,11 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     /* The limits follow every valid temperature, whatever the pump does. */
     sh_pump_track_limits(p, st, t_col, t_tank);
 
-    /* 1. Without both temperatures nothing can be judged: off (the full sensor-fault logic is a
-     *    later step). The collector protection ends with the stop. */
+    /* 1. Without both temperatures nothing can be judged: off (the sensor-fault modes are in
+     *    sh_pump_ctl; the frost protection is not checked there). The protections end with the stop. */
     if (!col_ok || !tank_ok) {
         st->col_protect = false;
+        st->frost = false;
         decided(st, false, SH_PUMP_REASON_SENSOR);
         return;
     }
@@ -58,6 +59,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
      *    the flow did not cool the collector (no flow or steam in the circuit). */
     if (st->col_boiling) {
         st->col_protect = false;
+        st->frost = false;
         decided(st, false, SH_PUMP_REASON_COL_BOILING);
         return;
     }
@@ -65,6 +67,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     /* 3. Tank emergency ceiling: off at once, whatever the collector does. */
     if (st->tank_ceiling) {
         st->col_protect = false;
+        st->frost = false;
         decided(st, false, SH_PUMP_REASON_TANK_CEILING);
         return;
     }
@@ -80,17 +83,40 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         st->col_protect = false;
     }
     if (st->col_protect) {
+        st->frost = false;
         decided(st, true, SH_PUMP_REASON_COL_PROTECT);
         return;
     }
 
-    /* 5. Tank Tmax: normal charging stops at once (a limit, not the difference). */
+    /* 5. Frost protection: on at once (no minimum off time) when the collector is below the
+     *    threshold, if the tank has heat to give (>= 5 °C); ends at collector >= threshold + 2 K once
+     *    the pump has run for the minimum run time, and at once when the tank is below 5 °C. Like
+     *    the collector protection it is set only where the pump is switched on. */
+    const bool tank_cold = t_tank < SH_PUMP_FROST_TANK_MIN;
+    if (p->frost_on && tank_cold && (st->frost || (!st->on && t_col < p->frost))) {
+        st->frost = false;          /* no heat to give: off at once, whatever the minimum run time */
+        decided(st, false, SH_PUMP_REASON_FROST_TANK);
+        return;
+    }
+    if (!p->frost_on || tank_cold) {
+        st->frost = false;
+    } else if (t_col < p->frost) {
+        st->frost = true;
+    } else if (st->frost && t_col >= p->frost + SH_PUMP_RETURN_ZONE && elapsed_s >= p->min_run_s) {
+        st->frost = false;
+    }
+    if (st->frost) {
+        decided(st, true, SH_PUMP_REASON_FROST);
+        return;
+    }
+
+    /* 6. Tank Tmax: normal charging stops at once (a limit, not the difference). */
     if (st->tank_max) {
         decided(st, false, SH_PUMP_REASON_TANK_MAX);
         return;
     }
 
-    /* 6. Difference, with the minimum times and the minimum collector temperature (it only blocks
+    /* 7. Difference, with the minimum times and the minimum collector temperature (it only blocks
      *    the start, a running pump is stopped by the difference). */
     const int32_t diff = (int32_t)t_col - t_tank;
     if (st->on) {
@@ -122,6 +148,8 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_COL_BOILING]  = "collector at boiling point",
         [SH_PUMP_REASON_TANK_CEILING] = "tank ceiling",
         [SH_PUMP_REASON_COL_PROTECT]  = "collector protection",
+        [SH_PUMP_REASON_FROST]        = "frost protection",
+        [SH_PUMP_REASON_FROST_TANK]   = "frost protection: tank below 5 degC",
         [SH_PUMP_REASON_TANK_MAX]     = "tank Tmax",
         [SH_PUMP_REASON_DIFF]         = "difference",
         [SH_PUMP_REASON_MIN_RUN]      = "minimum run time",

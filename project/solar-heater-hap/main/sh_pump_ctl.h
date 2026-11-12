@@ -10,10 +10,11 @@
  *   2. anti-seize run      -> on for 60 s; the same two limits stop and end it
  *   3. the mode chosen by the sensor faults:
  *        both faulty       -> off
- *        none faulty       -> sh_pump_decide() (normal mode)
+ *        none faulty       -> sh_pump_decide() (normal mode, with the frost protection)
  *        tank faulty       -> by the collector: on at >= 60 °C, off below 58 °C, off at >= 95 °C
  *                             (until below 93 °C), probe at the collector emergency temperature
  *        collector faulty  -> probes of 10 min: does the tank rise >= 0.5 K?
+ *      (the frost protection is not checked while a sensor is faulty)
  *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
  * The end of the test and of the anti-seize run is handled like a stopped pump whose minimum off

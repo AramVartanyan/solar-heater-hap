@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="bg"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solar</title>
+<style>
+:root{--bg:#F2F1F6;--card:#fff;--txt:#000;--sub:#6D6D72;--sep:#C6C6C8;--green:#34C759;--blue:#3F88F2;--red:#FF3B30;--orange:#FF9500;--off:#E9E9EB}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--txt:#fff;--sub:#8E8E93;--sep:#38383A;--off:#39393D}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:460px;margin:0 auto;padding:16px 16px 90px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+h1{font-size:28px;margin:6px 4px 2px}
+.dev{color:var(--sub);margin:0 4px 14px;font-size:15px}
+.flags{display:flex;gap:8px;margin-top:12px}
+.flags svg{width:30px;height:20px;border-radius:3px;cursor:pointer;opacity:.45;box-shadow:0 0 0 .5px var(--sep)}
+.flags svg.on{opacity:1}
+h2{font-size:13px;font-weight:500;color:var(--sub);text-transform:uppercase;margin:22px 18px 6px;letter-spacing:.3px}
+.grp{background:var(--card);border-radius:14px;overflow:hidden}
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;min-height:46px;font-size:17px;position:relative;gap:12px}
+.row+.row:before{content:'';position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.row[data-k]{cursor:pointer}
+.v{color:var(--sub);text-align:right}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:var(--card);border-radius:14px;padding:14px 16px}
+.tile .l{color:var(--sub);font-size:14px}
+.tile .t{font-size:34px;font-weight:600;margin-top:4px}
+.tile .s{color:var(--sub);font-size:13px;margin-top:2px;min-height:16px}
+.alarm{background:var(--card);border-radius:14px;padding:12px 16px;border-left:5px solid var(--red);margin-bottom:8px}
+.alarm.info{border-left-color:var(--orange)}
+.alarm b{font-size:17px}.alarm div{color:var(--sub);font-size:14px;margin-top:2px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--sep)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:600;color:#fff;background:var(--blue);margin-top:10px;font-family:inherit;cursor:pointer}
+.btn.g{background:var(--green)}.btn.o{background:var(--orange)}.btn.r{background:var(--red)}.btn.n{background:var(--off);color:var(--txt)}
+.btns{display:flex;gap:10px}.btns .btn{flex:1}
+.sw{width:51px;height:31px;border-radius:16px;background:var(--green);position:relative;flex:none;cursor:pointer}
+.sw:after{content:'';position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.off{background:var(--off)}.sw.off:after{right:auto;left:2px}
+.note{color:var(--sub);font-size:13px;margin:6px 18px 0}
+.calc{color:var(--blue)}
+.na{opacity:.38;pointer-events:none;filter:grayscale(1)}
+.dis{pointer-events:none}.dis .v{opacity:.5}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:.5px solid var(--sep);display:flex;justify-content:center}
+.tabs div{flex:1;max-width:92px;text-align:center;font-size:11px;color:var(--sub);padding:8px 0 22px;cursor:pointer}
+.tabs div.on{color:var(--blue)}.tabs svg{display:block;margin:0 auto 3px;width:30px;height:30px}
+section{display:none}section.on{display:block}
+.msg{background:var(--card);border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px;color:var(--red);display:none}
+.msg.on{display:block}
+input{font:inherit;font-size:20px;padding:10px 12px;border-radius:10px;border:1px solid var(--sep);background:var(--bg);color:var(--txt);width:100%;text-align:center;letter-spacing:2px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;justify-content:center;z-index:9}
+.ov.on{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:18px 16px 30px}
+.sheet h3{margin:0 0 12px;font-size:17px;text-align:center}
+.step{display:flex;align-items:center;justify-content:space-between;background:var(--card);border-radius:14px;padding:10px}
+.step b{font-size:32px}.step button{width:56px;height:56px;border-radius:28px;border:0;background:var(--off);color:var(--txt);font-size:28px;cursor:pointer}
+.opt{display:flex;justify-content:space-between;cursor:pointer}
+.opt.sel:after{content:'\2713';color:var(--blue)}
+</style></head><body>
+<div class="wrap">
+<div class="msg" id="offline" data-t="offline"></div>
+<div class="top">
+ <div><h1 data-t="title"></h1>
+ <p class="dev"><span id="host"></span><span data-f="season"> · <span data-t="season_auto"></span></span><span data-f="clock"> · --:--</span></p></div>
+ <div class="flags">
+  <svg id="fl-bg" viewBox="0 0 3 2" onclick="setLang('bg')"><rect width="3" height="2" fill="#fff"/><rect y=".667" width="3" height=".667" fill="#00966E"/><rect y="1.333" width="3" height=".667" fill="#D62612"/></svg>
+  <svg id="fl-en" viewBox="0 0 60 30" onclick="setLang('en')"><clipPath id="u"><path d="M0,0v30h60V0z"/></clipPath><g clip-path="url(#u)"><path d="M0,0v30h60V0z" fill="#012169"/><path d="M0,0L60,30M60,0L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0L60,30M60,0L0,30" stroke="#C8102E" stroke-width="2.5"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></g></svg>
+ </div>
+</div>
+
+<section id="s1" class="on">
+ <div id="alarms" data-f="alarms"></div>
+ <h2 data-t="temps"></h2>
+ <div class="big" data-f="temps">
+  <div class="tile"><div class="l" data-t="tank"></div><div class="t" id="tt">---</div><div class="s" id="tt-s"></div></div>
+  <div class="tile"><div class="l" data-t="collector"></div><div class="t" id="tc">---</div><div class="s" id="tc-s"></div></div>
+ </div>
+ <div data-f="chart"><h2 data-t="today_chart"></h2><div class="grp"><div class="row"><span data-t="chart"></span><span class="v">›</span></div></div></div>
+ <h2 data-t="pump"></h2>
+ <div class="grp">
+  <div class="row" data-f="pump"><span><span class="dot" id="pdot"></span><span id="pstate"></span></span><span class="v" id="pwhy"></span></div>
+  <div class="row" data-f="run_today"><span data-t="today"></span><span class="v">—</span></div>
+ </div>
+ <h2 data-t="system"></h2>
+ <div class="grp">
+  <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v" data-t="normal"></span></div>
+  <div class="row" data-f="season"><span data-t="season"></span><span class="v">—</span></div>
+  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
+  <div class="row" data-f="clock"><span data-t="clock"></span><span class="v">—</span></div>
+ </div>
+</section>
+
+<section id="s2">
+ <h2 data-t="vacation"></h2>
+ <div class="grp" data-f="vacation"><div class="row"><span data-t="vacation_mode"></span><span class="sw off"></span></div></div>
+ <h2 data-t="pump"></h2>
+ <div data-f="test">
+  <div class="grp"><div class="row"><span data-t="pump_test"></span><span class="v" id="tleft"></span></div></div>
+  <button class="btn g" id="tstart" onclick="cmd('test_plus')" data-t="test_start"></button>
+  <div id="trun" style="display:none">
+   <div class="btns"><button class="btn" onclick="cmd('test_minus')">−60 s</button><button class="btn" onclick="cmd('test_plus')">+60 s</button></div>
+   <button class="btn r" onclick="cmd('test_stop')" data-t="test_stop"></button>
+  </div>
+  <p class="note" data-t="test_note"></p>
+ </div>
+ <div data-f="air">
+  <h2 data-t="air"></h2>
+  <div class="grp"><div class="row"><span data-t="air_cycles"></span></div></div>
+  <button class="btn o" data-t="air_start"></button>
+ </div>
+</section>
+
+<section id="s3">
+ <h2 data-t="season"></h2>
+ <div class="grp" data-f="season"><div class="row"><span data-t="season"></span><span class="v"><span data-t="season_auto"></span> ›</span></div></div>
+ <h2 data-t="general"></h2>
+ <div class="grp">
+  <div class="row" data-f="settings" data-k="tbo"><span data-t="tbo"></span><span class="v"><span id="v-tbo"></span> ›</span></div>
+  <div class="row" data-f="night_cool"><span data-t="night_tmax"></span><span class="sw off"></span></div>
+  <div class="row" data-f="frost"><span data-t="frost"></span><span class="sw" id="sw-frost" onclick="toggleFrost()"></span></div>
+ </div>
+ <h2 data-t="params"></h2>
+ <div class="grp" data-f="settings">
+  <div class="row" data-k="c_lo"><span data-t="c_lo"></span><span class="v"><span id="v-c_lo"></span> ›</span></div>
+  <div class="row" data-k="d_on"><span data-t="d_on"></span><span class="v"><span id="v-d_on"></span> ›</span></div>
+  <div class="row" data-k="d_of"><span data-t="d_of"></span><span class="v"><span id="v-d_of"></span> ›</span></div>
+  <div class="row" data-k="t_st"><span data-t="t_st"></span><span class="v"><span id="v-t_st"></span> ›</span></div>
+ </div>
+ <div class="grp" data-f="season" style="margin-top:12px"><div class="row"><span data-t="by_season"></span><span class="v">›</span></div></div>
+ <div class="grp" data-f="night_cool" style="margin-top:12px"><div class="row"><span data-t="night_cool"></span><span class="sw off"></span></div></div>
+</section>
+
+<section id="s4">
+ <div class="lock"></div>
+ <div class="locked">
+ <h2 data-t="coolant"></h2>
+ <div class="grp" data-f="installer">
+  <div class="row" data-k="coolant"><span data-t="kind"></span><span class="v"><span id="v-coolant"></span> ›</span></div>
+  <div class="row" data-k="glycol" id="r-glycol"><span data-t="glycol"></span><span class="v"><span id="v-glycol"></span> ›</span></div>
+  <div class="row" data-k="p_min"><span data-t="p_min"></span><span class="v"><span id="v-p_min"></span> ›</span></div>
+ </div>
+ <h2 data-t="col_tank"></h2>
+ <div class="grp">
+  <div class="row" data-f="collector"><span data-t="collector"></span><span class="v">— ›</span></div>
+  <div class="row" data-f="installer" data-k="col_max"><span data-t="col_max"></span><span class="v"><span id="v-col_max"></span> ›</span></div>
+  <div class="row" data-f="tank_volume"><span data-t="tank_volume"></span><span class="v">— ›</span></div>
+  <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">— ›</span></div>
+  <div class="row" data-f="sensor_mount"><span data-t="sensor_mount"></span><span class="v">— ›</span></div>
+ </div>
+ <h2 data-t="computed"></h2>
+ <div class="grp">
+  <div class="row" data-f="calc"><span data-t="boil"></span><span class="v calc" id="c-boil"></span></div>
+  <div class="row" data-f="calc"><span data-t="cap"></span><span class="v calc" id="c-cap"></span></div>
+  <div class="row" data-f="calc"><span data-t="prot"></span><span class="v calc" id="c-used"></span></div>
+  <div class="row" data-f="calc"><span data-t="ban"></span><span class="v calc" id="c-ban"></span></div>
+  <div class="row" data-f="vac_threshold"><span data-t="vac_thr"></span><span class="v calc">—</span></div>
+  <div class="row" data-f="calc"><span data-t="frost_thr"></span><span class="v calc" id="c-frost"></span></div>
+ </div>
+ <p class="note" id="c-note"></p>
+ </div>
+</section>
+
+<section id="s5">
+ <div class="lock"></div>
+ <div class="locked">
+ <h2 data-t="network"></h2>
+ <div class="grp">
+  <div class="row" data-f="network"><span>Wi-Fi</span><span class="v" id="n-ssid"></span></div>
+  <div class="row" data-f="network"><span>IP</span><span class="v" id="n-ip"></span></div>
+  <div class="row" data-f="net_mode"><span data-t="net_mode"></span><span class="v">CP ›</span></div>
+ </div>
+ <h2 data-t="time_place"></h2>
+ <div class="grp">
+  <div class="row" data-f="timezone"><span data-t="timezone"></span><span class="v">— ›</span></div>
+  <div class="row" data-f="timezone"><span data-t="col_peak"></span><span class="v">—</span></div>
+  <div class="row" data-f="city"><span data-t="city"></span><span class="v">— ›</span></div>
+ </div>
+ <h2 data-t="firmware"></h2>
+ <div class="grp">
+  <div class="row" data-f="firmware"><span data-t="version"></span><span class="v" id="ver"></span></div>
+  <div class="row" data-f="ota"><span data-t="ota"></span><span class="v">›</span></div>
+ </div>
+ <h2>HomeKit</h2>
+ <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
+ <h2 data-t="reset"></h2>
+ <div class="grp">
+  <div class="row" data-f="reset_wifi" onclick="ask('reset_wifi')" style="cursor:pointer"><span data-t="reset_wifi"></span><span class="v">›</span></div>
+  <div class="row" data-f="reset_homekit"><span data-t="reset_homekit"></span><span class="v">›</span></div>
+  <div class="row" data-f="reset_learned"><span data-t="reset_learned"></span><span class="v">›</span></div>
+  <div class="row" data-f="reset_history"><span data-t="reset_history"></span><span class="v">›</span></div>
+  <div class="row" data-f="reset_settings" onclick="ask('reset_settings')" style="cursor:pointer"><span data-t="reset_settings"></span><span class="v">›</span></div>
+  <div class="row" data-f="reset_factory" onclick="ask('reset_factory')" style="cursor:pointer;color:var(--red)"><span data-t="reset_factory"></span><span class="v">›</span></div>
+ </div>
+ </div>
+</section>
+</div>
+
+<div class="tabs">
+ <div class="on" data-s="s1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg><span data-t="tab1"></span></div>
+ <div data-s="s2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/></svg><span data-t="tab2"></span></div>
+ <div data-s="s3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span data-t="tab3"></span></div>
+ <div data-s="s4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span data-t="tab4"></span></div>
+ <div data-s="s5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span data-t="tab5"></span></div>
+</div>
+
+<div class="ov" id="ov"><div class="sheet" id="sheet"></div></div>
+
+<script>
+var T={bg:{
+title:'Соларен контролер',offline:'Няма връзка с контролера',tab1:'Състояние',tab2:'Управление',tab3:'Настройки',tab4:'Сервизни',tab5:'Система',
+temps:'Температури',tank:'Бойлер',collector:'Колектор',no_sensor:'датчикът не отговаря',today_chart:'Днес',chart:'Графика за деня',
+pump:'Помпа',today:'Днес',system:'Система',mode:'Режим',normal:'Нормален',season:'Сезон',season_auto:'Автоматичен',heater:'Нагревател',clock:'Часовник',
+runs:'Работи',stopped:'Стои',
+vacation:'Ваканция',vacation_mode:'Режим „Ваканция“',pump_test:'Тест на помпата',left:'остават',test_start:'Пусни теста',test_stop:'Спри теста',
+test_note:'Като от бутоните: +60 s, −60 s; спира не по-рано от 1 min след пускането.',air:'Обезвъздушаване',air_cycles:'3 цикъла · работа и престой по топлоносителя',air_start:'Започни обезвъздушаване',
+general:'Общи',tbo:'Максимум на бойлера (Tmax)',night_tmax:'Нощно охлаждане над Tmax',frost:'Защита от замръзване',params:'Помпа',
+c_lo:'Мин. температура на колектора',d_on:'Разлика за включване',d_of:'Разлика за изключване',t_st:'Време за тест на помпата',by_season:'Стойности по сезони (лято / зима)',night_cool:'Нощно охлаждане',
+coolant:'Топлоносител',kind:'Вид',water:'Вода',pg:'Пропилен-гликол',glycol:'Концентрация',p_min:'Мин. налягане (студена система)',
+col_tank:'Колектор и бойлер',col_max:'Макс. температура на колектора',tank_volume:'Обем на бойлера',sensor_mount:'Монтаж на датчиците',
+computed:'Изчислено',boil:'Точка на кипене',cap:'Защита на колектора (таван)',prot:'Защита на колектора (използвана)',ban:'Забрана за пускане над',vac_thr:'Праг във ваканция',frost_thr:'Защита от замръзване под',
+limited:'Настройката на защитата на колектора ({0}) е ограничена до тавана.',
+network:'Мрежа',net_mode:'Режим',time_place:'Време и място',timezone:'Часова зона',col_peak:'Пик на колектора',city:'Град (за прогнозата)',
+firmware:'Фърмуер',version:'Версия',ota:'Проверка за обновяване',paired:'Сдвоен',reset:'Нулиране',
+reset_wifi:'Wi-Fi',reset_homekit:'HomeKit',reset_learned:'Научени стойности',reset_history:'История',reset_settings:'Настройки по подразбиране',reset_factory:'Фабрично',
+q_reset_wifi:'Да се изтрие ли мрежата? Контролерът се рестартира в портала за Wi-Fi.',q_reset_settings:'Всички настройки (потребителски и сервизни) по подразбиране?',q_reset_factory:'Да се изтрие ли всичко? Контролерът се рестартира в портала за Wi-Fi.',
+yes:'Да',no:'Не',save:'Запази',cancel:'Отказ',done:'Готово',
+code_title:'Код за достъп',code_note:'Последните 6 знака от името на мрежата на контролера (напр. SOLAR-810841 → 810841); в менюто: nEt → AP.',code_ok:'Влез',code_bad:'Грешен код',
+err_value:'Стойността не е приета',err_conn:'Няма връзка с контролера',
+r_none:'—',r_sensor:'няма стойност от датчик',r_col_boiling:'колекторът над точката на кипене',r_tank_ceiling:'бойлерът на аварийния таван',r_col_protect:'защита на колектора',
+r_frost:'защита от замръзване',r_frost_tank:'защита от замръзване — бойлерът е под 5 °C',r_tank_max:'бойлерът достигна Tmax',r_diff_on:'зареждане',r_diff_off:'малка разлика',
+r_min_run:'мин. време на работа',r_min_off:'мин. време на престой',r_col_min:'колекторът под минимума',r_test:'тест',r_anti_seize:'защита от блокиране',
+r_both_fault:'двата датчика са повредени',r_tf_run:'повреден датчик на бойлера — колекторът е топъл',r_tf_cold:'повреден датчик на бойлера — колекторът е студен',
+r_tf_hot:'повреден датчик на бойлера — колекторът е горещ',r_tf_probe:'повреден датчик на бойлера — проба при горещ колектор',r_cf_probe:'повреден датчик на колектора — проба',
+r_cf_run:'повреден датчик на колектора — бойлерът расте',r_cf_wait:'повреден датчик на колектора — изчакване',r_cf_heater:'повреден датчик на колектора — работи нагревател',
+E1:['Повреден датчик на колектора','Няма валидно измерване ~1 min. Помпата работи на проби. Проверете кабела и датчика.'],
+E2:['Повреден датчик на бойлера','Помпата се управлява само по колектора. Проверете кабела и датчика.'],
+E4:['Бойлерът на аварийния таван (95 °C)','Помпата е спряна, докато бойлерът изстине под 93 °C. Може да източите топла вода.'],
+E5:['Колекторът над точката на кипене','Помпата не тръгва, докато колекторът не изстине 2 K под точката на кипене.'],
+E6:['Повреда на помпата / няма поток','Колекторът се загрява бързо, а бойлерът не. Проверете помпата и кръга.'],
+Hot:['Защита на колектора','Колекторът е над прага на защитата — помпата пренася топлина към бойлера.'],
+Fro:['Защита от замръзване','Колекторът е под прага — помпата пренася топлина от бойлера към колектора.']
+},en:{
+title:'Solar controller',offline:'No connection to the controller',tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
+temps:'Temperatures',tank:'Tank',collector:'Collector',no_sensor:'sensor not answering',today_chart:'Today',chart:'Chart of the day',
+pump:'Pump',today:'Today',system:'System',mode:'Mode',normal:'Normal',season:'Season',season_auto:'Automatic',heater:'Heater',clock:'Clock',
+runs:'Running',stopped:'Stopped',
+vacation:'Vacation',vacation_mode:'Vacation mode',pump_test:'Pump test',left:'left',test_start:'Start the test',test_stop:'Stop the test',
+test_note:'As from the buttons: +60 s, −60 s; stops not earlier than 1 min after the start.',air:'Air purge',air_cycles:'3 cycles · run and pause by the coolant',air_start:'Start the air purge',
+general:'General',tbo:'Tank maximum (Tmax)',night_tmax:'Night cooling above Tmax',frost:'Frost protection',params:'Pump',
+c_lo:'Collector minimum temperature',d_on:'Switch-on difference',d_of:'Switch-off difference',t_st:'Pump test time',by_season:'Values by season (summer / winter)',night_cool:'Night cooling',
+coolant:'Coolant',kind:'Kind',water:'Water',pg:'Propylene glycol',glycol:'Concentration',p_min:'Min. pressure (cold system)',
+col_tank:'Collector and tank',col_max:'Collector max. temperature',tank_volume:'Tank volume',sensor_mount:'Sensor mounting',
+computed:'Computed',boil:'Boiling point',cap:'Collector protection (cap)',prot:'Collector protection (in use)',ban:'No start above',vac_thr:'Vacation threshold',frost_thr:'Frost protection below',
+limited:'The collector protection setting ({0}) is limited to the cap.',
+network:'Network',net_mode:'Mode',time_place:'Time and place',timezone:'Time zone',col_peak:'Collector peak',city:'City (for the forecast)',
+firmware:'Firmware',version:'Version',ota:'Check for update',paired:'Paired',reset:'Reset',
+reset_wifi:'Wi-Fi',reset_homekit:'HomeKit',reset_learned:'Learned values',reset_history:'History',reset_settings:'Default settings',reset_factory:'Factory',
+q_reset_wifi:'Erase the network? The controller restarts into the Wi-Fi portal.',q_reset_settings:'All settings (user and service) to the defaults?',q_reset_factory:'Erase everything? The controller restarts into the Wi-Fi portal.',
+yes:'Yes',no:'No',save:'Save',cancel:'Cancel',done:'Done',
+code_title:'Access code',code_note:'The last 6 characters of the controller\'s own network name (e.g. SOLAR-810841 → 810841); in the menu: nEt → AP.',code_ok:'Enter',code_bad:'Wrong code',
+err_value:'The value was not accepted',err_conn:'No connection to the controller',
+r_none:'—',r_sensor:'no sensor value',r_col_boiling:'collector above boiling point',r_tank_ceiling:'tank at the emergency ceiling',r_col_protect:'collector protection',
+r_frost:'frost protection',r_frost_tank:'frost protection — tank below 5 °C',r_tank_max:'tank reached Tmax',r_diff_on:'charging',r_diff_off:'difference too small',
+r_min_run:'minimum run time',r_min_off:'minimum off time',r_col_min:'collector below its minimum',r_test:'test',r_anti_seize:'anti-seize',
+r_both_fault:'both sensors faulty',r_tf_run:'tank sensor faulty — collector warm',r_tf_cold:'tank sensor faulty — collector cold',
+r_tf_hot:'tank sensor faulty — collector hot',r_tf_probe:'tank sensor faulty — probe at hot collector',r_cf_probe:'collector sensor faulty — probe',
+r_cf_run:'collector sensor faulty — tank rises',r_cf_wait:'collector sensor faulty — waiting',r_cf_heater:'collector sensor faulty — heater running',
+E1:['Collector sensor faulty','No valid measurement for ~1 min. The pump runs on probes. Check the cable and the sensor.'],
+E2:['Tank sensor faulty','The pump follows the collector only. Check the cable and the sensor.'],
+E4:['Tank at the emergency ceiling (95 °C)','The pump is stopped until the tank cools below 93 °C. You may draw off hot water.'],
+E5:['Collector above the boiling point','The pump does not start until the collector is 2 K below the boiling point.'],
+E6:['Pump failure / no flow','The collector heats up fast, the tank does not. Check the pump and the circuit.'],
+Hot:['Collector protection','The collector is above the protection threshold — the pump moves heat to the tank.'],
+Fro:['Frost protection','The collector is below the threshold — the pump moves heat from the tank to the collector.']
+}};
+var L,S=null,ED=null;
+function $(i){return document.getElementById(i)}
+function t(k){return (T[L]&&T[L][k])||T.bg[k]||k}
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}}
+function setLang(l){L=l;store('lang',l);document.documentElement.lang=l;document.title=t('title');
+ document.querySelectorAll('[data-t]').forEach(function(e){e.textContent=t(e.dataset.t)});
+ $('fl-bg').classList.toggle('on',l=='bg');$('fl-en').classList.toggle('on',l=='en');render()}
+/* one function for every feature: the elements whose feature the firmware does not list are grey */
+function features(list){document.querySelectorAll('[data-f]').forEach(function(e){e.classList.toggle('na',list.indexOf(e.dataset.f)<0)})}
+function deg(v){return (v/10).toFixed(1)}
+function c1(v){return (v/10).toFixed(1)+' °C'}
+function code(){var m=document.cookie.match(/(?:^|; )code=([^;]*)/);return m?m[1]:''}
+function setCode(c){document.cookie='code='+c+'; max-age='+(c?315360000:0)+'; path=/; SameSite=Strict'}
+function fmt(k,v){if(k=='coolant')return t(v?'pg':'water');if(k=='glycol')return v+' %';if(k=='p_min')return (v/10).toFixed(1)+' bar';
+ if(k=='d_on'||k=='d_of')return v+' K';if(k=='t_st')return v+' s';return v+' °C'}
+function val(k){return k in S.set?S.set[k]:S.inst[k]}
+function render(){if(!S)return;var s=S,i;
+ features(s.f);$('host').textContent=s.host;
+ var h='';s.al.forEach(function(c){var a=T[L][c]||[c,''];h+='<div class="alarm'+(c=='Hot'||c=='Fro'?' info':'')+'"><b>'+c+' — '+a[0]+'</b><div>'+a[1]+'</div></div>'});$('alarms').innerHTML=h;
+ $('tt').textContent=s.tt==null?'---':deg(s.tt)+'°';$('tc').textContent=s.tc==null?'---':deg(s.tc)+'°';
+ $('tt-s').textContent=s.tf?t('no_sensor'):'Tmax '+s.set.tbo+' °C';$('tc-s').textContent=s.cf?t('no_sensor'):'';
+ var prot=['col_protect','frost','tf_probe'].indexOf(s.why)>=0;
+ $('pdot').style.background=s.pump?(prot?'var(--orange)':'var(--green)'):'var(--sep)';
+ $('pstate').textContent=t(s.pump?'runs':'stopped');
+ $('pwhy').textContent=t('r_'+(s.why=='diff'?(s.pump?'diff_on':'diff_off'):s.why));
+ $('tleft').textContent=s.test==null?s.set.t_st+' s':s.test+' s '+t('left');
+ $('tstart').style.display=s.test==null?'':'none';$('trun').style.display=s.test==null?'none':'';
+ ['tbo','c_lo','d_on','d_of','t_st'].forEach(function(k){$('v-'+k).textContent=fmt(k,s.set[k])});
+ $('sw-frost').classList.toggle('off',!s.set.frost);
+ for(i in s.inst)$('v-'+i).textContent=fmt(i,s.inst[i]);
+ $('r-glycol').classList.toggle('dis',!s.inst.coolant);
+ $('c-boil').textContent=c1(s.calc.boil);$('c-cap').textContent=c1(s.calc.cap);$('c-used').textContent=c1(s.calc.used);
+ $('c-ban').textContent=c1(s.calc.ban);$('c-frost').textContent=c1(s.calc.frost);
+ $('c-note').textContent=s.calc.prot>s.calc.used?t('limited').replace('{0}',c1(s.calc.prot)):'';
+ $('n-ssid').textContent=s.net.ssid+(s.net.ssid?' · '+s.net.rssi+' dBm':'');$('n-ip').textContent=s.net.ip;$('ver').textContent=s.ver;
+ if(ED&&ED.k)edit(ED.k,ED.v)}
+function load(){fetch('/api/state',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()})
+ .then(function(j){S=j;$('offline').classList.remove('on');render()}).catch(function(){$('offline').classList.add('on')})}
+function post(url,body,ok){fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+ .then(function(r){return r.json().catch(function(){return{}}).then(function(j){
+  if(r.ok){if(ok)ok();load();return}
+  if(j.err=='code'){setCode('');lock();close_();return}
+  alert(t('err_value'))})}).catch(function(){alert(t('err_conn'))})}
+function cmd(c){post('/api/cmd','c='+c)}
+function set(k,v,ok){post('/api/set','k='+k+'&v='+v,ok)}
+function toggleFrost(){if(S)set('frost',S.set.frost?0:1)}
+/* code: "Service" and "System" are shown after it is entered; the server checks it on every change */
+function lock(){var c=code();document.querySelectorAll('.locked').forEach(function(e){e.style.display=c?'':'none'});
+ document.querySelectorAll('.lock').forEach(function(e){e.innerHTML=c?'':'<h2>'+t('code_title')+'</h2><div class="grp" style="padding:14px"><input inputmode="numeric" maxlength="6" autocomplete="off" placeholder="______"><button class="btn" onclick="login(this)">'+t('code_ok')+'</button></div><p class="note">'+t('code_note')+'</p>'})}
+function login(b){var v=b.previousElementSibling.value.trim();
+ fetch('/api/code',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'code='+encodeURIComponent(v)})
+ .then(function(r){if(r.ok){setCode(v.toUpperCase());lock()}else alert(t('code_bad'))}).catch(function(){alert(t('err_conn'))})}
+function close_(){ED=null;$('ov').classList.remove('on')}
+/* the editor of one value: -/+ in its range and step (the same checks as the menu, on the server) */
+function edit(k,v){if(!S)return;var r=S.rng[k],h;ED={k:k,v:v};
+ h='<h3>'+t(k=='coolant'?'kind':k)+'</h3>';
+ if(k=='coolant'){h+='<div class="grp">'+[0,1].map(function(o){return '<div class="row opt'+(o==v?' sel':'')+'" onclick="edit(\'coolant\','+o+')">'+t(o?'pg':'water')+'</div>'}).join('')+'</div>'}
+ else h+='<div class="step"><button onclick="bump(-1)">−</button><b>'+fmt(k,v)+'</b><button onclick="bump(1)">+</button></div>';
+ h+='<div class="btns"><button class="btn n" onclick="close_()">'+t('cancel')+'</button><button class="btn" onclick="set(ED.k,ED.v,close_)">'+t('save')+'</button></div>';
+ $('sheet').innerHTML=h;$('ov').classList.add('on')}
+function bump(d){var r=S.rng[ED.k],v=ED.v+d*r[2];if(v<r[0])v=r[0];if(v>r[1])v=r[1];edit(ED.k,v)}
+function ask(c){ED={};$('sheet').innerHTML='<h3>'+t(c)+'</h3><p class="note" style="text-align:center;margin:0 0 8px">'+t('q_'+c)+'</p><div class="btns"><button class="btn n" onclick="close_()">'+t('no')+'</button><button class="btn r" onclick="close_();cmd(\''+c+'\')">'+t('yes')+'</button></div>';$('ov').classList.add('on')}
+document.querySelectorAll('[data-k]').forEach(function(e){e.onclick=function(){if(S)edit(e.dataset.k,val(e.dataset.k))}});
+$('ov').onclick=function(e){if(e.target==this)close_()};
+document.querySelectorAll('.tabs div').forEach(function(x){x.onclick=function(){
+ document.querySelectorAll('.tabs div').forEach(function(y){y.classList.remove('on')});x.classList.add('on');
+ document.querySelectorAll('section').forEach(function(s){s.classList.toggle('on',s.id==x.dataset.s)});scrollTo(0,0)}});
+L=store('lang')||((navigator.language||'').slice(0,2)=='bg'?'bg':'en');
+setLang(L);lock();load();setInterval(load,5000);
+</script>
+</body></html>
