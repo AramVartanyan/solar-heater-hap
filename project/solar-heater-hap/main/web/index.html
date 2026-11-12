@@ -50,6 +50,12 @@ td input{font:inherit;color:var(--blue);background:none;border:0;text-align:righ
 .note{color:var(--sub);font-size:13px;margin:6px 18px 0}
 .calc{color:var(--blue)}
 .na{opacity:.38;pointer-events:none}
+.chart{padding:10px 8px 6px}.chart svg{display:block;width:100%;height:auto}
+.chart text{font-size:9px;fill:var(--sub)}.chart .ax{stroke:var(--sep);stroke-width:.5}
+.lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub);padding:2px 8px 4px}
+.lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.days td,.days th{padding:8px 6px;font-size:14px}.days td:first-child,.days th:first-child{text-align:left}
+.v a{color:var(--blue);text-decoration:none}
 .hide{display:none!important}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:.5px solid var(--sep);display:flex;justify-content:center}
 .tabs div{flex:1;max-width:92px;text-align:center;font-size:11px;color:var(--sub);padding:8px 0 22px;cursor:pointer}
@@ -64,12 +70,14 @@ section{display:none}section.on{display:block}
 .box div{display:flex;border-top:.5px solid var(--sep)}
 .box button{flex:1;border:0;background:none;font:inherit;font-size:17px;color:var(--blue);padding:12px;cursor:pointer}
 .box button+button{border-left:.5px solid var(--sep);font-weight:600;color:var(--red)}
+.sw-btn{border:0;background:none;font:inherit;color:var(--blue);font-weight:600;cursor:pointer;padding:0}
+.sw-btn:disabled{color:var(--sub)}
 </style></head><body>
 <div class="wrap">
 <div class="warn hide" id="offline" data-t="offline"></div>
 <div class="top">
  <div><h1 data-t="title"></h1>
- <p class="dev"><span id="dev"></span><span data-f="season"> · <span data-t="season"></span> —</span><span data-f="clock"> · --:--</span></p></div>
+ <p class="dev"><span id="dev"></span><span data-f="season"> · <span data-t="season"></span> —</span><span data-f="clock"> · <span id="hd-time">--:--</span></span></p></div>
  <div class="lang">
   <button id="l-bg" title="Български"><svg viewBox="0 0 5 3"><path fill="#fff" d="M0 0h5v3H0z"/><path fill="#00966E" d="M0 1h5v1H0z"/><path fill="#D62612" d="M0 2h5v1H0z"/></svg></button>
   <button id="l-en" title="English"><svg viewBox="0 0 60 36"><path fill="#012169" d="M0 0h60v36H0z"/><path d="M0 0l60 36M60 0L0 36" stroke="#fff" stroke-width="7"/><path d="M0 0l60 36M60 0L0 36" stroke="#C8102E" stroke-width="3"/><path d="M30 0v36M0 18h60" stroke="#fff" stroke-width="12"/><path d="M30 0v36M0 18h60" stroke="#C8102E" stroke-width="7"/></svg></button>
@@ -86,17 +94,25 @@ section{display:none}section.on{display:block}
  <h2 data-t="pump"></h2>
  <div class="grp">
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
-  <div class="row" data-f="run_today"><span data-t="today"></span><span class="v">—</span></div>
+  <div class="row" data-f="run_today"><span data-t="today"></span><span class="v" id="run-today">—</span></div>
  </div>
  <h2 data-t="chart" data-f="chart"></h2>
- <div class="grp" data-f="chart"><div class="row"><span data-t="chart_d"></span><span class="v">—</span></div></div>
+ <div class="grp chart" data-f="chart"><svg id="chart" viewBox="0 0 320 170"></svg>
+  <div class="lg"><span><i style="background:var(--red)"></i><span data-t="col"></span></span><span><i style="background:var(--blue)"></i><span data-t="tank"></span></span>
+  <span><i style="background:var(--green)"></i><span data-t="k_charge"></span></span><span><i style="background:var(--orange)"></i><span data-t="k_prot"></span></span><span><i style="background:var(--sub)"></i><span data-t="k_other"></span></span></div></div>
+ <p class="note" data-f="chart" id="chart-note"></p>
  <h2 data-t="system"></h2>
  <div class="grp">
   <div class="row" data-f="vacation"><span data-t="mode"></span><span class="v">—</span></div>
   <div class="row" data-f="season"><span data-t="season"></span><span class="v">—</span></div>
   <div class="row" data-f="heater"><span data-t="heater"></span><span class="v">—</span></div>
-  <div class="row" data-f="clock"><span data-t="clock"></span><span class="v">—</span></div>
+  <div class="row" data-f="clock"><span data-t="clock"></span><span class="v" id="clock-v">—</span></div>
  </div>
+ <h2 data-t="last7" data-f="history"></h2>
+ <div class="grp" style="padding:4px 6px" data-f="history">
+  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th></tr></thead><tbody id="days"></tbody></table>
+ </div>
+ <p class="note" data-f="history" data-t="days_note"></p>
 </section>
 
 <section id="s2">
@@ -188,8 +204,9 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="time_place" data-f="timezone"></h2>
  <div class="grp">
-  <div class="row" data-f="timezone"><span data-t="tz"></span><span class="v">— ›</span></div>
-  <div class="row" data-f="timezone"><span data-t="peak"></span><span class="v">—</span></div>
+  <label class="row" data-f="timezone"><span data-t="tz"></span><span class="v"><select data-p id="tz-sel"></select></span></label>
+  <div class="row hide" data-f="timezone" id="tz-sug"><span id="tz-sug-t"></span><button class="sw-btn" data-p id="tz-ok" data-t="confirm"></button></div>
+  <div class="row" data-f="timezone"><span data-t="peak"></span><span class="v" id="peak-v">—</span></div>
   <div class="row" data-f="city"><span data-t="city"></span><span class="v">— ›</span></div>
  </div>
  <h2 data-t="fw"></h2>
@@ -200,13 +217,13 @@ section{display:none}section.on{display:block}
  <h2 data-f="homekit">HomeKit</h2>
  <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
  <h2 data-t="hist" data-f="history"></h2>
- <div class="grp" data-f="history"><div class="row"><span data-t="hist_dl"></span><span class="v">›</span></div></div>
+ <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl"></span><span class="v">›</span></a></div>
  <h2 data-t="reset"></h2>
  <div class="grp">
   <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi"></span><span class="v">›</span></button>
   <button class="row" data-f="homekit"><span data-t="rs_hk"></span><span class="v">›</span></button>
-  <button class="row" data-f="learned"><span data-t="rs_learn"></span><span class="v">›</span></button>
-  <button class="row" data-f="history"><span data-t="rs_hist"></span><span class="v">›</span></button>
+  <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn"></span><span class="v">›</span></button>
+  <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist"></span><span class="v">›</span></button>
   <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def"></span><span class="v">›</span></button>
   <button class="row" data-f="reset" data-p data-r="factory"><span data-t="rs_fact"></span><span class="v">›</span></button>
  </div>
@@ -226,7 +243,12 @@ const T={bg:{
 title:'Соларен контролер',offline:'Няма връзка с контролера.',
 tab1:'Състояние',tab2:'Управление',tab3:'Настройки',tab4:'Сервизни',tab5:'Система',
 temps:'Температури',tank:'Бойлер',col:'Колектор',no_sensor:'датчикът не отговаря',
-pump:'Помпа',runs:'Работи',idle:'Стои',today:'Днес',chart:'Графика',chart_d:'Температури и помпа за деня',
+pump:'Помпа',runs:'Работи',idle:'Стои',today:'Днес',chart:'Графика',
+k_charge:'зареждане',k_prot:'защита',k_other:'друго',chart_day:'Днес от полунощ, местно време; лентата — кога е работила помпата.',
+chart_24:'Последните 24 h (часовникът не е сверен); лентата — кога е работила помпата.',
+c_unset:'не е сверен',c_tz:'зоната не е потвърдена',c_bad:'ненадежден',c_ok:'надежден',
+last7:'Последните 7 дни',date:'Дата',no_days:'Още няма записан ден.',
+days_note:'Колекторът — максимум; бойлерът — минимум – максимум; помпата — общо време на работа. * — непълен ден (часовникът е сверен след полунощ).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора, нощем охлажда бойлера. Изключва се само ръчно.',
 test:'Тест на помпата',test_start:'Пусни теста',test_stop:'Спри',left:'остават',
@@ -246,11 +268,14 @@ no_start:'Забрана за пускане над',vac_limit:'Праг във 
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
 net:'Мрежа',ip:'IP адрес',time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
 fw:'Фърмуер',ver:'Версия',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
+confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
 q_wifi:'Изтриване на запазената Wi-Fi мрежа? Контролерът ще се рестартира и ще отвори своята мрежа за настройка.',
 q_defaults:'Връщане на всички параметри (потребителски и сервизни) към стойностите по подразбиране?',
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
+q_history:'Изтриване на историята (всички дневни обобщения)?',
+q_learned:'Нулиране на научените стойности (засега — проверката на часовата зона)?',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
 a_E1:'Повреден датчик на колектора',d_E1:'Датчикът не отговаря. Помпата работи на проби. Проверете кабела и датчика.',
 a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът не отговаря. Помпата работи само по температурата на колектора. Проверете кабела и датчика.',
@@ -271,7 +296,12 @@ r_cf_wait:'изчакване до следващата проба (повред
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
 temps:'Temperatures',tank:'Tank',col:'Collector',no_sensor:'sensor not answering',
-pump:'Pump',runs:'Running',idle:'Stopped',today:'Today',chart:'Chart',chart_d:'Temperatures and pump today',
+pump:'Pump',runs:'Running',idle:'Stopped',today:'Today',chart:'Chart',
+k_charge:'charging',k_prot:'protection',k_other:'other',chart_day:'Today from midnight, local time; the band shows when the pump ran.',
+chart_24:'The last 24 h (the clock is not set); the band shows when the pump ran.',
+c_unset:'not set',c_tz:'time zone not confirmed',c_bad:'not reliable',c_ok:'reliable',
+last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
+days_note:'Collector — maximum; tank — minimum – maximum; pump — total run time. * — partial day (the clock was set after midnight).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'Protects the collector by day, cools the tank at night. Switched off by hand only.',
 test:'Pump test',test_start:'Start the test',test_stop:'Stop',left:'left',
@@ -291,11 +321,14 @@ no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
 net:'Network',ip:'IP address',time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
 fw:'Firmware',ver:'Version',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
+confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
 q_wifi:'Erase the stored Wi-Fi network? The controller will restart and open its own setup network.',
 q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
+q_history:'Erase the history (all daily summaries)?',
+q_learned:'Reset the learned values (for now — the time zone check)?',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
 a_E1:'Collector sensor fault',d_E1:'The sensor does not answer. The pump runs on probes. Check the cable and the sensor.',
 a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the collector temperature only. Check the cable and the sensor.',
@@ -314,9 +347,12 @@ r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
-let S=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
+let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
+let BZ='';try{BZ=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
 const t=k=>T[lang][k]||k;
 const deg=v=>(v/10).toFixed(1).replace('-','−');
+const p2=n=>String(n).padStart(2,'0'),hm=m=>p2(Math.floor(m/60))+':'+p2(m%60);
+const dur=m=>m>=60?Math.floor(m/60)+' h '+m%60+' min':m+' min';
 
 /* The only place that greys out: every element names its function (data-f); the ones the
    firmware does not list are dimmed and cannot be used. */
@@ -385,7 +421,50 @@ function render(){
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
  $('#n-wifi').textContent=S.net.ssid?S.net.ssid+' · '+String(S.net.rssi).replace('-','−')+' dBm':'—';
  $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;
+ const c=S.clock;
+ $('#hd-time').textContent=(c.min==null?'--:--':hm(c.min))+(c.st=='ok'?'':' ('+t('c_'+c.st)+')');
+ $('#clock-v').textContent=t('c_'+c.st);
+ $('#run-today').textContent=dur(S.run[0]+S.run[1]+S.run[2]);
+ $('#peak-v').textContent=c.peak==null?'—':hm(c.peak)+(c.peak>=600&&c.peak<=1020?' ✓':' ✗');
+ const sel=$('#tz-sel');
+ if(TZ&&!sel.options.length)TZ.forEach((z,i)=>sel.add(new Option(z,i)));
+ if(TZ&&document.activeElement!=sel)sel.value=TZ.indexOf(c.tz);
+ const bi=TZ?TZ.indexOf(BZ):-1,other=bi>=0&&BZ!=c.tz;
+ $('#tz-sug').classList.toggle('hide',c.tzok&&!other);
+ $('#tz-sug-t').textContent=[c.tzok?'':t('c_tz'),other?t('tz_sug').replace('{tz}',BZ):''].filter(x=>x).join(' · ').replace(/^./,x=>x.toUpperCase());
+ $('#tz-ok').dataset.i=other?bi:TZ?TZ.indexOf(c.tz):-1;
+ drawChart();drawDays();
 }
+/* The chart: the temperatures at the end of each 10-min interval, below them the pump band (minutes
+   of each interval by kind). x in minutes: 0 ... 1440 from midnight, or -1440 ... 0 from now. */
+function drawChart(){
+ if(!C)return;
+ const W=320,L=28,R=6,T=6,Y0=118,BY=137,day=C.day,x0=day?0:-1440,pw=(W-L-R)/1440;
+ const X=x=>L+(x-x0)*pw;let lo=1e9,hi=-1e9;
+ C.pts.forEach(p=>[p[1],p[2]].forEach(v=>{if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v)}}));
+ if(lo>hi){lo=0;hi=600}lo=Math.floor(lo/100)*100;hi=Math.ceil(hi/100)*100;if(hi-lo<200)hi=lo+200;
+ const Y=v=>Y0-(v-lo)/(hi-lo)*(Y0-T),st=(hi-lo)/100>6?200:100;let h='';
+ for(let v=lo;v<=hi;v+=st)h+=`<line class="ax" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-3}" y="${Y(v)+3}" text-anchor="end">${v/10}°</text>`;
+ for(let i=0;i<=4;i++){const x=x0+i*360;h+=`<text x="${X(x)}" y="${Y0+11}" text-anchor="middle">${day?p2(i*6):(i<4?'−'+(24-i*6)+' h':'0')}</text>`}
+ [[1,'var(--red)'],[2,'var(--blue)']].forEach(([k,col])=>{let d='',prev=null;
+  C.pts.forEach(p=>{const v=p[k];if(v==null){prev=null;return}d+=(prev?'L':'M')+X(p[0]).toFixed(1)+' '+Y(v).toFixed(1);prev=1});
+  if(d)h+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/>`});
+ h+=`<rect x="${L}" y="${BY}" width="${W-L-R}" height="12" rx="2" fill="var(--off)"/>`;
+ C.pts.forEach(p=>{let x=X(p[0]-10);[[3,'var(--green)'],[4,'var(--orange)'],[5,'var(--sub)']].forEach(([k,col])=>{
+  if(p[k]>0){h+=`<rect x="${x.toFixed(1)}" y="${BY}" width="${(p[k]*pw).toFixed(2)}" height="12" fill="${col}"/>`;x+=p[k]*pw}})});
+ $('#chart').setAttribute('viewBox','0 0 320 156');$('#chart').innerHTML=h;
+ $('#chart-note').textContent=t(day?'chart_day':'chart_24');
+}
+function drawDays(){
+ const b=$('#days');if(!D)return;b.textContent='';
+ if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=4;c.textContent=t('no_days');return}
+ const tv=v=>v==null?'—':deg(v)+'°';
+ D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2];
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h'].forEach(x=>r.insertCell().textContent=x)});
+}
+async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
+async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}
+async function loadDays(){const d=await getJ('/api/days');if(d){D=d;drawDays()}}
 function ask(q){return new Promise(res=>{
  $('#dlg-q').textContent=q;$('#dlg').classList.remove('hide');
  const end=v=>{$('#dlg').classList.add('hide');res(v)};
@@ -408,12 +487,18 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
  code=v;if(await post('/api/auth',{})){document.cookie='code='+v+';max-age=31536000;path=/';
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
- if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(w=='defaults'?'done':'restart'));refresh()}});
+ if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
+$('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};
+$('#tz-ok').onclick=async e=>{const i=+e.target.dataset.i;if(i>=0&&await post('/api/tz',{tz:i}))toast(t('done'));refresh();loadChart()};
 
 let l='';try{l=localStorage.getItem('lang')}catch(e){}
 setLang(l||((navigator.language||'').toLowerCase().startsWith('bg')?'bg':'en'));
 code=cookie();
-(async()=>{if(code&&await post('/api/auth',{},1))lock(false);else lock(true);await refresh()})();
-setInterval(refresh,5000);setInterval(testText,1000);
+(async()=>{
+ await post('/api/time',{t:Math.floor(Date.now()/1000)},1);   /* taken only without SNTP in the last 24 h */
+ if(code&&await post('/api/auth',{},1))lock(false);else lock(true);
+ const z=await getJ('/api/tz');if(z)TZ=z.tz;
+ await refresh();loadChart();loadDays()})();
+setInterval(refresh,5000);setInterval(testText,1000);setInterval(loadChart,60000);setInterval(loadDays,600000);
 </script>
 </body></html>

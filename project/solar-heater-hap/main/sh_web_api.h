@@ -9,10 +9,16 @@
  *                     of the button menu), fro (0 / 1), installer data (fluid, glycol, press,
  *                     col_max — only with the access code)
  *              test   cmd=start | plus | minus | stop
- *              reset  what=wifi | defaults | factory (only with the access code)
+ *              reset  what=wifi | defaults | factory | history | learned (only with the access
+ *                     code)
+ *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
+ *                     whether it is taken)
+ *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
  *            the access code ("code") is the last 6 characters of the setup network name
+ *   chart    the day in RAM (sh_day): the 10-min intervals of today / of the last 24 h
+ *   days     the last daily summaries (sh_hist), newest first
  *   features the functions the firmware has; the page greys out every element whose function is
- *            not in the list (doc/web-interface.md 7) */
+ *            not in the list (doc/web-interface.md 7); "history" only with the history partition */
 #pragma once
 
 #include <stdbool.h>
@@ -21,6 +27,9 @@
 #include "sh_pump_logic.h"
 #include "sh_settings.h"
 #include "sh_installer.h"
+#include "sh_clock_rules.h"
+#include "sh_day.h"
+#include "sh_hist.h"
 
 #define SH_WEB_CODE_LEN         6
 #define SH_WEB_STATUS_MAX       2048    /* a buffer of this size always holds the status */
@@ -31,6 +40,16 @@ typedef struct {
     bool frost;                 /* frost protection enabled */
     sh_installer_t inst;
 } sh_web_config_t;
+
+/* The clock, as the page shows it. */
+typedef struct {
+    sh_clock_trust_t trust;
+    bool sntp;                  /* set by SNTP (otherwise by the browser, or not set) */
+    int16_t min;                /* local minute of the day, -1: not set */
+    const char *tz;             /* time zone name */
+    bool tz_confirmed;
+    int16_t peak;               /* collector peak of the last counted day, SH_PEAK_NONE */
+} sh_web_clock_t;
 
 typedef struct {
     int16_t t_col, t_tank;      /* last valid values, SH_TEMP_INVALID: none */
@@ -47,10 +66,30 @@ typedef struct {
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;
+    sh_web_clock_t clock;
+    uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
+    bool history;               /* the history partition is there */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */
 int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s);
+
+/* The chart as JSON: {"day":1,"pts":[[x,col,tank,charge,protect,other],...]} — x is the end of
+ * the interval in minutes: with a set clock from midnight (10 ... 1440), without it from now
+ * (-1440 ... 0); temperatures in tenths (null: none), run time in whole minutes. */
+#define SH_WEB_CHART_MAX        6144
+int sh_web_chart_json(char *buf, size_t size, const sh_day_t *d, const sh_local_t *lt, uint32_t now_s);
+
+/* The last daily summaries, newest first: {"on":1,"days":[{"d":"2026-11-11","cx":..,"cn":..,
+ * "tx":..,"tn":..,"run":[c,p,o],"al":["E1"],"pk":..,"rel":1,"part":0},...]}; `on`: the history
+ * partition is there. */
+#define SH_WEB_DAYS             7
+#define SH_WEB_DAYS_MAX         2048
+int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days, unsigned n);
+
+/* The supported time zones: {"tz":["UTC","Europe/Sofia",...]} (the index is sent back). */
+#define SH_WEB_TZ_MAX           2048
+int sh_web_tz_json(char *buf, size_t size);
 
 typedef enum {
     SH_WEB_OK = 0,
@@ -84,10 +123,18 @@ typedef enum {
     SH_WEB_RESET_WIFI = 0,      /* the stored network */
     SH_WEB_RESET_DEFAULTS,      /* user and installer settings */
     SH_WEB_RESET_FACTORY,       /* everything */
+    SH_WEB_RESET_HISTORY,       /* the daily summaries */
+    SH_WEB_RESET_LEARNED,       /* the learned values (for now: the state of the time zone check) */
 } sh_web_reset_t;
 
 /* "reset": needs the access code. */
 sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *what);
+
+/* "time": the time of the browser, s since 1970 (UTC). */
+sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s);
+
+/* "tz": a time zone of sh_tz_list by its index; needs the access code. */
+sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz);
 
 /* Key of a pump reason for the page (it holds the texts). */
 const char *sh_web_reason_key(sh_pump_reason_t reason);

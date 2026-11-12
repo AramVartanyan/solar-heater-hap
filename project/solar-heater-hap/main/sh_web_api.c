@@ -6,13 +6,16 @@
 #include <string.h>
 #include "sh_state.h"           /* SH_TEMP_INVALID */
 #include "sh_alarm.h"
+#include "sh_tz.h"
 #include "sh_web_api.h"
 
 /* The functions this firmware has. A step that adds a function adds its name here and wires its
- * elements of the page (main/web/index.html, data-f="name"). */
+ * elements of the page (main/web/index.html, data-f="name"). "history" is added when the history
+ * partition is there. */
 static const char *const FEATURES[] = {
     "alarms", "temps", "pump", "pump_test", "settings", "frost",
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
+    "clock", "timezone", "run_today", "chart", "learned",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -65,6 +68,15 @@ static void put_temp(out_t *o, const char *name, int16_t t, bool fault)
     }
 }
 
+static void put_or_null(out_t *o, bool have, int v)
+{
+    if (have) {
+        put(o, "%d", v);
+    } else {
+        put(o, "null");
+    }
+}
+
 int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
 {
     out_t o = { .buf = buf, .size = size };
@@ -79,6 +91,9 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, ",\"feat\":[");
     for (size_t i = 0; i < sizeof(FEATURES) / sizeof(FEATURES[0]); i++) {
         put(&o, "%s\"%s\"", i ? "," : "", FEATURES[i]);
+    }
+    if (s->history) {
+        put(&o, ",\"history\"");
     }
     put(&o, "],");
 
@@ -120,8 +135,109 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ssid);
     put(&o, ",\"ip\":");
     put_str(&o, s->ip);
-    put(&o, ",\"rssi\":%d}}", s->rssi);
+    put(&o, ",\"rssi\":%d},", s->rssi);
 
+    static const char *const trust[] = {
+        [SH_CLOCK_UNSET] = "unset", [SH_CLOCK_TZ_UNCONFIRMED] = "tz",
+        [SH_CLOCK_UNRELIABLE] = "bad", [SH_CLOCK_RELIABLE] = "ok",
+    };
+    const sh_web_clock_t *c = &s->clock;
+    put(&o, "\"clock\":{\"st\":\"%s\",\"sntp\":%d,\"min\":", trust[c->trust], c->sntp);
+    put_or_null(&o, c->trust != SH_CLOCK_UNSET && c->min >= 0, c->min);
+    put(&o, ",\"tz\":");
+    put_str(&o, c->tz);
+    put(&o, ",\"tzok\":%d,\"peak\":", c->tz_confirmed);
+    put_or_null(&o, c->peak >= 0, c->peak);
+    put(&o, "},\"run\":[%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
+        (unsigned long)((s->run_s[1] + 30) / 60), (unsigned long)((s->run_s[2] + 30) / 60));
+
+    return o.full ? -1 : (int)o.len;
+}
+
+/* ---- chart, days, time zones ------------------------------------------------------------ */
+
+typedef struct {
+    out_t *o;
+    const sh_local_t *lt;
+    uint32_t now_s;
+    bool first;
+} chart_ctx_t;
+
+static void chart_slot(void *ctx, const sh_chart_slot_t *s)
+{
+    chart_ctx_t *c = ctx;
+    const long x = c->lt->set ? (long)(s->idx + 1) * SH_CHART_SLOT_MIN : -(long)((c->now_s - s->end_s) / 60);
+    put(c->o, "%s[%ld,", c->first ? "" : ",", x);
+    put_or_null(c->o, s->t_col != SH_TEMP_INVALID, s->t_col);
+    put(c->o, ",");
+    put_or_null(c->o, s->t_tank != SH_TEMP_INVALID, s->t_tank);
+    put(c->o, ",%u,%u,%u]", (s->run_s[0] + 30u) / 60u, (s->run_s[1] + 30u) / 60u, (s->run_s[2] + 30u) / 60u);
+    c->first = false;
+}
+
+int sh_web_chart_json(char *buf, size_t size, const sh_day_t *d, const sh_local_t *lt, uint32_t now_s)
+{
+    out_t o = { .buf = buf, .size = size };
+    if (size == 0) {
+        return -1;
+    }
+    put(&o, "{\"day\":%d,\"pts\":[", lt->set);
+    chart_ctx_t c = { .o = &o, .lt = lt, .now_s = now_s, .first = true };
+    sh_day_chart(d, lt, now_s, chart_slot, &c);
+    put(&o, "]}");
+    return o.full ? -1 : (int)o.len;
+}
+
+static void put_hist_temp(out_t *o, const char *name, int16_t t)
+{
+    put(o, ",\"%s\":", name);
+    put_or_null(o, t != SH_HIST_NO_TEMP, t);
+}
+
+int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days, unsigned n)
+{
+    out_t o = { .buf = buf, .size = size };
+    if (size == 0) {
+        return -1;
+    }
+    put(&o, "{\"on\":%d,\"days\":[", on);
+    for (unsigned i = 0; i < n; i++) {
+        const sh_hist_rec_t *r = &days[i];
+        int y, m, d;
+        sh_day_date(r->day, &y, &m, &d);
+        put(&o, "%s{\"d\":\"%04d-%02d-%02d\"", i ? "," : "", y, m, d);
+        put_hist_temp(&o, "cx", r->col_max);
+        put_hist_temp(&o, "cn", r->col_min);
+        put_hist_temp(&o, "tx", r->tank_max);
+        put_hist_temp(&o, "tn", r->tank_min);
+        put(&o, ",\"run\":[%u,%u,%u],\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2]);
+        bool first = true;
+        for (int a = 0; a < SH_ALARM_COUNT; a++) {
+            if (r->alarms & SH_ALARM_BIT(a)) {
+                put(&o, "%s\"%s\"", first ? "" : ",", sh_alarm_name((sh_alarm_t)a));
+                first = false;
+            }
+        }
+        put(&o, "],\"pk\":");
+        put_or_null(&o, r->peak_min >= 0, r->peak_min);
+        put(&o, ",\"rel\":%d,\"part\":%d}", r->clock_reliable, r->partial);
+    }
+    put(&o, "]}");
+    return o.full ? -1 : (int)o.len;
+}
+
+int sh_web_tz_json(char *buf, size_t size)
+{
+    out_t o = { .buf = buf, .size = size };
+    if (size == 0) {
+        return -1;
+    }
+    put(&o, "{\"tz\":[");
+    for (size_t i = 0; i < sh_tz_count; i++) {
+        put(&o, "%s", i ? "," : "");
+        put_str(&o, sh_tz_list[i].name);
+    }
+    put(&o, "]}");
     return o.full ? -1 : (int)o.len;
 }
 
@@ -313,10 +429,45 @@ sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *wh
         *what = SH_WEB_RESET_DEFAULTS;
     } else if (strcmp(v, "factory") == 0) {
         *what = SH_WEB_RESET_FACTORY;
+    } else if (strcmp(v, "history") == 0) {
+        *what = SH_WEB_RESET_HISTORY;
+    } else if (strcmp(v, "learned") == 0) {
+        *what = SH_WEB_RESET_LEARNED;
     } else {
         return SH_WEB_BAD;
     }
     return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
+}
+
+sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "t", v) || v[0] == '\0' || strlen(v) > 12) {
+        return SH_WEB_BAD;
+    }
+    int64_t t = 0;
+    for (const char *p = v; *p; p++) {
+        if (*p < '0' || *p > '9') {
+            return SH_WEB_BAD;
+        }
+        t = t * 10 + (*p - '0');
+    }
+    *epoch_s = t;
+    return SH_WEB_OK;
+}
+
+sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz)
+{
+    char v[VALUE_MAX];
+    int16_t i;
+    if (!form_get(body, "tz", v) || !parse_int(v, &i) || i < 0 || (size_t)i >= sh_tz_count) {
+        return SH_WEB_BAD;
+    }
+    if (!sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
+    *tz = i;
+    return SH_WEB_OK;
 }
 
 const char *sh_web_reason_key(sh_pump_reason_t reason)
