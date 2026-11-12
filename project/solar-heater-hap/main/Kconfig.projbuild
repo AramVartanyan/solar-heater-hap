@@ -112,6 +112,47 @@ menu "Device Settings"
                 Default of the menu value tSt (stored in NVS): how long the pump test started
                 with "+" runs. A multiple of 30 s (the menu step; checked at compile time).
 
+        config SH_E6_TIME_MIN
+            int "E6 pump failure: skipped run time and window (min)"
+            range 5 30
+            default 10
+            help
+                E6 (pump failure / no flow, doc/led-indication.md 6) is checked only while the
+                pump runs continuously by the normal control. The first this many minutes of the
+                run are skipped (cold liquid from the pipes cools the collector, then it comes
+                back quickly); then, once a minute, the rises over the last this many minutes are
+                compared. The first check is after twice this time.
+
+        config SH_E6_COL_RISE_K
+            int "E6: collector rise over the window (K)"
+            range 3 30
+            default 10
+            help
+                E6 is declared when the collector rose at least this much over the window ...
+
+        config SH_E6_TANK_RISE_DK
+            int "E6: tank rise over the window (0.1 K)"
+            range 1 30
+            default 5
+            help
+                ... the tank rose less than this (tenths of K, 5 = 0.5 K) ...; E6 is cleared when
+                the tank rose at least this much.
+
+        config SH_E6_DIFF_K
+            int "E6: collector - tank difference (K)"
+            range 10 50
+            default 20
+            help
+                ... and the difference collector - tank is at least this much.
+
+        config SH_E6_CLEAR_DIFF_K
+            int "E6 cleared: collector - tank difference below (K)"
+            range 3 30
+            default 10
+            help
+                E6 is cleared when the difference falls below this (there is flow). Must be lower
+                than the E6 difference (checked at compile time). Otherwise E6 stays until restart.
+
     endmenu
 
     config SH_INTERNAL_PULLUPS
@@ -147,6 +188,22 @@ menu "Device Settings"
         default 20
         help
             20 % chosen on the hardware (25 % was already bright enough, doc/firmware.md).
+
+    config SH_LED_COLD_C
+        int "Status LED: cold collector, white below (degC)"
+        range 0 40
+        default 20
+        help
+            The LED is white (pump stopped, nothing else to show) while the collector is below
+            this temperature; it returns to blue above it + 2 K.
+
+    config SH_LED_HOT_C
+        int "Status LED: hot collector, yellow above (degC)"
+        range 50 120
+        default 90
+        help
+            The LED is yellow while the pump is stopped and the collector is above this
+            temperature; it returns below it - 2 K.
 
     config SH_HOSTNAME
         string "Network hostname"

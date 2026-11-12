@@ -10,6 +10,8 @@ idf_component_register(
         "sh_pump_logic.c"
         "sh_pump_ctl.c"
         "sh_meas.c"
+        "sh_alarm.c"
+        "sh_ind.c"
         "sh_settings.c"
         "sh_settings_store.c"
         "sh_menu.c"

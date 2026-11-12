@@ -55,3 +55,10 @@ void sh_state_set_wifi(bool connected, bool portal)
     s_state.wifi_portal = portal;
     xSemaphoreGive(s_lock);
 }
+
+void sh_state_set_alarms(uint8_t alarms)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.alarms = alarms;
+    xSemaphoreGive(s_lock);
+}
