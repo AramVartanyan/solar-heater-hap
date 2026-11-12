@@ -5,7 +5,8 @@
  * Temperatures are tenths of °C, times are seconds of a monotonic clock (0 = boot).
  *
  * Order, first match wins:
- *   1. pump test           -> on; only the boiling point and the tank ceiling stop it (and end it;
+ *   1. pump test           -> on; only the boiling point and the tank ceiling (with the collector
+ *                             at 95 °C too, or faulty) stop it (and end it;
  *                             a test asked for while one of them is active ends at once)
  *   1a. air venting        -> 3 cycles of 5 min run + pause (10 min x the viscosity coefficient of
  *                             the fluid); the same two limits stop and end it (like the test)

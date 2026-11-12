@@ -282,7 +282,10 @@ static void test_test_emergency_only(void)
     temps(&s, 300, 949);
     run(&s, 1);
     ON(s, TEST);
-    temps(&s, 300, 950);            /* tank ceiling: off at once, the test ends */
+    temps(&s, 300, 950);            /* tank ceiling, collector cold: goes on (takes heat out) */
+    run(&s, 1);
+    ON(s, TEST);
+    temps(&s, 950, 950);            /* tank ceiling and the collector hot: off at once, the test ends */
     run(&s, 1);
     OFF(s, TANK_CEILING);
     CHECK(!s.c.test);
@@ -320,11 +323,17 @@ static void test_test_refused_by_limits(void)
     CHECK_EQ(left(&s), 0);
     CHECK_EQ(s.c.switched_s, switched);     /* the pump did not run: the 24 h are not restarted */
 
-    s = sim(300, 950);              /* tank ceiling */
+    s = sim(950, 950);              /* tank ceiling, the collector hot too */
     run_to(&s, 200);
     plus(&s);
     OFF(s, TANK_CEILING);
     CHECK(!s.c.test);
+
+    s = sim(300, 950);              /* tank ceiling, the collector cold: the test runs */
+    run_to(&s, 200);
+    plus(&s);
+    ON(s, TEST);
+    CHECK(s.c.test);
 }
 
 static void test_test_with_faulty_sensors(void)
@@ -342,6 +351,18 @@ static void test_test_with_faulty_sensors(void)
     faults(&s, true, true);
     run(&s, 1);
     ON(s, TEST);
+
+    /* the tank at the ceiling and a faulty collector sensor: whether the collector is hot is not
+     * known — the ceiling stops the test (as with a hot collector) */
+    s = sim_idle();
+    plus(&s);
+    temps(&s, 300, 950);            /* the collector cold: the test goes on */
+    run(&s, 1);
+    ON(s, TEST);
+    faults(&s, true, false);
+    run(&s, 1);
+    OFF(s, TANK_CEILING);
+    CHECK(!s.c.test);
 
     s = sim(300, 300);              /* both faulty: the pump is off, the test is allowed */
     faults(&s, true, true);

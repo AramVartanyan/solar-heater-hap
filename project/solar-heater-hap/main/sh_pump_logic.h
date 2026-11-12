@@ -8,7 +8,9 @@
  * Order of the checks, first match wins:
  *   1. invalid temperature        -> off at once
  *   2. collector at boiling point -> off at once, also a running pump; no start for any reason
- *   3. tank emergency ceiling     -> off at once
+ *   3. tank emergency ceiling     -> off at once while the collector is at 95 °C too (until below
+ *                                    93 °C); with a colder collector the pump can only take heat
+ *                                    out of the tank, so the rules below decide as usual
  *   4. collector protection       -> on at once (no minimum off time), also above Tmax
  *   5. frost protection           -> on at once while the collector is below the frost threshold
  *                                    and the tank is at least 5 °C
@@ -90,6 +92,7 @@ typedef struct {
     bool col_boiling;               /* collector reached the boiling point, not yet below it - 2 K */
     bool tank_ceiling;              /* tank reached the ceiling, not yet below it - 2 K */
     bool tank_max;                  /* tank reached Tmax, not yet below it - 2 K */
+    bool col_hot;                   /* collector reached the tank ceiling (95 °C), not yet below 93 °C */
     bool col_protect;               /* collector protection is running the pump */
     bool frost;                     /* frost protection is running the pump */
     bool cool;                      /* night cooling is running the pump */
@@ -108,6 +111,10 @@ void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_
  * did); the caller restarts that time whenever `st->on` changes. Updates `st`. */
 void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank,
                     uint32_t elapsed_s);
+
+/* The tank ceiling stops the pump: the tank at the ceiling and the collector hot too (with a colder
+ * collector the pump takes heat out of the tank — allowed). */
+bool sh_pump_ceiling_stop(const sh_pump_state_t *st);
 
 /* Collector protection threshold in use: the parameter, capped. */
 int16_t sh_pump_col_protect(const sh_pump_params_t *p);

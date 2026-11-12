@@ -15,15 +15,16 @@ static void set(sh_pump_ctl_t *c, bool on, sh_pump_reason_t reason, uint32_t now
     c->reason = reason;
 }
 
-/* The only limits that stop the test and the anti-seize run. A limit whose sensor is faulty
- * (passed as SH_TEMP_INVALID) cannot be checked. */
+/* The only limits that stop the test, the air venting and the anti-seize run. A limit whose sensor
+ * is faulty (passed as SH_TEMP_INVALID) cannot be checked; the tank ceiling with a faulty collector
+ * stops them (whether the collector is hot is not known). */
 static bool emergency(const sh_pump_ctl_t *c, int16_t col, int16_t tank, sh_pump_reason_t *reason)
 {
     if (col != SH_TEMP_INVALID && c->norm.col_boiling) {
         *reason = SH_PUMP_REASON_COL_BOILING;
         return true;
     }
-    if (tank != SH_TEMP_INVALID && c->norm.tank_ceiling) {
+    if (tank != SH_TEMP_INVALID && c->norm.tank_ceiling && (col == SH_TEMP_INVALID || c->norm.col_hot)) {
         *reason = SH_PUMP_REASON_TANK_CEILING;
         return true;
     }
@@ -291,7 +292,7 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     bool restart = false;               /* the test or the anti-seize run just ended */
 
     /* The test, the air venting and the anti-seize run end when their time is over or when the boiling point or the
-     * tank ceiling stops them; they do not start again by themselves. A test asked for while such a
+     * tank ceiling (with a hot collector, see emergency()) stops them; they do not start again by themselves. A test asked for while such a
      * limit is active ends in the same step (refused). */
     if (c->test) {
         if (now_s < c->test_end_s && !emergency(c, col, tank, &reason)) {

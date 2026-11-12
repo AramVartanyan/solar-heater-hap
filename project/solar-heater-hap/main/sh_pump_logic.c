@@ -21,6 +21,11 @@ static void decided(sh_pump_state_t *st, bool on, sh_pump_reason_t reason)
     st->reason = reason;
 }
 
+bool sh_pump_ceiling_stop(const sh_pump_state_t *st)
+{
+    return st->tank_ceiling && st->col_hot;
+}
+
 int16_t sh_pump_col_protect(const sh_pump_params_t *p)
 {
     return p->col_protect < p->col_protect_cap ? p->col_protect : p->col_protect_cap;
@@ -30,6 +35,7 @@ void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_
 {
     if (t_col != SH_TEMP_INVALID) {
         st->col_boiling = sh_pump_latch(st->col_boiling, t_col, p->col_boiling);
+        st->col_hot = sh_pump_latch(st->col_hot, t_col, SH_PUMP_TANK_CEILING);
     }
     if (t_tank != SH_TEMP_INVALID) {
         st->tank_ceiling = sh_pump_latch(st->tank_ceiling, t_tank, SH_PUMP_TANK_CEILING);
@@ -66,8 +72,10 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         return;
     }
 
-    /* 3. Tank emergency ceiling: off at once, whatever the collector does. */
-    if (st->tank_ceiling) {
+    /* 3. Tank emergency ceiling: no more heat into the tank — off at once while the collector is hot
+     *    too (>= 95 °C, until below 93 °C). With the collector below that the pump can only take heat
+     *    out of the tank (the wanted answer to an E4): the rules below decide as usual. */
+    if (sh_pump_ceiling_stop(st)) {
         st->col_protect = false;
         st->frost = false;
         st->cool = false;
