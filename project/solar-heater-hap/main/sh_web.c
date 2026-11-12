@@ -393,7 +393,9 @@ static void server_start(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.stack_size = 6144;
-    cfg.max_open_sockets = 4;
+    /* browsers keep several connections to one address open (Safari up to 6); with fewer places
+     * the oldest one is purged while the browser still uses it and its request fails */
+    cfg.max_open_sockets = 7;
     cfg.lru_purge_enable = true;
     cfg.max_uri_handlers = 16;
     esp_err_t err = httpd_start(&s_httpd, &cfg);
