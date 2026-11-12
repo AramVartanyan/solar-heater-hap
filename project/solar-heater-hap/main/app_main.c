@@ -2,11 +2,11 @@
  *
  * Boot order:
  *   1. pump relay forced off (before anything that can take time)
- *   2. NVS, shared state, user settings, installer data
+ *   2. NVS, shared state, user settings, installer data, time zone, history partition
  *   3. hardware: status LED, sensors, display, buttons
- *   4. measurement task, control task
- *   5. Wi-Fi (captive-wifi) and the web interface (while connected to the router); HomeKit
- *      follows in a later phase
+ *   4. measurement task, control task, history task
+ *   5. Wi-Fi (captive-wifi), SNTP (at every connection to the router) and the web interface
+ *      (while connected to the router); HomeKit follows in a later phase
  */
 
 #include "freertos/FreeRTOS.h"
@@ -27,6 +27,8 @@
 #include "sh_buttons.h"
 #include "sh_control.h"
 #include "sh_web.h"
+#include "sh_clock.h"
+#include "sh_history.h"
 
 static const char *TAG = "app_main";
 
@@ -36,6 +38,7 @@ static void wifi_event(captive_wifi_event_t evt, void *ctx)
     switch (evt) {
     case CAPTIVE_WIFI_EVT_STA_CONNECTED:
         sh_state_set_wifi(true, false);
+        sh_clock_connected();
         sh_web_enable(true);
         break;
     case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
@@ -69,6 +72,8 @@ void app_main(void)
     sh_state_init();
     ESP_ERROR_CHECK(sh_settings_init());
     ESP_ERROR_CHECK(sh_installer_init());
+    ESP_ERROR_CHECK(sh_clock_init());
+    ESP_ERROR_CHECK(sh_history_init());
 
     ESP_LOGI(TAG, "solar-heater-hap %s", esp_app_get_description()->version);
 
@@ -79,8 +84,10 @@ void app_main(void)
 
     sh_sensors_start();                             /* 4. measurement, control */
     sh_control_start();
+    sh_history_start();
 
-    ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi, web */
+    ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi, clock, web */
+    sh_clock_start();
     ESP_ERROR_CHECK(sh_web_init());
     ESP_ERROR_CHECK(captive_wifi_start());
 }

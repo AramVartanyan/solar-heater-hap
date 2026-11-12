@@ -1,5 +1,5 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-# 4 MB flash: two 1600 KB OTA slots, HomeKit factory_nvs / nvs_keys
+# 4 MB flash: two 1600 KB OTA slots, HomeKit factory_nvs / nvs_keys, daily history (after all others)
 # Firmware partition offset needs to be 64K aligned, initial 36K (9 sectors) are reserved for bootloader and partition table
 sec_cert,  0x3F, ,0xd000,    0x3000, ,  # Never mark this as an encrypted partition
 nvs,      data, nvs,     0x10000,   0x6000,
@@ -9,3 +9,4 @@ ota_0,    app,  ota_0,   0x20000,   1600K,
 ota_1,    app,  ota_1,   ,          1600K,
 factory_nvs, data,   nvs,     0x340000,  0x6000
 nvs_keys, data, nvs_keys,0x346000,  0x1000
+history,  data, undefined, 0x350000, 64K,

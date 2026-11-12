@@ -10,7 +10,7 @@
 | 2 | [step2-settings-menu-pump-sensors.md](step2-settings-menu-pump-sensors.md) — настройки и меню, тест на помпата, защита от блокиране, повреден датчик | PR #25 |
 | 5 | [step5-alarms-indication.md](step5-alarms-indication.md) — аварии и индикация | след #27 / #28 |
 | 6 (A) | [step6-installer-web.md](step6-installer-web.md) — данни на монтажника, точка на кипене, защита от замръзване, основа на уеб интерфейса | след #31 / #32 |
-| 9 (B) | [step9-clock-history.md](step9-clock-history.md) — часовник, история | — |
+| 9 (B) | [step9-clock-history.md](step9-clock-history.md) — часовник, история | след #35 / #36 |
 
 ## Групи на оставащите стъпки (прието)
 
