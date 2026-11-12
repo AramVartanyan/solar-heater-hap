@@ -4,8 +4,8 @@
  *
  * Colour, by priority (first match wins):
  *   red      any alarm (E1, E2, E4, E5, E6) — blinking only
- *   orange   the pump runs because of a protection (Hot, Fro)
- *   purple   vacation (not yet: the input is always off)
+ *   orange   the pump runs because of a protection (Hot, Fro) or by the night cooling
+ *   purple   vacation
  *   yellow   collector > 90 °C (released below 88 °C), pump stopped
  *   green    the pump runs (any other reason: normal charging, test, anti-seize, sensor-fault modes)
  *   white    collector < 20 °C (released above 22 °C)
@@ -35,7 +35,7 @@ typedef enum {
     SH_COLOR_GREEN,     /* pump running */
     SH_COLOR_WHITE,     /* cold collector / OTA */
     SH_COLOR_YELLOW,    /* hot collector, pump stopped */
-    SH_COLOR_ORANGE,    /* pump running because of a protection */
+    SH_COLOR_ORANGE,    /* pump running because of a protection or the night cooling */
     SH_COLOR_PURPLE,    /* vacation */
     SH_COLOR_RED,       /* alarm (blinking only) */
     SH_COLOR_COUNT
@@ -59,6 +59,7 @@ typedef struct {
     int16_t t_col;      /* SH_TEMP_INVALID: none */
     bool col_fault;
     bool vacation;
+    bool cooling;       /* the pump runs by the night cooling */
     bool wifi_connected;
     bool wifi_portal;
 } sh_ind_in_t;

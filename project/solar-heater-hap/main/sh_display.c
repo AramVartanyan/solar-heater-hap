@@ -31,6 +31,21 @@ static const uint8_t s_digit[10] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0
 static const uint8_t s_boil[DIGITS] = { 0x7C /* b */, 0x5C /* o */, 0x16 /* il */ };
 static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ };
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
+static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x30 /* I */, 0x50 /* r */ };
+static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
+static const uint8_t s_pau[DIGITS]  = { 0x73 /* P */, 0x77 /* A */, 0x1C /* u */ };
+static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
+
+/* Values shown as words: SSn (sh_ssn_t) and HoL (0 / 1) */
+static const uint8_t s_ssn[SH_SSN_COUNT][DIGITS] = {
+    [SH_SSN_SUMMER] = { 0x6D /* S */, 0x1C /* u */, 0x54 /* n */ },
+    [SH_SSN_WINTER] = { 0x39 /* C */, 0x30 /* l */, 0x5E /* d */ },
+    [SH_SSN_AUTO]   = { 0x77 /* A */, 0x1C /* u */, 0x78 /* t */ },
+};
+static const uint8_t s_onoff[2][DIGITS] = {
+    { 0x5C /* o */, 0x71 /* F */, 0x71 /* F */ },
+    { 0, 0x5C /* o */, 0x54 /* n */ },
+};
 
 /* Alarm and information codes, in the order of sh_alarm_t: "E1" ... right-aligned, "Hot", "Fro" */
 static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
@@ -45,6 +60,8 @@ static const uint8_t s_codes[SH_ALARM_COUNT][DIGITS] = {
 
 /* Menu items, in the order of sh_setting_t, then End */
 static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
+    [SH_SET_SEASON]   = { 0x6D /* S */, 0x6D /* S */, 0x54 /* n */ },
+    [SH_SET_VACATION] = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ },
     [SH_SET_TANK_MAX] = { 0x78 /* t */, 0x7C /* b */, 0x5C /* o */ },
     [SH_SET_COL_MIN]  = { 0x39 | SEG_DP /* C. */, 0x38 /* L */, 0x5C /* o */ },
     [SH_SET_DIFF_ON]  = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x54 /* n */ },
@@ -120,6 +137,10 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
 {
     if (v->mode == SH_MENU_LIST) {
         set_seg(s, s_items[v->pos < SH_MENU_ITEMS ? v->pos : SH_MENU_END]);
+    } else if (v->value_visible && v->id == SH_SET_SEASON && v->value >= 0 && v->value < SH_SSN_COUNT) {
+        set_seg(s, s_ssn[v->value]);
+    } else if (v->value_visible && v->id == SH_SET_VACATION) {
+        set_seg(s, s_onoff[v->value ? 1 : 0]);
     } else if (v->value_visible) {
         set_number(s, v->value);
     } else {
@@ -138,14 +159,40 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
     }
 }
 
+/* Air venting: "AIr", the phase ("run" / "PAu") or the minutes left (sh_menu_air_screen). */
+static void air_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
+{
+    switch (sh_menu_air_screen(now_s - st->modes.air_start_s)) {
+    case SH_MENU_AIR_LABEL:
+        set_seg(s, s_air);
+        break;
+    case SH_MENU_AIR_PHASE:
+        set_seg(s, st->modes.air_run ? s_run : s_pau);
+        break;
+    default:
+        set_number(s, (int)((st->modes.air_left_s + 59) / 60));
+        break;
+    }
+}
+
 /* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
- * codes (1 s each). Returns false when the cycle is over (the caller starts it again). */
+ * codes (1 s each) and HoL during the vacation (1 s). Returns false when the cycle is over (the
+ * caller starts it again). */
 static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
 {
     if (ms >= CYCLE_MS) {
         const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
         if (code == SH_ALARM_COUNT) {
-            return false;
+            /* after the codes: HoL for 1 s */
+            uint32_t n = 0;
+            for (int a = 0; a < SH_ALARM_COUNT; a++) {
+                n += (st->alarms >> a) & 1u;
+            }
+            if (!st->vacation || ms - CYCLE_MS >= (n + 1) * SH_ALARM_CODE_MS) {
+                return false;
+            }
+            set_seg(s, s_hol);
+            return true;
         }
         set_seg(s, s_codes[code]);
     } else if (ms < LABEL_MS) {
@@ -183,18 +230,21 @@ static void display_task(void *arg)
         screen_t scr = { 0 };
         const bool normal = view.mode == SH_MENU_NORMAL;
         if (!normal) {
-            menu_screen(&scr, &view);   /* no alarms or test in the menu */
+            menu_screen(&scr, &view);   /* no alarms, test or air venting in the menu */
         } else {
-            if (!was_normal || (was_test && !st.test_on)) {
+            const bool service = st.test_on || st.modes.air;
+            if (!was_normal || (was_test && !service)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
             if (st.test_on) {
                 test_screen(&scr, &st, now_s);
+            } else if (st.modes.air) {
+                air_screen(&scr, &st, now_s);
             } else if (!normal_screen(&scr, &st, now_ms - cycle_ms)) {
                 cycle_ms = now_ms;      /* the codes are over: from "Boil" again */
                 normal_screen(&scr, &st, 0);
             }
-            was_test = st.test_on;
+            was_test = service;
         }
         was_normal = normal;
 

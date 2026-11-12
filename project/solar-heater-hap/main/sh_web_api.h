@@ -5,10 +5,12 @@
  *   status   one JSON object with everything the page shows; temperatures in tenths of °C
  *            (null: faulty sensor or no value yet), the pressure in tenths of bar
  *   requests bodies are forms ("key=value&key=value"), values are whole numbers or short words:
- *              set    user settings by their NVS keys (tbo, c_lo, d_on, d_of, t_st — the checks
- *                     of the button menu), fro (0 / 1), installer data (fluid, glycol, press,
- *                     col_max — only with the access code)
+ *              set    user settings by their NVS keys (ssn, hol, tbo, c_lo, d_on, d_of, t_st and the
+ *                     winter c_lo_w, d_on_w, d_of_w, the night cooling nc / nc_w — the checks of
+ *                     the button menu), fro (0 / 1), installer data (fluid, glycol, press,
+ *                     col_max, col_type, area, tank_vol — only with the access code)
  *              test   cmd=start | plus | minus | stop
+ *              air    cmd=start | stop: the air venting (no code)
  *              reset  what=wifi | defaults | factory | history | learned (only with the access
  *                     code)
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
@@ -30,9 +32,10 @@
 #include "sh_clock_rules.h"
 #include "sh_day.h"
 #include "sh_hist.h"
+#include "sh_state.h"           /* sh_state_modes_t */
 
 #define SH_WEB_CODE_LEN         6
-#define SH_WEB_STATUS_MAX       2048    /* a buffer of this size always holds the status */
+#define SH_WEB_STATUS_MAX       3072    /* a buffer of this size always holds the status */
 
 /* Everything the page can change. */
 typedef struct {
@@ -70,19 +73,20 @@ typedef struct {
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
     bool history;               /* the history partition is there */
+    sh_state_modes_t modes;     /* season, night cooling, sunrise / sunset, air venting (group C) */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */
 int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s);
 
-/* The chart as JSON: {"day":1,"pts":[[x,col,tank,charge,protect,other],...]} — x is the end of
+/* The chart as JSON: {"day":1,"pts":[[x,col,tank,charge,protect,other,cool],...]} — x is the end of
  * the interval in minutes: with a set clock from midnight (10 ... 1440), without it from now
  * (-1440 ... 0); temperatures in tenths (null: none), run time in whole minutes. */
 #define SH_WEB_CHART_MAX        6144
 int sh_web_chart_json(char *buf, size_t size, const sh_day_t *d, const sh_local_t *lt, uint32_t now_s);
 
 /* The last daily summaries, newest first: {"on":1,"days":[{"d":"2026-11-11","cx":..,"cn":..,
- * "tx":..,"tn":..,"run":[c,p,o],"al":["E1"],"pk":..,"rel":1,"part":0},...]}; `on`: the history
+ * "tx":..,"tn":..,"run":[c,p,o],"cool":..,"al":["E1"],"pk":..,"rel":1,"part":0},...]}; `on`: the history
  * partition is there. */
 #define SH_WEB_DAYS             7
 #define SH_WEB_DAYS_MAX         2048
@@ -121,11 +125,20 @@ typedef enum {
 sh_web_res_t sh_web_test(const char *body, bool test_on, sh_web_test_t *cmd);
 
 typedef enum {
+    SH_WEB_AIR_NONE = 0,        /* nothing to do ("start" while it runs, "stop" without it) */
+    SH_WEB_AIR_START,
+    SH_WEB_AIR_STOP,
+} sh_web_air_t;
+
+/* "air": the air venting. */
+sh_web_res_t sh_web_air(const char *body, bool air_on, sh_web_air_t *cmd);
+
+typedef enum {
     SH_WEB_RESET_WIFI = 0,      /* the stored network */
     SH_WEB_RESET_DEFAULTS,      /* user and installer settings */
     SH_WEB_RESET_FACTORY,       /* everything */
     SH_WEB_RESET_HISTORY,       /* the daily summaries */
-    SH_WEB_RESET_LEARNED,       /* the learned values (for now: the state of the time zone check) */
+    SH_WEB_RESET_LEARNED,       /* the learned values: sunrise / sunset, the cooling target, the time zone check */
 } sh_web_reset_t;
 
 /* "reset": needs the access code. */

@@ -4,10 +4,13 @@
 #include "sh_installer.h"
 
 const sh_inst_info_t sh_inst_info[SH_INST_COUNT] = {
-    [SH_INST_FLUID]    = { "fluid",     0, SH_FLUID_COUNT - 1 },
-    [SH_INST_GLYCOL]   = { "glycol",    0,  60 },
-    [SH_INST_PRESSURE] = { "press",     5,  60 },
-    [SH_INST_COL_MAX]  = { "col_max", 100, 250 },
+    [SH_INST_FLUID]    = { "fluid",     0, SH_FLUID_COUNT - 1, 1 },
+    [SH_INST_GLYCOL]   = { "glycol",    0,  60, 1 },
+    [SH_INST_PRESSURE] = { "press",     5,  60, 1 },
+    [SH_INST_COL_MAX]  = { "col_max", 100, 250, 1 },
+    [SH_INST_COL_TYPE] = { "col_type",  0, SH_COL_TYPE_COUNT - 1, 1 },
+    [SH_INST_AREA]     = { "area",      5, 200, 1 },
+    [SH_INST_TANK_VOL] = { "tank_vol", 50, 1000, 10 },
 };
 
 /* Antoine equation for water, 99 - 374 °C: log10(P / mmHg) = A - B / (C + T / °C) */
@@ -22,6 +25,7 @@ const sh_inst_info_t sh_inst_info[SH_INST_COUNT] = {
 #define FROST_MAX       100
 #define COL_MAX_MARGIN  50          /* protection at most 5 K below the collector maximum ... */
 #define BOILING_MARGIN  100         /* ... and 10 K below the boiling point */
+#define TANK_CEILING    950         /* the tank emergency ceiling, 95 °C */
 
 typedef struct {
     int16_t pct;                /* propylene glycol, % by volume */
@@ -33,6 +37,8 @@ static const point_t BOIL_RISE[] = { { 0, 0 }, { 20, 10 }, { 30, 20 }, { 40, 30 
 /* Freezing point of the mixture (likewise) */
 static const point_t FREEZING[] = { { 0, 0 }, { 10, -30 }, { 20, -80 }, { 30, -140 }, { 40, -220 },
                                     { 50, -330 }, { 60, -480 } };
+/* Viscosity factor x 10 (bubbles rise slower in a thicker fluid) */
+static const point_t VISCOSITY[] = { { 0, 10 }, { 10, 13 }, { 30, 25 }, { 40, 35 }, { 50, 45 }, { 60, 55 } };
 
 /* Linear between the points of the table; outside it the first / last value. */
 static double interpolate(const point_t *tab, int n, int pct)
@@ -51,7 +57,8 @@ static double interpolate(const point_t *tab, int n, int pct)
 
 static bool value_ok(sh_inst_t id, int16_t v)
 {
-    return v >= sh_inst_info[id].min && v <= sh_inst_info[id].max;
+    const sh_inst_info_t *i = &sh_inst_info[id];
+    return v >= i->min && v <= i->max && (v - i->min) % i->step == 0;
 }
 
 bool sh_installer_ok(const sh_installer_t *d)
@@ -104,4 +111,32 @@ void sh_limits_calc(const sh_installer_t *d, sh_limits_t *out)
         frost = FROST_MAX;
     }
     out->frost = (int16_t)frost;
+
+    /* vacation: 75 % of the collector maximum (tenths: x 10 x 3 / 4), at most boiling - 10 K */
+    const int16_t by_max = (int16_t)(d->v[SH_INST_COL_MAX] * 30 / 4);
+    out->vac_protect = by_max < by_boiling ? by_max : by_boiling;
+}
+
+int16_t sh_cool_target(const sh_installer_t *d, int16_t tank_max, int16_t learned)
+{
+    /* dT in tenths of K = area (0.1 m²) x kWh/m² (0.1 kWh) x 10^5 / (volume x 1163), rounded up:
+     * the target rounded down (the cautious side) */
+    const int32_t kwh = d->v[SH_INST_COL_TYPE] == SH_COL_TUBES ? SH_COOL_KWH_TUBES : SH_COOL_KWH_FLAT;
+    const int32_t num = (int32_t)d->v[SH_INST_AREA] * kwh * 100000;
+    const int32_t den = (int32_t)d->v[SH_INST_TANK_VOL] * 1163;
+    const int32_t rise = (num + den - 1) / den;
+    int32_t target = TANK_CEILING - rise + learned;
+    if (target > tank_max) {
+        target = tank_max;
+    }
+    if (target < tank_max - SH_COOL_SPAN) {
+        target = tank_max - SH_COOL_SPAN;
+    }
+    return (int16_t)target;
+}
+
+uint32_t sh_air_pause_s(const sh_installer_t *d)
+{
+    const int pct = d->v[SH_INST_FLUID] == SH_FLUID_GLYCOL ? d->v[SH_INST_GLYCOL] : 0;
+    return (uint32_t)(SH_AIR_PAUSE_BASE_S * interpolate(VISCOSITY, 6, pct) / 10.0 + 0.5);
 }

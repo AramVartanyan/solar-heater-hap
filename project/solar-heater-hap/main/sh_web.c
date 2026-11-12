@@ -107,6 +107,7 @@ static esp_err_t state_get(httpd_req_t *req)
             .tz = ci.tz, .tz_confirmed = ci.tz_confirmed, .peak = ci.peak.peak,
         },
         .history = sh_history_on(),
+        .modes = st.modes,
     };
     get_config(&s.cfg);
     sh_day_run_today(sh_history_day_lock(), &ci.lt, now_s, s.run_s);
@@ -321,6 +322,25 @@ static esp_err_t test_post(httpd_req_t *req)
     return answer(req, res);
 }
 
+static esp_err_t air_post(httpd_req_t *req)
+{
+    char body[BODY_MAX];
+    if (!read_body(req, body)) {
+        return ESP_FAIL;
+    }
+    sh_state_t st;
+    sh_state_get(&st);
+    sh_web_air_t cmd = SH_WEB_AIR_NONE;
+    const sh_web_res_t res = sh_web_air(body, st.modes.air, &cmd);
+    if (res == SH_WEB_OK && cmd == SH_WEB_AIR_START) {
+        ESP_LOGI(TAG, "web: air venting");
+        sh_control_cmd(SH_CONTROL_AIR_START);
+    } else if (res == SH_WEB_OK && cmd == SH_WEB_AIR_STOP) {
+        sh_control_cmd(SH_CONTROL_AIR_STOP);
+    }
+    return answer(req, res);
+}
+
 static esp_err_t reset_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -353,6 +373,7 @@ static esp_err_t reset_post(httpd_req_t *req)
         case SH_WEB_RESET_LEARNED:
             ESP_LOGW(TAG, "web: learned values reset");
             sh_clock_reset_learned();
+            sh_control_cmd(SH_CONTROL_RESET_LEARNED);
             break;
         }
     }
@@ -421,6 +442,7 @@ static void server_start(void)
         { .uri = "/api/state", .method = HTTP_GET,  .handler = state_get },
         { .uri = "/api/set",   .method = HTTP_POST, .handler = set_post },
         { .uri = "/api/test",  .method = HTTP_POST, .handler = test_post },
+        { .uri = "/api/air",   .method = HTTP_POST, .handler = air_post },
         { .uri = "/api/reset", .method = HTTP_POST, .handler = reset_post },
         { .uri = "/api/auth",  .method = HTTP_POST, .handler = auth_post },
         { .uri = "/api/chart", .method = HTTP_GET,  .handler = chart_get },

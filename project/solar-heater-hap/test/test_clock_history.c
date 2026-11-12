@@ -175,7 +175,14 @@ static void test_kinds(void)
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_ANTI_SEIZE), SH_RUN_OTHER);
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_TF_PROBE), SH_RUN_PROTECT);   /* Hot, orange */
     CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_CF_PROBE), SH_RUN_OTHER);
+    /* group C */
+    CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_COOL), SH_RUN_COOL);
+    CHECK_EQ(sh_run_kind(false, SH_PUMP_REASON_COOL_WAIT), -1);
+    CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_AIR_RUN), SH_RUN_OTHER);
+    CHECK_EQ(sh_run_kind(false, SH_PUMP_REASON_AIR_PAUSE), -1);
+    CHECK_EQ(sh_run_kind(false, SH_PUMP_REASON_VACATION), -1);
 }
+
 
 static sh_day_t s_d;
 static sh_day_sum_t s_done;
@@ -344,6 +351,45 @@ static void test_summary_day(void)
     sh_day_init(&s_d);
     CHECK_EQ(run(0, 2 * 86400, false, 0, 0, &in), 0);
     CHECK(!s_d.sum.valid);
+}
+
+/* Group C: the minutes of cooling, the sunrise / sunset and the cooling target of the day */
+static void test_summary_group_c(void)
+{
+    sh_day_init(&s_d);
+    const uint16_t D = 2800;
+    sh_day_in_t in = { .t_col = 400, .t_tank = 700, .pump_on = true, .reason = SH_PUMP_REASON_COOL,
+                       .sunrise = -1, .sunset = -1, .cool_target = 663 };
+    sh_local_t lt = { .set = true, .day = D, .min = 0 };
+    sh_day_sum_t done;
+    uint32_t t = 0;
+    for (; t < 3 * 3600; t += 60) {                 /* 00:00 - 03:00: cooling */
+        lt.min = (uint16_t)(t / 60);
+        sh_day_step(&s_d, &in, &lt, t, &done);
+    }
+    in.pump_on = false;
+    in.reason = SH_PUMP_REASON_COOL_WAIT;
+    in.sunrise = 6 * 60 + 41;
+    for (; t < 18 * 3600; t += 60) {
+        lt.min = (uint16_t)(t / 60);
+        sh_day_step(&s_d, &in, &lt, t, &done);
+    }
+    in.sunset = 17 * 60 + 2;
+    in.cool_target = 633;
+    for (; t < 24 * 3600; t += 60) {
+        lt.min = (uint16_t)(t / 60);
+        sh_day_step(&s_d, &in, &lt, t, &done);
+    }
+    lt.day = D + 1;
+    lt.min = 0;
+    in.sunrise = in.sunset = -1;                    /* the new day: none yet */
+    CHECK(sh_day_step(&s_d, &in, &lt, t, &done));
+    CHECK_EQ(done.run_s[SH_RUN_COOL], 3 * 3600);
+    CHECK_EQ(done.run_s[SH_RUN_CHARGE], 0);
+    CHECK_EQ(done.sunrise, 6 * 60 + 41);
+    CHECK_EQ(done.sunset, 17 * 60 + 2);
+    CHECK_EQ(done.cool_target, 633);
+    CHECK_EQ(s_d.sum.sunrise, -1);
 }
 
 /* The local time jumps within the day (from the other experiment variant, step 9, PR #35). */
@@ -759,6 +805,7 @@ int main(void)
     test_chart_clock();
     test_chart_no_clock();
     test_summary_day();
+    test_summary_group_c();
     test_clock_jumps();
     test_record();
     test_ring();

@@ -1,7 +1,8 @@
 /* User settings in the "nvs" partition (namespace "sh_settings"): read at boot, a missing or
  * invalid value -> its default (Kconfig "Control"); written only when a value changes. The factory
  * reset erases the partition, so the defaults come back. Table and checks: sh_settings.
- * The frost protection switch (web interface only, key "fro") is kept here too. */
+ * The frost protection switch (web interface only, key "fro") is kept here too, and the season
+ * recognised in the Aut mode (key "sea", doc/operating-modes.md 2.2: summer at the first start). */
 #pragma once
 
 #include "esp_err.h"
@@ -14,3 +15,6 @@ esp_err_t sh_settings_put(const sh_settings_t *s);      /* all values, checked; 
 bool sh_settings_frost(void);                           /* frost protection enabled */
 esp_err_t sh_settings_set_frost(bool on);               /* no write if unchanged */
 esp_err_t sh_settings_reset(void);                      /* erases the namespace: the defaults, at once */
+bool sh_settings_auto_winter(void);                     /* the season recognised in Aut: winter */
+esp_err_t sh_settings_set_auto_winter(bool winter);     /* no write if unchanged */
+bool sh_settings_winter(void);                          /* the season in use (SSn, or Aut: the recognised one) */

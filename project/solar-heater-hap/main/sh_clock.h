@@ -23,6 +23,8 @@ typedef struct {
     char tz[SH_TZ_NAME_MAX];
     bool tz_confirmed;
     sh_peak_t peak;
+    bool has_dst;               /* the zone has daylight saving time ... */
+    bool dst;                   /* ... and it is in effect now */
 } sh_clock_info_t;
 
 esp_err_t sh_clock_init(void);          /* after nvs_flash_init(): the zone and the peak check */

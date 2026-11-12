@@ -21,7 +21,10 @@ int sh_run_kind(bool pump_on, sh_pump_reason_t reason)
     case SH_PUMP_REASON_TEST:
     case SH_PUMP_REASON_ANTI_SEIZE:
     case SH_PUMP_REASON_CF_PROBE:
+    case SH_PUMP_REASON_AIR_RUN:
         return SH_RUN_OTHER;
+    case SH_PUMP_REASON_COOL:
+        return SH_RUN_COOL;
     default:                    /* difference, minimum run time, charging with a faulty sensor */
         return SH_RUN_CHARGE;
     }
@@ -76,6 +79,7 @@ static void start_sum(sh_day_sum_t *s, uint16_t day, bool full)
     s->day = day;
     s->col_max = s->col_min = s->tank_max = s->tank_min = SH_TEMP_INVALID;
     s->peak_min = -1;
+    s->sunrise = s->sunset = -1;
 }
 
 static void take_temps(sh_day_sum_t *s, const sh_day_in_t *in, uint16_t min)
@@ -100,6 +104,9 @@ static void take_temps(sh_day_sum_t *s, const sh_day_in_t *in, uint16_t min)
         }
     }
     s->alarms |= in->alarms;
+    s->sunrise = in->sunrise;
+    s->sunset = in->sunset;
+    s->cool_target = in->cool_target;
 }
 
 bool sh_day_step(sh_day_t *d, const sh_day_in_t *in, const sh_local_t *lt, uint32_t now_s,

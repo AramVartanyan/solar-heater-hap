@@ -92,10 +92,14 @@ static void day_over(const sh_day_sum_t *d, const sh_clock_info_t *ci)
     r.col_min = hist_temp(d->col_min);
     r.tank_max = hist_temp(d->tank_max);
     r.tank_min = hist_temp(d->tank_min);
-    for (int k = 0; k < SH_RUN_KINDS; k++) {
+    for (int k = 0; k <= SH_RUN_OTHER; k++) {
         r.run_min[k] = minutes(d->run_s[k]);
     }
+    r.cool_min = minutes(d->run_s[SH_RUN_COOL]);
     r.alarms = d->alarms;
+    r.sunrise = d->sunrise >= 0 ? (uint16_t)d->sunrise : SH_HIST_NO_TIME;
+    r.sunset = d->sunset >= 0 ? (uint16_t)d->sunset : SH_HIST_NO_TIME;
+    r.cool_target = d->cool_target > 0 ? (uint8_t)(d->cool_target / 10) : SH_HIST_NO_U8;
     r.peak_min = d->peak_min;
     r.clock_reliable = ci->trust == SH_CLOCK_RELIABLE;
     r.partial = !d->full;
@@ -107,8 +111,8 @@ static void day_over(const sh_day_sum_t *d, const sh_clock_info_t *ci)
         int y, m, md;
         sh_day_date(d->day, &y, &m, &md);
         if (ok) {
-            ESP_LOGI(TAG, "day %04d-%02d-%02d saved%s: pump %u / %u / %u min", y, m, md,
-                     r.partial ? " (partial)" : "", r.run_min[0], r.run_min[1], r.run_min[2]);
+            ESP_LOGI(TAG, "day %04d-%02d-%02d saved%s: pump %u / %u / %u min, cooling %u min", y, m, md,
+                     r.partial ? " (partial)" : "", r.run_min[0], r.run_min[1], r.run_min[2], r.cool_min);
         } else {
             ESP_LOGE(TAG, "day %04d-%02d-%02d: flash write error", y, m, md);
         }
@@ -128,6 +132,8 @@ static void history_task(void *arg)
         const sh_day_in_t in = {
             .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
             .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
+            .sunrise = st.modes.sun_rise, .sunset = st.modes.sun_set,
+            .cool_target = st.modes.cool_target,
         };
         const uint32_t now = (uint32_t)(esp_timer_get_time() / 1000000);
         sh_day_sum_t done;

@@ -8,7 +8,7 @@
 
 static const sh_installer_t DEF = { .v = {
     [SH_INST_FLUID] = SH_FLUID_WATER, [SH_INST_GLYCOL] = 0, [SH_INST_PRESSURE] = 15,
-    [SH_INST_COL_MAX] = 120,
+    [SH_INST_COL_MAX] = 120, [SH_INST_COL_TYPE] = SH_COL_FLAT, [SH_INST_AREA] = 20, [SH_INST_TANK_VOL] = 150,
 } };
 
 static sh_limits_t calc(int fluid, int glycol, int press, int col_max)
@@ -16,6 +16,7 @@ static sh_limits_t calc(int fluid, int glycol, int press, int col_max)
     const sh_installer_t d = { .v = {
         [SH_INST_FLUID] = (int16_t)fluid, [SH_INST_GLYCOL] = (int16_t)glycol,
         [SH_INST_PRESSURE] = (int16_t)press, [SH_INST_COL_MAX] = (int16_t)col_max,
+        [SH_INST_COL_TYPE] = SH_COL_FLAT, [SH_INST_AREA] = 20, [SH_INST_TANK_VOL] = 150,
     } };
     sh_limits_t lim;
     sh_limits_calc(&d, &lim);
@@ -67,25 +68,25 @@ static void test_sanitize(void)
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 0);
 
     /* each value out of range -> its default, the others stay */
-    d = (sh_installer_t){ .v = { PG, 61, 22, 150 } };
+    d = (sh_installer_t){ .v = { PG, 61, 22, 150, SH_COL_FLAT, 20, 150 } };
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 1u << SH_INST_GLYCOL);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
     CHECK_EQ(d.v[SH_INST_FLUID], PG);
     CHECK_EQ(d.v[SH_INST_PRESSURE], 22);
     CHECK_EQ(d.v[SH_INST_COL_MAX], 150);
 
-    d = (sh_installer_t){ .v = { PG, 30, 4, 251 } };
+    d = (sh_installer_t){ .v = { PG, 30, 4, 251, SH_COL_FLAT, 20, 150 } };
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), (1u << SH_INST_PRESSURE) | (1u << SH_INST_COL_MAX));
     CHECK_EQ(d.v[SH_INST_PRESSURE], 15);
     CHECK_EQ(d.v[SH_INST_COL_MAX], 120);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 30);
 
-    d = (sh_installer_t){ .v = { 7, 30, 22, 150 } };    /* unknown fluid -> water, so no glycol */
+    d = (sh_installer_t){ .v = { 7, 30, 22, 150, SH_COL_FLAT, 20, 150 } };    /* unknown fluid -> water, so no glycol */
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), (1u << SH_INST_FLUID) | (1u << SH_INST_GLYCOL));
     CHECK_EQ(d.v[SH_INST_FLUID], WATER);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
 
-    d = (sh_installer_t){ .v = { WATER, 30, 22, 150 } };    /* glycol stored with water -> 0 */
+    d = (sh_installer_t){ .v = { WATER, 30, 22, 150, SH_COL_FLAT, 20, 150 } };    /* glycol stored with water -> 0 */
     CHECK_EQ(sh_installer_sanitize(&d, &DEF), 1u << SH_INST_GLYCOL);
     CHECK_EQ(d.v[SH_INST_GLYCOL], 0);
     CHECK(sh_installer_ok(&d));
@@ -181,6 +182,96 @@ static void test_frost(void)
     CHECK_EQ(calc(PG, 30, 60, 250).frost, -100);
 }
 
+/* Group C: the new installer data, the vacation threshold, the cooling target, the air venting
+ * pause (doc/tasks/step10-cooling-vacation-seasons.md 3.1 - 3.3, 3.5). */
+static void test_group_c(void)
+{
+    /* ranges and steps */
+    sh_installer_t d = DEF;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_AREA] = 5;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_AREA] = 200;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_AREA] = 4;
+    CHECK(!sh_installer_ok(&d));
+    d.v[SH_INST_AREA] = 201;
+    CHECK(!sh_installer_ok(&d));
+    d = DEF;
+    d.v[SH_INST_TANK_VOL] = 50;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_TANK_VOL] = 1000;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_TANK_VOL] = 125;                /* off the 10 l step */
+    CHECK(!sh_installer_ok(&d));
+    d.v[SH_INST_TANK_VOL] = 40;
+    CHECK(!sh_installer_ok(&d));
+    d.v[SH_INST_TANK_VOL] = 1010;
+    CHECK(!sh_installer_ok(&d));
+    d = DEF;
+    d.v[SH_INST_COL_TYPE] = SH_COL_TUBES;
+    CHECK(sh_installer_ok(&d));
+    d.v[SH_INST_COL_TYPE] = 2;
+    CHECK(!sh_installer_ok(&d));
+    d = DEF;
+    d.v[SH_INST_TANK_VOL] = 155;
+    d.v[SH_INST_AREA] = 0;
+    CHECK_EQ(sh_installer_sanitize(&d, &DEF), (1u << SH_INST_AREA) | (1u << SH_INST_TANK_VOL));
+    CHECK_EQ(d.v[SH_INST_TANK_VOL], 150);
+    CHECK_EQ(d.v[SH_INST_AREA], 20);
+    CHECK_EQ(sh_inst_info[SH_INST_TANK_VOL].step, 10);
+
+    /* vacation threshold: 75 % of the collector maximum, at most boiling - 10 K (doc examples:
+     * water, 1.5 bar -> 117.7 °C; 120 -> 90, 150 -> 112.5, 180 -> 117.7) */
+    CHECK_EQ(calc(WATER, 0, 15, 120).vac_protect, 900);
+    CHECK_EQ(calc(WATER, 0, 15, 150).vac_protect, 1125);
+    CHECK_EQ(calc(WATER, 0, 15, 180).vac_protect, 1177);
+    CHECK_EQ(calc(WATER, 0, 15, 180).vac_protect, calc(WATER, 0, 15, 180).boiling - 100);
+    CHECK_EQ(calc(WATER, 0, 15, 101).vac_protect, 757);         /* 75.75 -> down */
+
+    /* cooling target: 95 °C - energy / (volume x 1.163), within Tmax - 20 K ... Tmax */
+    d = DEF;
+    d.v[SH_INST_AREA] = 18;                     /* doc example: 1.8 m² flat, 120 l -> ~32 K -> ~63 °C */
+    d.v[SH_INST_TANK_VOL] = 120;
+    CHECK_EQ(sh_cool_target(&d, 700, 0), 627);  /* 4.5 kWh -> 32.25 K (up) -> 62.7 °C (down) */
+    CHECK_EQ(sh_cool_target(&d, 700, -30), 597);    /* the learned correction */
+    CHECK_EQ(sh_cool_target(&d, 600, 0), 600);      /* at most Tmax */
+    CHECK_EQ(sh_cool_target(&d, 850, 0), 650);      /* at least Tmax - 20 K */
+    CHECK_EQ(sh_cool_target(&d, 700, -200), 500);   /* Tmax - 20 K */
+    d.v[SH_INST_COL_TYPE] = SH_COL_TUBES;       /* 3.0 kWh/m²: 5.4 kWh -> 38.7 K */
+    CHECK_EQ(sh_cool_target(&d, 700, 0), 563);
+    CHECK_EQ(sh_cool_target(&DEF, 700, 0), 663);    /* defaults: 2.0 m² flat, 150 l */
+    d = DEF;
+    d.v[SH_INST_AREA] = 200;                    /* the extremes do not overflow */
+    d.v[SH_INST_TANK_VOL] = 50;
+    d.v[SH_INST_COL_TYPE] = SH_COL_TUBES;
+    CHECK_EQ(sh_cool_target(&d, 850, 0), 650);
+    d.v[SH_INST_AREA] = 5;
+    d.v[SH_INST_TANK_VOL] = 1000;
+    CHECK_EQ(sh_cool_target(&d, 300, 0), 300);
+
+    /* air venting pause: 10 min x viscosity factor */
+    CHECK_EQ(sh_air_pause_s(&DEF), 600);                        /* water: 3 x (5 + 10) = 45 min */
+    d = DEF;
+    d.v[SH_INST_FLUID] = PG;
+    d.v[SH_INST_GLYCOL] = 0;
+    CHECK_EQ(sh_air_pause_s(&d), 600);
+    d.v[SH_INST_GLYCOL] = 10;
+    CHECK_EQ(sh_air_pause_s(&d), 780);                          /* 1.3 */
+    d.v[SH_INST_GLYCOL] = 5;
+    CHECK_EQ(sh_air_pause_s(&d), 690);                          /* 1.15, between the points */
+    d.v[SH_INST_GLYCOL] = 30;
+    CHECK_EQ(sh_air_pause_s(&d), 1500);                         /* 2.5 */
+    d.v[SH_INST_GLYCOL] = 40;
+    CHECK_EQ(sh_air_pause_s(&d), 2100);
+    d.v[SH_INST_GLYCOL] = 50;
+    CHECK_EQ(sh_air_pause_s(&d), 2700);
+    d.v[SH_INST_GLYCOL] = 60;
+    CHECK_EQ(sh_air_pause_s(&d), 3300);                         /* 5.5: 3 x (5 + 55) = 180 min */
+    d.v[SH_INST_FLUID] = WATER;                                 /* glycol ignored with water */
+    CHECK_EQ(sh_air_pause_s(&d), 600);
+}
+
 int main(void)
 {
     test_ranges();
@@ -189,5 +280,6 @@ int main(void)
     test_boiling_glycol();
     test_protect_cap();
     test_frost();
+    test_group_c();
     return test_summary("test_installer");
 }

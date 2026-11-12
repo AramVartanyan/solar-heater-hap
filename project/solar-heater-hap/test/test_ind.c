@@ -240,6 +240,27 @@ static void test_pattern_times(void)
     CHECK_EQ(lit, 80);
 }
 
+/* Group C: the night cooling is orange (over the purple of the vacation), red over it */
+static void test_cooling(void)
+{
+    sh_ind_in_t in = idle();
+    in.pump_on = true;
+    in.cooling = true;
+    CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.vacation = true;                                 /* the vacation night */
+    CHECK_EQ(color(&in), SH_COLOR_ORANGE);
+    in.cooling = false;                                 /* the session waits: purple */
+    in.pump_on = false;
+    CHECK_EQ(color(&in), SH_COLOR_PURPLE);
+    in.cooling = true;
+    in.pump_on = true;
+    in.alarms = BIT(SH_ALARM_E4);
+    CHECK_EQ(color(&in), SH_COLOR_RED);
+    in.alarms = 0;
+    in.wifi_connected = false;
+    CHECK_EQ(ind(&in).pattern, SH_IND_HEARTBEAT);
+}
+
 int main(void)
 {
     test_colors();
@@ -247,5 +268,6 @@ int main(void)
     test_thresholds();
     test_patterns();
     test_pattern_times();
+    test_cooling();
     return test_summary("test_ind");
 }

@@ -66,6 +66,15 @@ static void expect(const char *file, int line, const sim_t *s, bool on, sh_pump_
     }
 }
 
+#define CHECK_EQ_PUMP(a, b)                                                            \
+    do {                                                                                \
+        s_checks++;                                                                     \
+        if ((long)(a) != (long)(b)) {                                                   \
+            s_failed++;                                                                 \
+            printf("FAIL %s:%d: %s = %ld, expected %ld\n", __FILE__, __LINE__, #a, (long)(a), (long)(b)); \
+        }                                                                               \
+    } while (0)
+
 #define EXPECT_ON(s, reason)    expect(__FILE__, __LINE__, &(s), true, SH_PUMP_REASON_##reason)
 #define EXPECT_OFF(s, reason)   expect(__FILE__, __LINE__, &(s), false, SH_PUMP_REASON_##reason)
 
@@ -830,6 +839,150 @@ static void test_initial_state(void)
     }
 }
 
+/* ==== Group C: night cooling session, vacation (doc/tasks/step10-cooling-vacation-seasons.md 3.2,
+ * 3.3) ===================================================================================== */
+
+static sh_pump_params_t s_pc;
+
+/* A cooling session (sh_cool decided it), pump off, minimum off time over. */
+static sim_t sim_cool(void)
+{
+    s_pc = P;
+    s_pc.cool = true;
+    sim_t s = sim_off();
+    s.p = &s_pc;
+    return s;
+}
+
+static void test_cool_reverse_difference(void)
+{
+    /* starts at tank - collector >= the switch-on difference (6 K), exactly at it, 0.1 K below not */
+    sim_t s = sim_cool();
+    step(&s, 1, 641, 700);                  /* 5.9 K */
+    EXPECT_OFF(s, COOL_WAIT);
+    step(&s, 1, 640, 700);                  /* 6.0 K */
+    EXPECT_ON(s, COOL);
+    CHECK_EQ_PUMP(s.st.cool, true);
+    /* runs while above the switch-off difference; at it, after the minimum run time, it stops */
+    step(&s, 179, 660, 700);                /* 4.0 K, 3 min not over */
+    EXPECT_ON(s, COOL);
+    step(&s, 1, 660, 700);
+    EXPECT_OFF(s, COOL_WAIT);
+    CHECK_EQ_PUMP(s.st.cool, false);
+    /* a new start: the difference again, after the minimum off time */
+    step(&s, 60, 630, 700);
+    EXPECT_OFF(s, COOL_WAIT);
+    step(&s, 59, 630, 700);
+    EXPECT_OFF(s, COOL_WAIT);
+    step(&s, 1, 630, 700);                  /* 2 min */
+    EXPECT_ON(s, COOL);
+    step(&s, 180, 659, 700);                /* 4.1 K: still above the switch-off difference */
+    EXPECT_ON(s, COOL);
+}
+
+static void test_cool_not_by_normal_rules(void)
+{
+    /* during the session: no Tmax, no normal charging, no minimum collector temperature */
+    sim_t s = sim_cool();
+    step(&s, 1, 100, 800);                  /* collector below its minimum, tank above Tmax */
+    EXPECT_ON(s, COOL);
+    s = sim_cool();
+    step(&s, 1, 500, 400);                  /* collector warmer: no charging in the session */
+    EXPECT_OFF(s, COOL_WAIT);
+}
+
+static void test_cool_session_end_stops_at_once(void)
+{
+    sim_t s = sim_cool();
+    step(&s, 1, 600, 700);
+    EXPECT_ON(s, COOL);
+    s_pc.cool = false;                      /* the target, the sunrise ...: at once, no minimum run */
+    step(&s, 10, 600, 650);
+    EXPECT_OFF(s, DIFF);
+    CHECK_EQ_PUMP(s.st.cool, false);
+    /* a pump the cooling did not run is left to the normal rules */
+    s = sim_running();
+    s_pc = P;
+    s.p = &s_pc;
+    step(&s, 1, 500, 400);
+    EXPECT_ON(s, DIFF);
+}
+
+static void test_cool_below_protections(void)
+{
+    /* the collector protection, the frost protection, the boiling point and the ceiling come first */
+    sim_t s = sim_cool();
+    step(&s, 1, 1150, 900);
+    EXPECT_ON(s, COL_PROTECT);
+    s = sim_cool();
+    step(&s, 1, 600, 950);
+    EXPECT_OFF(s, TANK_CEILING);
+    s = sim_cool();
+    s_pc.frost_on = true;
+    step(&s, 1, 30, 600);
+    EXPECT_ON(s, FROST);
+    CHECK_EQ_PUMP(s.st.cool, false);
+    s = sim_cool();
+    step(&s, 1, 1280, 700);
+    EXPECT_OFF(s, COL_BOILING);
+    s = sim_cool();
+    step(&s, 1, SH_TEMP_INVALID, 700);
+    EXPECT_OFF(s, SENSOR);
+}
+
+static void test_vacation_day(void)
+{
+    /* normal charging off at once */
+    s_pc = P;
+    s_pc.vacation = true;
+    s_pc.vac_protect = 900;                 /* 75 % of a 120 °C collector */
+    sim_t s = sim_running();
+    s.p = &s_pc;
+    step(&s, 1, 500, 400);
+    EXPECT_OFF(s, VACATION);
+    s = sim_off();
+    s.p = &s_pc;
+    step(&s, 1, 800, 300);
+    EXPECT_OFF(s, VACATION);
+    /* the collector protection at its own threshold, also below the normal one; 2 K return zone
+     * after the minimum run time */
+    step(&s, 1, 899, 300);
+    EXPECT_OFF(s, VACATION);
+    step(&s, 1, 900, 300);
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 879, 300);                  /* below 88 °C, but the minimum run time */
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 178, 879, 300);
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 880, 300);                  /* 88.0: not below the zone */
+    EXPECT_ON(s, COL_PROTECT);
+    step(&s, 1, 879, 300);
+    EXPECT_OFF(s, VACATION);
+    /* the ceiling still applies */
+    step(&s, 1, 1000, 950);
+    EXPECT_OFF(s, TANK_CEILING);
+    CHECK_EQ_PUMP(sh_pump_col_protect(&s_pc), 900);
+    s_pc.vac_protect = 1300;                /* the threshold of the vacation is not capped by the normal cap */
+    CHECK_EQ_PUMP(sh_pump_col_protect(&s_pc), 1300);
+    s_pc.vacation = false;
+    CHECK_EQ_PUMP(sh_pump_col_protect(&s_pc), 1100);
+}
+
+static void test_vacation_night(void)
+{
+    /* the vacation night is a cooling session: the reverse difference */
+    s_pc = P;
+    s_pc.vacation = true;
+    s_pc.vac_protect = 900;
+    s_pc.cool = true;
+    sim_t s = sim_off();
+    s.p = &s_pc;
+    step(&s, 1, 300, 360);
+    EXPECT_ON(s, COOL);
+    step(&s, 180, 320, 359);
+    EXPECT_OFF(s, COOL_WAIT);               /* 3.9 K */
+}
+
 static void test_reason_names(void)
 {
     for (int r = 0; r < SH_PUMP_REASON_COUNT; r++) {
@@ -909,6 +1062,13 @@ int main(void)
 
     test_priority_order();
     test_min_times_only_for_difference();
+    test_cool_reverse_difference();
+    test_cool_not_by_normal_rules();
+    test_cool_session_end_stops_at_once();
+    test_cool_below_protections();
+    test_vacation_day();
+    test_vacation_night();
+
     test_reason_names();
 
     printf("%d checks, %d failed\n", s_checks, s_failed);

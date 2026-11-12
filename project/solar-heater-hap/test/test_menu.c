@@ -1,16 +1,18 @@
 /* Host test of the menu transitions (main/sh_menu.c; doc/tasks/step2-settings-menu-pump-sensors.md
- * 3.2) and of the pump test screen. Times in ms. */
+ * 3.2), the pump test screen and, group C (doc/tasks/step10-cooling-vacation-seasons.md 3.4 - 3.6),
+ * SSn / HoL, the values of the current season and the air venting screen. Times in ms. */
 
 #include "test_util.h"
 #include "sh_menu.h"
 
-static const sh_settings_t S = { .v = { 70, 25, 6, 4, 300 } };
+static const sh_settings_t S = { .v = { SH_SSN_AUTO, 0, 70, 25, 6, 4, 300, 15, 5, 3, 1, 0 } };
 
 typedef struct {
     sh_menu_t m;
     sh_settings_t s;
     uint32_t now;
     bool test;
+    bool winter;
 } ui_t;
 
 static ui_t ui(void)
@@ -23,7 +25,7 @@ static ui_t ui(void)
 static sh_menu_act_t key(ui_t *u, sh_key_t k, uint32_t dt)
 {
     u->now += dt;
-    return sh_menu_key(&u->m, k, u->now, u->test, &u->s);
+    return sh_menu_key(&u->m, k, u->now, u->test, &u->s, u->winter);
 }
 
 static sh_menu_view_t view(ui_t *u, uint32_t dt)
@@ -53,20 +55,20 @@ static void test_normal_screen(void)
     u.test = false;
     CHECK_EQ(key(&u, SH_KEY_MENU, 0), SH_MENU_ACT_NONE);
     CHECK_EQ(u.m.mode, SH_MENU_LIST);
-    CHECK_EQ(u.m.pos, SH_SET_TANK_MAX);                         /* at tbo */
+    CHECK_EQ(u.m.pos, SH_SET_SEASON);                           /* at SSn */
 }
 
 static void test_list_order_and_wrap(void)
 {
     ui_t u = ui();
     key(&u, SH_KEY_MENU, 0);
-    const uint8_t order[] = { SH_SET_COL_MIN, SH_SET_DIFF_ON, SH_SET_DIFF_OFF, SH_SET_TEST_S,
-                              SH_MENU_END, SH_SET_TANK_MAX };
+    const uint8_t order[] = { SH_SET_VACATION, SH_SET_TANK_MAX, SH_SET_COL_MIN, SH_SET_DIFF_ON,
+                              SH_SET_DIFF_OFF, SH_SET_TEST_S, SH_MENU_END, SH_SET_SEASON };
     for (unsigned i = 0; i < sizeof(order); i++) {
         CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
         CHECK_EQ(u.m.pos, order[i]);
     }
-    key(&u, SH_KEY_MINUS, 100);                                 /* tbo -> End */
+    key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
     CHECK_EQ(u.m.pos, SH_MENU_END);
     key(&u, SH_KEY_MINUS, 100);
     CHECK_EQ(u.m.pos, SH_SET_TEST_S);
@@ -91,6 +93,8 @@ static void test_edit_and_save(void)
 {
     ui_t u = ui();
     key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
     key(&u, SH_KEY_MENU, 100);                                  /* open tbo */
     CHECK_EQ(u.m.mode, SH_MENU_EDIT);
     CHECK_EQ(u.m.value, 70);
@@ -125,8 +129,9 @@ static void test_edit_limits_and_repeat(void)
 {
     ui_t u = ui();
     key(&u, SH_KEY_MENU, 0);
-    key(&u, SH_KEY_PLUS, 100);
-    key(&u, SH_KEY_PLUS, 100);                                  /* d.on */
+    for (int i = 0; i < 4; i++) {
+        key(&u, SH_KEY_PLUS, 100);                              /* HoL, tbo, C.Lo, d.on */
+    }
     key(&u, SH_KEY_MENU, 100);
     for (int i = 0; i < 5; i++) {
         key(&u, SH_KEY_MINUS_REPEAT, 200);
@@ -217,6 +222,115 @@ static void test_test_screen(void)
     CHECK(!sh_menu_test_label(24));
 }
 
+/* SSn and HoL: the values 0 ... 2 and 0 / 1, no wrap */
+static void test_season_vacation_items(void)
+{
+    ui_t u = ui();
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_MENU, 100);                                  /* open SSn */
+    CHECK_EQ(u.m.id, SH_SET_SEASON);
+    CHECK_EQ(u.m.value, SH_SSN_AUTO);
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(u.m.value, SH_SSN_AUTO);                           /* the last one */
+    key(&u, SH_KEY_MINUS, 100);
+    key(&u, SH_KEY_MINUS, 100);
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(u.m.value, SH_SSN_SUMMER);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_SAVE);
+    CHECK_EQ(u.m.id, SH_SET_SEASON);
+
+    u = ui();
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_MENU, 100);                                  /* open HoL */
+    CHECK_EQ(u.m.id, SH_SET_VACATION);
+    CHECK_EQ(u.m.value, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(u.m.value, 1);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_SAVE);
+    sh_menu_view_t v = view(&u, 0);
+    CHECK_EQ(v.id, SH_SET_VACATION);
+    CHECK_EQ(v.value, 1);
+}
+
+/* C.Lo, d.on, d.oF: the values of the current season */
+static void test_seasonal_values(void)
+{
+    ui_t u = ui();
+    u.winter = true;
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);                                  /* C.Lo */
+    CHECK_EQ(u.m.pos, SH_SET_COL_MIN);
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(u.m.id, SH_SET_COL_MIN_W);
+    CHECK_EQ(u.m.value, 15);                                    /* the winter value */
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_SAVE);      /* saved as the winter value */
+    CHECK_EQ(u.m.id, SH_SET_COL_MIN_W);
+    CHECK_EQ(u.m.value, 14);
+
+    u = ui();
+    u.winter = true;
+    key(&u, SH_KEY_MENU, 0);
+    for (int i = 0; i < 4; i++) {
+        key(&u, SH_KEY_PLUS, 100);                              /* d.on */
+    }
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(u.m.id, SH_SET_DIFF_ON_W);
+    CHECK_EQ(u.m.value, 5);
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(u.m.value, 4);                                     /* winter d.oF 3 + 1 */
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(u.m.value, 4);
+
+    u = ui();                                                   /* summer: the summer values */
+    key(&u, SH_KEY_MENU, 0);
+    for (int i = 0; i < 5; i++) {
+        key(&u, SH_KEY_PLUS, 100);                              /* d.oF */
+    }
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(u.m.id, SH_SET_DIFF_OFF);
+    CHECK_EQ(u.m.value, 4);
+
+    u = ui();                                                   /* tbo has no winter twin */
+    u.winter = true;
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(u.m.id, SH_SET_TANK_MAX);
+}
+
+/* "menu" during the air venting stops it (as the test) */
+static void test_air_stop(void)
+{
+    ui_t u = ui();
+    u.test = true;                                              /* the "service" flag: test or air venting */
+    CHECK_EQ(key(&u, SH_KEY_MENU, 0), SH_MENU_ACT_STOP);
+    CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
+}
+
+/* AIr 3 s, then every 7 s: AIr 1 s, the phase 1 s, the minutes 5 s */
+static void test_air_screen(void)
+{
+    for (uint32_t t = 0; t < 3; t++) {
+        CHECK_EQ(sh_menu_air_screen(t), SH_MENU_AIR_LABEL);
+    }
+    CHECK_EQ(sh_menu_air_screen(3), SH_MENU_AIR_LABEL);
+    CHECK_EQ(sh_menu_air_screen(4), SH_MENU_AIR_PHASE);
+    for (uint32_t t = 5; t < 10; t++) {
+        CHECK_EQ(sh_menu_air_screen(t), SH_MENU_AIR_MINUTES);
+    }
+    CHECK_EQ(sh_menu_air_screen(10), SH_MENU_AIR_LABEL);
+    CHECK_EQ(sh_menu_air_screen(11), SH_MENU_AIR_PHASE);
+    CHECK_EQ(sh_menu_air_screen(12), SH_MENU_AIR_MINUTES);
+    CHECK_EQ(sh_menu_air_screen(3 + 7 * 100), SH_MENU_AIR_LABEL);
+    CHECK_EQ(sh_menu_air_screen(3 + 7 * 100 + 6), SH_MENU_AIR_MINUTES);
+}
+
 int main(void)
 {
     test_normal_screen();
@@ -227,5 +341,9 @@ int main(void)
     test_blink();
     test_timeout();
     test_test_screen();
+    test_season_vacation_items();
+    test_seasonal_values();
+    test_air_stop();
+    test_air_screen();
     return test_summary("test_menu");
 }

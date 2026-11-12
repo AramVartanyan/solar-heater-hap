@@ -43,19 +43,19 @@ menu "Device Settings"
                 1 s control loop. No averaging.
 
         config SH_DIFF_ON_K
-            int "Switch-on difference, collector - tank (K)"
+            int "Switch-on difference, collector - tank, summer (K)"
             range 3 20
             default 6
             help
-                Default of the menu value d.on (stored in NVS): the pump starts when the
+                Summer default of the menu value d.on (stored in NVS): the pump starts when the
                 collector is at least this much warmer than the tank.
 
         config SH_DIFF_OFF_K
-            int "Switch-off difference, collector - tank (K)"
+            int "Switch-off difference, collector - tank, summer (K)"
             range 1 15
             default 4
             help
-                Default of the menu value d.oF (stored in NVS): the pump stops when the
+                Summer default of the menu value d.oF (stored in NVS): the pump stops when the
                 difference falls to this value (after the minimum run time). Must be lower than
                 the switch-on difference (checked at compile time).
 
@@ -85,14 +85,44 @@ menu "Device Settings"
                 charge above it, up to the fixed 95 degC emergency ceiling.
 
         config SH_COL_MIN_C
-            int "Minimum collector temperature (degC)"
+            int "Minimum collector temperature, summer (degC)"
             range 10 80
             default 25
             help
-                Default of the menu value C.Lo (stored in NVS): the difference does not start
+                Summer default of the menu value C.Lo (stored in NVS): the difference does not start
                 the pump while the collector is below this temperature. A running pump is not
                 stopped by it.
 
+        config SH_COL_MIN_WINTER_C
+            int "Minimum collector temperature, winter (degC)"
+            range 10 80
+            default 15
+            help
+                Winter default of C.Lo (the seasons, doc/operating-modes.md 2.1.2).
+        config SH_DIFF_ON_WINTER_K
+            int "Switch-on difference, winter (K)"
+            range 3 20
+            default 5
+            help
+                Winter default of d.on.
+        config SH_DIFF_OFF_WINTER_K
+            int "Switch-off difference, winter (K)"
+            range 1 15
+            default 3
+            help
+                Winter default of d.oF; lower than the winter switch-on difference (checked at
+                compile time).
+        config SH_NIGHT_COOL_SUMMER
+            bool "Night cooling above Tmax, summer"
+            default y
+            help
+                Default of the seasonal switch (web interface): with the tank above Tmax after
+                03:00 the night cooling starts at 04:00. The cooling after an E4 day is always on.
+        config SH_NIGHT_COOL_WINTER
+            bool "Night cooling above Tmax, winter"
+            default n
+            help
+                Likewise, for the winter.
         config SH_COL_PROTECT_C
             int "Collector protection (degC)"
             range 70 160
@@ -194,6 +224,25 @@ menu "Device Settings"
             help
                 What the collector withstands (manufacturer data). The collector protection is
                 kept at least 5 K below it.
+        config SH_INST_COL_TUBES
+            bool "Collector: evacuated tubes (off: flat plate)"
+            default n
+            help
+                With the area and the tank volume: the energy of a clear summer day (flat plate
+                2.5 kWh/m2, evacuated tubes 3.0 kWh/m2) and from it the target of the night
+                cooling.
+        config SH_INST_AREA_DM2
+            int "Collector area (0.1 m2)"
+            range 5 200
+            default 20
+            help
+                Tenths of m2: 20 = 2.0 m2.
+        config SH_INST_TANK_L
+            int "Tank volume (l)"
+            range 50 1000
+            default 150
+            help
+                A multiple of 10 l (checked at compile time).
 
     endmenu
 

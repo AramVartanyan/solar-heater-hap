@@ -9,11 +9,19 @@
  *   1. invalid temperature        -> off at once
  *   2. collector at boiling point -> off at once, also a running pump; no start for any reason
  *   3. tank emergency ceiling     -> off at once
- *   4. collector protection       -> on at once (no minimum off time), also above Tmax
+ *   4. collector protection       -> on at once (no minimum off time), also above Tmax; during
+ *                                    the vacation at its own threshold (75 % of the collector
+ *                                    maximum, sh_limits_t.vac_protect)
  *   5. frost protection           -> on at once while the collector is below the frost threshold
  *                                    and the tank is at least 5 °C
- *   6. tank Tmax                  -> normal charging off at once
- *   7. difference                 -> on / off; the only rule the minimum times apply to
+ *   6. night cooling session      -> (sh_cool decides the session) the reverse difference: on at
+ *                                    tank - collector >= the switch-on difference, off at <= the
+ *                                    switch-off difference, with the minimum times; a pump running
+ *                                    by it stops at once when the session ends
+ *   7. vacation                   -> normal charging off at once
+ *   8. tank Tmax                  -> normal charging off at once
+ *   9. difference                 -> on / off; with the cooling the only rules the minimum times
+ *                                    apply to
  * The boiling point, the ceiling of the collector protection and the frost threshold are computed
  * from the installer data (sh_installer) and come in with the parameters.
  */
@@ -40,6 +48,10 @@ typedef enum {
     SH_PUMP_REASON_MIN_RUN,         /* on:  difference low, minimum run time not over */
     SH_PUMP_REASON_MIN_OFF,         /* off: difference enough, minimum off time not over */
     SH_PUMP_REASON_COL_MIN,         /* off: difference enough, collector below its minimum */
+    SH_PUMP_REASON_COOL,            /* on:  night cooling (also its minimum run time) */
+    SH_PUMP_REASON_COOL_WAIT,       /* off: night cooling session, the reverse difference too small
+                                       (or its minimum off time) */
+    SH_PUMP_REASON_VACATION,        /* off: vacation, normal charging off */
     /* sh_pump_ctl: pump test, anti-seize, sensor faults */
     SH_PUMP_REASON_TEST,            /* on:  pump test (buttons) */
     SH_PUMP_REASON_ANTI_SEIZE,      /* on:  anti-seize run after 24 h without running */
@@ -52,6 +64,8 @@ typedef enum {
     SH_PUMP_REASON_CF_RUN,          /* on:  collector sensor faulty, the tank rises */
     SH_PUMP_REASON_CF_WAIT,         /* off: collector sensor faulty, waiting for the next probe */
     SH_PUMP_REASON_CF_HEATER,       /* off: collector sensor faulty, heater running, probe postponed */
+    SH_PUMP_REASON_AIR_RUN,         /* on:  air venting, run */
+    SH_PUMP_REASON_AIR_PAUSE,       /* off: air venting, pause */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -67,6 +81,9 @@ typedef struct {
     int16_t  col_boiling;           /* boiling point, 0.1 °C: no start at >= this, released below it - 2 K */
     bool     frost_on;              /* frost protection enabled */
     int16_t  frost;                 /* frost threshold, 0.1 °C: on below it, off at >= it + 2 K */
+    bool     vacation;              /* normal charging off, collector protection at vac_protect */
+    int16_t  vac_protect;           /* 0.1 °C (sh_limits_t.vac_protect) */
+    bool     cool;                  /* a night cooling session is running (sh_cool) */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).
@@ -79,6 +96,7 @@ typedef struct {
     bool tank_max;                  /* tank reached Tmax, not yet below it - 2 K */
     bool col_protect;               /* collector protection is running the pump */
     bool frost;                     /* frost protection is running the pump */
+    bool cool;                      /* the night cooling is running the pump */
 } sh_pump_state_t;
 
 /* A single-value limit with the 2 K return zone: true at t >= limit, false at t < limit - 2 K,
@@ -95,7 +113,7 @@ void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_
 void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank,
                     uint32_t elapsed_s);
 
-/* Collector protection threshold in use: the parameter, capped. */
+/* Collector protection threshold in use: the parameter, capped; during the vacation its own. */
 int16_t sh_pump_col_protect(const sh_pump_params_t *p);
 
 /* Short English name of the reason, for the log. */

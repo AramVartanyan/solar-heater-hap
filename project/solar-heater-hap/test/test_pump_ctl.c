@@ -1167,8 +1167,158 @@ static void test_settings_apply_at_once(void)
     OFF(s, DIFF);
 }
 
+/* ==== Air venting (group C, doc/tasks/step10-cooling-vacation-seasons.md 3.5) ============== */
+
+static void air_start(sim_t *s, uint32_t pause_s)
+{
+    sh_pump_ctl_air_start(&s->c, pause_s, s->now);
+    sh_pump_ctl_step(&s->c, &s->p, &s->t, s->now);
+}
+
+static void air_stop(sim_t *s)
+{
+    sh_pump_ctl_air_stop(&s->c, s->now);
+    sh_pump_ctl_step(&s->c, &s->p, &s->t, s->now);
+}
+
+static void test_air_cycles(void)
+{
+    /* water: 3 x (5 min run + 10 min pause) = 45 min; starts at once (no minimum off time) */
+    sim_t s = sim(300, 300);
+    run(&s, 10);
+    const uint32_t t0 = s.now;
+    air_start(&s, 600);
+    CHECK(events(&s) & SH_PUMP_EVT_AIR_START);
+    ON(s, AIR_RUN);
+    uint8_t cyc;
+    bool r;
+    uint32_t left;
+    CHECK(sh_pump_ctl_air(&s.c, s.now, &cyc, &r, &left));
+    CHECK_EQ(cyc, 1);
+    CHECK(r);
+    CHECK_EQ(left, 2700);
+    for (int c = 0; c < 3; c++) {
+        const uint32_t start = t0 + (uint32_t)c * 900;
+        run_to(&s, start + 299);
+        ON(s, AIR_RUN);
+        run_to(&s, start + 300);            /* the pause: +-1 s */
+        OFF(s, AIR_PAUSE);
+        sh_pump_ctl_air(&s.c, s.now, &cyc, &r, &left);
+        CHECK_EQ(cyc, c + 1);
+        CHECK(!r);
+        run_to(&s, start + 899);
+        OFF(s, AIR_PAUSE);
+        if (c < 2) {
+            run_to(&s, start + 900);
+            ON(s, AIR_RUN);
+            sh_pump_ctl_air(&s.c, s.now, &cyc, &r, &left);
+            CHECK_EQ(cyc, c + 2);
+            CHECK_EQ(left, 2700 - (uint32_t)(c + 1) * 900);
+        }
+    }
+    CHECK_EQ(events(&s), 0);
+    run_to(&s, t0 + 2700);                  /* over: the normal rules, as after the test */
+    CHECK(events(&s) & SH_PUMP_EVT_AIR_END);
+    OFF(s, DIFF);
+    CHECK(!sh_pump_ctl_air(&s.c, s.now, &cyc, &r, &left));
+    CHECK_EQ(left, 0);
+
+    /* a longer pause (glycol) */
+    s = sim(300, 300);
+    run(&s, 10);
+    air_start(&s, 3300);
+    run(&s, 300);
+    OFF(s, AIR_PAUSE);
+    run(&s, 3299);
+    OFF(s, AIR_PAUSE);
+    run(&s, 1);
+    ON(s, AIR_RUN);
+}
+
+static void test_air_stop(void)
+{
+    sim_t s = sim(500, 400);                /* a difference: the normal charging after the stop */
+    run(&s, 10);
+    air_start(&s, 600);
+    run(&s, 400);
+    OFF(s, AIR_PAUSE);
+    air_stop(&s);                           /* at once */
+    CHECK(events(&s) & SH_PUMP_EVT_AIR_END);
+    ON(s, DIFF);                            /* as a stopped pump whose minimum off time is over */
+    air_stop(&s);                           /* nothing to stop */
+    CHECK_EQ(events(&s), 0);
+}
+
+static void test_air_emergency_only(void)
+{
+    /* only the boiling point and the tank ceiling stop it (and end it) */
+    sim_t s = sim(300, 300);
+    run(&s, 10);
+    air_start(&s, 600);
+    temps(&s, 1200, 800);                   /* above the collector protection, Tmax */
+    run(&s, 1);
+    ON(s, AIR_RUN);
+    run(&s, 400);
+    OFF(s, AIR_PAUSE);                      /* the pause holds the pump off */
+    temps(&s, 600, 950);
+    run(&s, 1);
+    CHECK(events(&s) & SH_PUMP_EVT_AIR_END);
+    OFF(s, TANK_CEILING);
+    CHECK(!s.c.air);
+
+    s = sim(300, 300);
+    run(&s, 10);
+    air_start(&s, 600);
+    temps(&s, 1280, 300);                   /* boiling */
+    run(&s, 1);
+    OFF(s, COL_BOILING);
+    CHECK(!s.c.air);
+
+    /* asked for while the ceiling is on: refused in the same step */
+    s = sim(300, 960);
+    run(&s, 10);
+    air_start(&s, 600);
+    CHECK(!s.c.air);
+    OFF(s, TANK_CEILING);
+
+    /* faulty sensors do not stop it */
+    s = sim(300, 300);
+    run(&s, 10);
+    faults(&s, true, true);
+    run(&s, 70);
+    air_start(&s, 600);
+    ON(s, AIR_RUN);
+}
+
+static void test_air_and_test(void)
+{
+    /* the venting replaces a running test; "+" does not start a test during it */
+    sim_t s = sim(300, 300);
+    run(&s, 10);
+    plus(&s);
+    ON(s, TEST);
+    events(&s);
+    air_start(&s, 600);
+    CHECK(events(&s) & SH_PUMP_EVT_TEST_END);
+    CHECK(!s.c.test);
+    ON(s, AIR_RUN);
+    plus(&s);
+    CHECK(!s.c.test);
+    ON(s, AIR_RUN);
+    /* a second start does not restart it */
+    run(&s, 100);
+    const uint32_t start = s.c.air_start_s;
+    air_start(&s, 600);
+    CHECK_EQ(s.c.air_start_s, start);
+}
+
 int main(void)
 {
+    test_air_cycles();
+    test_air_stop();
+    test_air_emergency_only();
+    test_air_and_test();
+
     test_test_starts_at_once();
     test_test_duration();
     test_test_plus();

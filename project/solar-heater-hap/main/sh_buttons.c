@@ -74,9 +74,10 @@ static void menu_key(sh_key_t key)
     sh_state_t st;
     sh_state_get(&st);
 
+    const bool winter = sh_settings_winter();
     xSemaphoreTake(s_menu_lock, portMAX_DELAY);
-    const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), st.test_on, &settings);
-    const sh_setting_t id = (sh_setting_t)s_menu.pos;
+    const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), st.test_on || st.modes.air, &settings, winter);
+    const sh_setting_t id = (sh_setting_t)s_menu.id;
     const int16_t value = s_menu.value;
     xSemaphoreGive(s_menu_lock);
 
@@ -88,7 +89,7 @@ static void menu_key(sh_key_t key)
         sh_control_cmd(SH_CONTROL_TEST_MINUS);
         break;
     case SH_MENU_ACT_STOP:
-        sh_control_cmd(SH_CONTROL_TEST_STOP);
+        sh_control_cmd(st.modes.air ? SH_CONTROL_AIR_STOP : SH_CONTROL_TEST_STOP);
         break;
     case SH_MENU_ACT_SAVE:
         sh_settings_set(id, value);     /* logs the result */

@@ -18,6 +18,9 @@
  *   http://localhost:8080/sim?tzok=0                 the zone is not confirmed
  *   http://localhost:8080/sim?peak=0                 the peak check says "not reliable"
  *   http://localhost:8080/sim?hist=0                 no history partition (grey)
+ *   http://localhost:8080/sim?at=0400                the local time is 04:00 now (the night cooling)
+ *   http://localhost:8080/sim?sea=1                  the season recognised in Aut: winter (0: summer)
+ *   http://localhost:8080/sim?e4=1                   E4 was active today (the night cooling b)
  * POSIX sockets, one request at a time. */
 
 #define _POSIX_C_SOURCE 200809L
@@ -39,14 +42,24 @@
 #include "sh_tz.h"
 #include "sh_day.h"
 #include "sh_hist.h"
+#include "sh_modes.h"
 
 #define CODE    "810841"
 
-static sh_web_config_t s_cfg = {
-    .settings = { .v = { 70, 25, 6, 4, 300 } },
-    .frost = true,
-    .inst = { .v = { SH_FLUID_WATER, 0, 15, 120 } },
-};
+#define DEFAULT_CFG { \
+    .settings = { .v = { [SH_SET_SEASON] = SH_SSN_AUTO, [SH_SET_VACATION] = 0, [SH_SET_TANK_MAX] = 70, \
+                         [SH_SET_COL_MIN] = 25, [SH_SET_DIFF_ON] = 6, [SH_SET_DIFF_OFF] = 4, [SH_SET_TEST_S] = 300, \
+                         [SH_SET_COL_MIN_W] = 15, [SH_SET_DIFF_ON_W] = 5, [SH_SET_DIFF_OFF_W] = 3, \
+                         [SH_SET_NIGHT_COOL] = 1, [SH_SET_NIGHT_COOL_W] = 0 } }, \
+    .frost = true, \
+    .inst = { .v = { [SH_INST_FLUID] = SH_FLUID_WATER, [SH_INST_GLYCOL] = 0, [SH_INST_PRESSURE] = 15, \
+                     [SH_INST_COL_MAX] = 120, [SH_INST_COL_TYPE] = SH_COL_FLAT, [SH_INST_AREA] = 20, \
+                     [SH_INST_TANK_VOL] = 150 } }, \
+}
+
+static sh_web_config_t s_cfg = DEFAULT_CFG;
+static sh_modes_t s_modes;
+static bool s_e4_today;
 static sh_pump_temps_t s_temps = { .t_col = 523, .t_tank = 418 };
 static sh_pump_ctl_t s_pump;
 static sh_alarm_state_t s_alarm;
@@ -105,6 +118,8 @@ static long long sim_epoch(void)
     return (long long)time(NULL) + s_offset;
 }
 
+static bool s_dst;                      /* summer time at the last local_at() */
+
 static void local_at(long long epoch, sh_local_t *lt)
 {
     lt->set = s_clock_set;
@@ -118,6 +133,7 @@ static void local_at(long long epoch, sh_local_t *lt)
         localtime_r(&t, &tm);
         lt->day = sh_day_number(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
         lt->min = (uint16_t)(tm.tm_hour * 60 + tm.tm_min);
+        s_dst = tm.tm_isdst > 0;
     }
 }
 
@@ -135,10 +151,14 @@ static void day_over(const sh_day_sum_t *d)
     r.col_min = d->col_min == SH_TEMP_INVALID ? SH_HIST_NO_TEMP : d->col_min;
     r.tank_max = d->tank_max == SH_TEMP_INVALID ? SH_HIST_NO_TEMP : d->tank_max;
     r.tank_min = d->tank_min == SH_TEMP_INVALID ? SH_HIST_NO_TEMP : d->tank_min;
-    for (int k = 0; k < SH_RUN_KINDS; k++) {
+    for (int k = 0; k <= SH_RUN_OTHER; k++) {
         r.run_min[k] = (uint16_t)((d->run_s[k] + 30) / 60);
     }
     r.alarms = d->alarms;
+    r.cool_min = (uint16_t)((d->run_s[SH_RUN_COOL] + 30) / 60);
+    r.sunrise = d->sunrise >= 0 ? (uint16_t)d->sunrise : SH_HIST_NO_TIME;
+    r.sunset = d->sunset >= 0 ? (uint16_t)d->sunset : SH_HIST_NO_TIME;
+    r.cool_target = d->cool_target > 0 ? (uint8_t)(d->cool_target / 10) : SH_HIST_NO_U8;
     r.peak_min = d->peak_min;
     r.clock_reliable = trust() == SH_CLOCK_RELIABLE;
     r.partial = !d->full;
@@ -168,6 +188,9 @@ static void made_up(int min, sh_day_in_t *in, int16_t *tank)
         *tank = (int16_t)(*tank - 1);
     }
     in->alarms = in->reason == SH_PUMP_REASON_COL_PROTECT ? SH_ALARM_BIT(SH_ALARM_HOT) : 0;
+    in->sunrise = min >= 410 ? 410 : -1;
+    in->sunset = min >= 1150 ? 1150 : -1;
+    in->cool_target = 663;
 }
 
 static void made_up_start(void)
@@ -202,6 +225,10 @@ static void made_up_start(void)
         r.peak_min = (int16_t)(13 * 60 + (d * 11) % 120);
         r.clock_reliable = true;
         r.partial = d == 3;
+        r.cool_min = (uint16_t)(d % 5 == 0 ? 95 : 0);
+        r.sunrise = (uint16_t)(6 * 60 + 30 + d % 9);
+        r.sunset = (uint16_t)(17 * 60 + 10 - d % 7);
+        r.cool_target = 66;
         r.alarms = (uint16_t)((d == 10 ? SH_ALARM_BIT(SH_ALARM_E1) : 0) |
                               (r.run_min[SH_RUN_PROTECT] ? SH_ALARM_BIT(SH_ALARM_HOT) : 0));
         sh_hist_append(&s_hist, &r);
@@ -213,16 +240,37 @@ static void control(void)
 {
     sh_limits_t lim;
     sh_limits_calc(&s_cfg.inst, &lim);
+    const uint32_t now = now_s();
+
+    /* the modes (sunrise / sunset, season, night cooling, vacation), as sh_control */
+    sh_local_t lt;
+    local_at(sim_epoch(), &lt);
+    const sh_settings_t *set = &s_cfg.settings;
+    const sh_modes_in_t mi = {
+        .t_col = s_temps.col_fault ? SH_TEMP_INVALID : s_temps.t_col,
+        .t_tank = s_temps.tank_fault ? SH_TEMP_INVALID : s_temps.t_tank,
+        .pump_on = s_pump.on,
+        .charging = s_pump.on && (s_pump.reason == SH_PUMP_REASON_DIFF || s_pump.reason == SH_PUMP_REASON_MIN_RUN),
+        .tank_max = s_pump.norm.tank_max,
+        .e4 = s_e4_today || (s_alarm.active & SH_ALARM_BIT(SH_ALARM_E4)) != 0,
+        .set = set, .inst = &s_cfg.inst,
+        .clock_set = lt.set, .reliable = trust() == SH_CLOCK_RELIABLE, .day = lt.day, .min = lt.min,
+        .has_dst = true, .dst = s_dst,
+    };
+    s_e4_today = false;
+    sh_modes_step(&s_modes, &mi, now);
+    const bool winter = s_modes.winter;
     const sh_pump_params_t p = {
-        .diff_on = (int16_t)(s_cfg.settings.v[SH_SET_DIFF_ON] * 10),
-        .diff_off = (int16_t)(s_cfg.settings.v[SH_SET_DIFF_OFF] * 10),
+        .diff_on = (int16_t)(set->v[sh_settings_seasonal(SH_SET_DIFF_ON, winter)] * 10),
+        .diff_off = (int16_t)(set->v[sh_settings_seasonal(SH_SET_DIFF_OFF, winter)] * 10),
         .min_run_s = 180, .min_off_s = 120,
-        .tank_max = (int16_t)(s_cfg.settings.v[SH_SET_TANK_MAX] * 10),
-        .col_min = (int16_t)(s_cfg.settings.v[SH_SET_COL_MIN] * 10),
+        .tank_max = (int16_t)(set->v[SH_SET_TANK_MAX] * 10),
+        .col_min = (int16_t)(set->v[sh_settings_seasonal(SH_SET_COL_MIN, winter)] * 10),
         .col_protect = 1100, .col_protect_cap = lim.protect_cap, .col_boiling = lim.boiling,
         .frost_on = s_cfg.frost, .frost = lim.frost,
+        .vacation = set->v[SH_SET_VACATION] != 0, .vac_protect = lim.vac_protect,
+        .cool = s_modes.cool.why != SH_COOL_NONE,
     };
-    const uint32_t now = now_s();
     sh_pump_ctl_step(&s_pump, &p, &s_temps, now);
     s_pump.events = 0;
     const sh_alarm_in_t in = {
@@ -234,12 +282,11 @@ static void control(void)
     sh_alarm_step(&s_alarm, &ALARM, &in, now);
 
     /* the day, as sh_history does it every second */
-    sh_local_t lt;
-    local_at(sim_epoch(), &lt);
     const sh_day_in_t din = {
         .t_col = s_temps.t_col, .t_tank = s_temps.t_tank, .col_fault = s_temps.col_fault,
         .tank_fault = s_temps.tank_fault, .pump_on = s_pump.on, .reason = s_pump.reason,
-        .alarms = s_alarm.active,
+        .alarms = s_alarm.active, .sunrise = s_modes.sun.rise_min, .sunset = s_modes.sun.set_min,
+        .cool_target = s_modes.target,
     };
     sh_day_sum_t done;
     if (sh_day_step(&s_day, &din, &lt, now, &done)) {
@@ -294,6 +341,21 @@ static void reply_state(int fd)
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
     };
+    sh_state_modes_t *m = &s.modes;
+    m->winter = s_modes.winter;
+    m->cool_why = (uint8_t)s_modes.cool.why;
+    m->cool_goal = s_modes.cool.target;
+    m->cool_until = s_modes.cool.until;
+    m->cool_heater = s_modes.cool.heater;
+    m->cool_target = s_modes.target;
+    m->cool_learned = s_modes.learned.cool.offset;
+    m->sun_rise = s_modes.sun.rise_min;
+    m->sun_set = s_modes.sun.set_min;
+    m->avg_rise = sh_sun_list_avg(&s_modes.learned.rise);
+    m->avg_set = sh_sun_list_avg(&s_modes.learned.set);
+    uint32_t left;
+    m->air = sh_pump_ctl_air(&s_pump, now, &m->air_cycle, &m->air_run, &left);
+    m->air_left_s = left;
     sh_day_run_today(&s_day, &lt, now, s.run_s);
     static char json[SH_WEB_STATUS_MAX];
     const int len = sh_web_status_json(json, sizeof(json), &s);
@@ -334,6 +396,17 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "hist=")) && sscanf(p + 5, "%d", &v) == 1) {
         s_hist_on = v != 0;
+    }
+    if ((p = strstr(query, "at=")) && sscanf(p + 3, "%d", &v) == 1) {
+        sh_local_t lt;
+        local_at(sim_epoch(), &lt);
+        s_offset += ((v / 100) * 60 + v % 100 - lt.min) * 60LL;
+    }
+    if ((p = strstr(query, "sea=")) && sscanf(p + 4, "%d", &v) == 1) {
+        s_modes.season.winter = v != 0;
+    }
+    if ((p = strstr(query, "e4=")) && sscanf(p + 3, "%d", &v) == 1) {
+        s_e4_today = v != 0;
     }
 }
 
@@ -474,6 +547,19 @@ static void handle(int fd, const char *page, size_t page_len)
         }
         control();
         reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/air") == 0) {
+        sh_web_air_t cmd = SH_WEB_AIR_NONE;
+        uint8_t cyc;
+        bool run;
+        uint32_t left;
+        const sh_web_res_t res = sh_web_air(body, sh_pump_ctl_air(&s_pump, now_s(), &cyc, &run, &left), &cmd);
+        if (res == SH_WEB_OK && cmd == SH_WEB_AIR_START) {
+            sh_pump_ctl_air_start(&s_pump, sh_air_pause_s(&s_cfg.inst), now_s());
+        } else if (res == SH_WEB_OK && cmd == SH_WEB_AIR_STOP) {
+            sh_pump_ctl_air_stop(&s_pump, now_s());
+        }
+        control();
+        reply_res(fd, res);
     } else if (post && strcmp(path, "/api/reset") == 0) {
         sh_web_reset_t what;
         const sh_web_res_t res = sh_web_reset(body, CODE, &what);
@@ -481,9 +567,9 @@ static void handle(int fd, const char *page, size_t page_len)
             sh_hist_clear(&s_hist);
         } else if (res == SH_WEB_OK && what == SH_WEB_RESET_LEARNED) {
             sh_peak_reset(&s_peak, s_tz_ok);
+            sh_modes_reset_learned(&s_modes);
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
-            s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300 } }, .frost = true,
-                                       .inst = { .v = { SH_FLUID_WATER, 0, 15, 120 } } };
+            s_cfg = (sh_web_config_t)DEFAULT_CFG;
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {
@@ -520,6 +606,13 @@ int main(int argc, char **argv)
     }
     s_start = time(NULL);
     s_sntp_s = now_s();
+    sh_learned_t learned;                               /* a made-up week of sunrises and sunsets */
+    sh_learned_init(&learned);
+    for (int d = 0; d < 7; d++) {
+        sh_sun_list_add(&learned.rise, (int16_t)(6 * 60 + 40 + d * 2));
+        sh_sun_list_add(&learned.set, (int16_t)(17 * 60 + 5 - d * 2));
+    }
+    sh_modes_init(&s_modes, false, &learned, now_s());
     made_up_start();
     printf("page %zu bytes, http://localhost:%d/ (access code %s)\n", page_len, port, CODE);
     fflush(stdout);

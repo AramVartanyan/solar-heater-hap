@@ -6,7 +6,11 @@
  * every appearance and clearing logged; and the status LED (sh_ind -> sh_led), computed when its
  * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control"; the boiling point, the
  * ceiling of the collector protection and the frost threshold come from the installer data
- * (sh_installer_store) and are logged at boot and when they change. */
+ * (sh_installer_store) and are logged at boot and when they change.
+ * Group C: before the pump decision the modes (sh_modes: sunrise / sunset, the season, the night
+ * cooling, the vacation) — the season and the learned values kept in NVS when they change, every
+ * start and end of a cooling session and every change of the season in the log; the air venting
+ * from the web interface. */
 #pragma once
 
 #include "esp_err.h"
@@ -20,6 +24,9 @@ typedef enum {
     SH_CONTROL_TEST_PLUS,       /* start the test, or +60 s */
     SH_CONTROL_TEST_MINUS,      /* -60 s */
     SH_CONTROL_TEST_STOP,       /* stop (not earlier than 1 min after the start) */
+    SH_CONTROL_AIR_START,       /* air venting (web interface) */
+    SH_CONTROL_AIR_STOP,        /* (web interface, short "menu") */
+    SH_CONTROL_RESET_LEARNED,   /* the learned values of the modes (web interface) */
 } sh_control_cmd_t;
 
 esp_err_t sh_control_start(void);

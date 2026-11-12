@@ -8,10 +8,12 @@
  *   kinds    charging (difference, minimum run time, charging with a faulty sensor) / protection
  *            (collector protection, frost protection, the probe at the collector emergency
  *            temperature with a faulty tank sensor — Hot) / other (pump test, anti-seize run, the
- *            probe with a faulty collector sensor)
+ *            probe with a faulty collector sensor, the air venting) / night cooling (group C; its
+ *            own field of the daily record, orange on the chart)
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
  *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
- *            day, the minute of the collector maximum (the first one). At the first step of the
+ *            day, the minute of the collector maximum (the first one), the sunrise and the sunset
+ *            detected that day and the cooling target (group C). At the first step of the
  *            next day (a normal midnight: the next date, before 01:00) the day is handed over to
  *            be written; it is full when it was collected with a set clock from midnight to
  *            midnight, otherwise partial. Any other change of the date (the clock was set to
@@ -35,6 +37,7 @@ typedef enum {
     SH_RUN_CHARGE = 0,
     SH_RUN_PROTECT,
     SH_RUN_OTHER,
+    SH_RUN_COOL,
     SH_RUN_KINDS
 } sh_run_kind_t;
 
@@ -55,6 +58,8 @@ typedef struct {
     bool pump_on;
     sh_pump_reason_t reason;
     uint16_t alarms;            /* SH_ALARM_BIT() of the active codes */
+    int16_t sunrise, sunset;    /* detected today (local minutes), -1: none (sh_sun) */
+    int16_t cool_target;        /* the cooling target in use, 0.1 °C */
 } sh_day_in_t;
 
 /* One finished interval. */
@@ -77,6 +82,8 @@ typedef struct {
     bool col_fault;             /* the collector sensor was faulty at some time */
     uint32_t run_s[SH_RUN_KINDS];
     uint16_t alarms;
+    int16_t sunrise, sunset;    /* local minutes, -1: none */
+    int16_t cool_target;        /* 0.1 °C */
 } sh_day_sum_t;
 
 typedef struct {

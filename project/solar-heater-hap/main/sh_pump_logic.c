@@ -23,7 +23,16 @@ static void decided(sh_pump_state_t *st, bool on, sh_pump_reason_t reason)
 
 int16_t sh_pump_col_protect(const sh_pump_params_t *p)
 {
+    if (p->vacation) {
+        return p->vac_protect;
+    }
     return p->col_protect < p->col_protect_cap ? p->col_protect : p->col_protect_cap;
+}
+
+/* The rules above the cooling stop the pump or run it for their own reason. */
+static void not_cooling(sh_pump_state_t *st)
+{
+    st->cool = false;
 }
 
 void sh_pump_track_limits(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_col, int16_t t_tank)
@@ -51,6 +60,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     if (!col_ok || !tank_ok) {
         st->col_protect = false;
         st->frost = false;
+        not_cooling(st);
         decided(st, false, SH_PUMP_REASON_SENSOR);
         return;
     }
@@ -60,6 +70,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     if (st->col_boiling) {
         st->col_protect = false;
         st->frost = false;
+        not_cooling(st);
         decided(st, false, SH_PUMP_REASON_COL_BOILING);
         return;
     }
@@ -68,6 +79,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     if (st->tank_ceiling) {
         st->col_protect = false;
         st->frost = false;
+        not_cooling(st);
         decided(st, false, SH_PUMP_REASON_TANK_CEILING);
         return;
     }
@@ -84,6 +96,7 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     }
     if (st->col_protect) {
         st->frost = false;
+        not_cooling(st);
         decided(st, true, SH_PUMP_REASON_COL_PROTECT);
         return;
     }
@@ -104,19 +117,46 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
         st->frost = false;
     }
     if (st->frost) {
+        not_cooling(st);
         decided(st, true, SH_PUMP_REASON_FROST);
         return;
     }
 
-    /* 6. Tank Tmax: normal charging stops at once (a limit, not the difference). */
+    /* 6. Night cooling: within the session (sh_cool) the difference the other way round, with the
+     *    minimum times; a pump the cooling ran stops at once when the session is over (the target,
+     *    the sunrise ... — limits, not the difference). */
+    const int32_t diff = (int32_t)t_col - t_tank;
+    if (!p->cool && st->cool) {
+        st->cool = false;
+        st->on = false;
+    }
+    if (p->cool) {
+        const int32_t rdiff = -diff;
+        if (st->on) {
+            const bool keep = rdiff > p->diff_off || elapsed_s < p->min_run_s;
+            decided(st, keep, keep ? SH_PUMP_REASON_COOL : SH_PUMP_REASON_COOL_WAIT);
+        } else {
+            const bool go = rdiff >= p->diff_on && elapsed_s >= p->min_off_s;
+            decided(st, go, go ? SH_PUMP_REASON_COOL : SH_PUMP_REASON_COOL_WAIT);
+        }
+        st->cool = st->on;
+        return;
+    }
+
+    /* 7. Vacation: no normal charging (only the protections above and the night cooling). */
+    if (p->vacation) {
+        decided(st, false, SH_PUMP_REASON_VACATION);
+        return;
+    }
+
+    /* 8. Tank Tmax: normal charging stops at once (a limit, not the difference). */
     if (st->tank_max) {
         decided(st, false, SH_PUMP_REASON_TANK_MAX);
         return;
     }
 
-    /* 7. Difference, with the minimum times and the minimum collector temperature (it only blocks
+    /* 9. Difference, with the minimum times and the minimum collector temperature (it only blocks
      *    the start, a running pump is stopped by the difference). */
-    const int32_t diff = (int32_t)t_col - t_tank;
     if (st->on) {
         if (diff > p->diff_off) {
             decided(st, true, SH_PUMP_REASON_DIFF);
@@ -152,6 +192,9 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_MIN_RUN]      = "minimum run time",
         [SH_PUMP_REASON_MIN_OFF]      = "minimum off time",
         [SH_PUMP_REASON_COL_MIN]      = "collector below minimum",
+        [SH_PUMP_REASON_COOL]         = "night cooling",
+        [SH_PUMP_REASON_COOL_WAIT]    = "night cooling: difference too small",
+        [SH_PUMP_REASON_VACATION]     = "vacation: no charging",
         [SH_PUMP_REASON_TEST]         = "pump test",
         [SH_PUMP_REASON_ANTI_SEIZE]   = "anti-seize",
         [SH_PUMP_REASON_BOTH_FAULT]   = "both sensors faulty",
@@ -163,6 +206,8 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_CF_RUN]       = "collector sensor faulty: tank rises",
         [SH_PUMP_REASON_CF_WAIT]      = "collector sensor faulty: waiting for probe",
         [SH_PUMP_REASON_CF_HEATER]    = "collector sensor faulty: heater, probe postponed",
+        [SH_PUMP_REASON_AIR_RUN]      = "air venting: run",
+        [SH_PUMP_REASON_AIR_PAUSE]    = "air venting: pause",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && names[reason] != NULL) {
         return names[reason];

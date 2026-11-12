@@ -7,17 +7,22 @@
  * Order, first match wins:
  *   1. pump test           -> on; only the boiling point and the tank ceiling stop it (and end it;
  *                             a test asked for while one of them is active ends at once)
- *   2. anti-seize run      -> on for 60 s; the same two limits stop and end it
- *   3. the mode chosen by the sensor faults:
+ *   2. air venting         -> 3 cycles of run (on) and pause (off), from the web interface; the
+ *                             same two limits stop and end it, and "stop" (web, short "menu")
+ *   3. anti-seize run      -> on for 60 s; the same two limits stop and end it
+ *   4. the mode chosen by the sensor faults:
  *        both faulty       -> off
- *        none faulty       -> sh_pump_decide() (normal mode, with the frost protection; it is
- *                             not checked while a sensor is faulty)
+ *        none faulty       -> sh_pump_decide() (normal mode, with the frost protection, the
+ *                             night cooling and the vacation; they are not checked while a sensor
+ *                             is faulty)
  *        tank faulty       -> by the collector: on at >= 60 °C, off below 58 °C, off at >= 95 °C
  *                             (until below 93 °C), probe at the collector emergency temperature
  *        collector faulty  -> probes of 10 min: does the tank rise >= 0.5 K?
- *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
+ *   5. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
- * The end of the test and of the anti-seize run is handled like a stopped pump whose minimum off
+ * The air venting replaces a running test, anti-seize run or probe; "+" does not start a test
+ * during it. The end of the test, of the air venting and of the anti-seize run is handled like a
+ * stopped pump whose minimum off
  * time is over: the pump keeps running if the mode would start it (its minimum run time counts from
  * then), otherwise it stops and the minimum off time counts from then. */
 #pragma once
@@ -25,6 +30,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "sh_pump_logic.h"
+#include "sh_installer.h"       /* SH_AIR_* */
 
 /* Pump test */
 #define SH_PUMP_TEST_STEP_S         60          /* "+" / "-" during the test */
@@ -70,6 +76,8 @@ typedef enum {
 #define SH_PUMP_EVT_TEST_END        0x02
 #define SH_PUMP_EVT_SEIZE_START     0x04
 #define SH_PUMP_EVT_SEIZE_END       0x08
+#define SH_PUMP_EVT_AIR_START       0x10
+#define SH_PUMP_EVT_AIR_END         0x20
 
 /* Everything the control keeps between the steps; all zeros at boot (pump off since 0 s). */
 typedef struct {
@@ -84,6 +92,12 @@ typedef struct {
     bool test;
     uint32_t test_start_s;
     uint32_t test_end_s;
+
+    /* air venting */
+    bool air;
+    uint32_t air_start_s;
+    uint32_t air_end_s;         /* planned end, or the time of "stop" */
+    uint32_t air_pause_s;       /* pause of each cycle */
 
     /* anti-seize */
     bool seize;
@@ -122,6 +136,15 @@ void sh_pump_ctl_step(sh_pump_ctl_t *ctl, const sh_pump_params_t *p, const sh_pu
 void sh_pump_ctl_plus(sh_pump_ctl_t *ctl, uint32_t test_s, uint32_t now_s);
 void sh_pump_ctl_minus(sh_pump_ctl_t *ctl, uint32_t now_s);
 void sh_pump_ctl_stop(sh_pump_ctl_t *ctl, uint32_t now_s);
+
+/* Air venting: start (3 cycles of SH_AIR_RUN_S run + `pause_s` pause; a running venting goes on as
+ * it is) and stop (at once). */
+void sh_pump_ctl_air_start(sh_pump_ctl_t *ctl, uint32_t pause_s, uint32_t now_s);
+void sh_pump_ctl_air_stop(sh_pump_ctl_t *ctl, uint32_t now_s);
+
+/* The air venting at `now_s`: false without it; the cycle (1 ...), the phase (run / pause) and the
+ * seconds left of the whole venting. */
+bool sh_pump_ctl_air(const sh_pump_ctl_t *ctl, uint32_t now_s, uint8_t *cycle, bool *run, uint32_t *left_s);
 
 /* Seconds left of the test (0 without a test). */
 uint32_t sh_pump_ctl_test_left(const sh_pump_ctl_t *ctl, uint32_t now_s);

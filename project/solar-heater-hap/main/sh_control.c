@@ -14,6 +14,9 @@
 #include "sh_ind.h"
 #include "sh_settings_store.h"
 #include "sh_installer_store.h"
+#include "sh_learned_store.h"
+#include "sh_modes.h"
+#include "sh_clock.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -51,27 +54,29 @@ static sh_ind_in_t s_ind_in;
 static bool s_ind_done;
 
 static QueueHandle_t s_cmds;
+static sh_modes_t s_modes;
+static sh_state_modes_t s_published;
+static bool s_published_vac, s_published_done;
 
-/* The menu settings (whole K / °C), Kconfig "Control" (minutes, °C) -> tenths and seconds, and
- * the limits computed from the installer data. Read on every cycle: a change applies at once. */
-static void get_params(sh_pump_params_t *p, uint32_t *test_s)
+/* The menu settings of the season in use (whole K / °C), Kconfig "Control" (minutes, °C) -> tenths
+ * and seconds, and the limits computed from the installer data. Read on every cycle: a change
+ * applies at once. */
+static void get_params(const sh_settings_t *s, const sh_limits_t *lim, bool winter, sh_pump_params_t *p)
 {
-    sh_settings_t s;
-    sh_settings_get(&s);
-    p->diff_on = (int16_t)(s.v[SH_SET_DIFF_ON] * 10);
-    p->diff_off = (int16_t)(s.v[SH_SET_DIFF_OFF] * 10);
+    p->diff_on = (int16_t)(s->v[sh_settings_seasonal(SH_SET_DIFF_ON, winter)] * 10);
+    p->diff_off = (int16_t)(s->v[sh_settings_seasonal(SH_SET_DIFF_OFF, winter)] * 10);
     p->min_run_s = CONFIG_SH_MIN_RUN_MIN * 60;
     p->min_off_s = CONFIG_SH_MIN_OFF_MIN * 60;
-    p->tank_max = (int16_t)(s.v[SH_SET_TANK_MAX] * 10);
-    p->col_min = (int16_t)(s.v[SH_SET_COL_MIN] * 10);
+    p->tank_max = (int16_t)(s->v[SH_SET_TANK_MAX] * 10);
+    p->col_min = (int16_t)(s->v[sh_settings_seasonal(SH_SET_COL_MIN, winter)] * 10);
     p->col_protect = SH_CONTROL_COL_PROTECT;
-    sh_limits_t lim;
-    sh_installer_get(NULL, &lim);
-    p->col_protect_cap = lim.protect_cap;
-    p->col_boiling = lim.boiling;
+    p->col_protect_cap = lim->protect_cap;
+    p->col_boiling = lim->boiling;
     p->frost_on = sh_settings_frost();
-    p->frost = lim.frost;
-    *test_s = (uint32_t)s.v[SH_SET_TEST_S];
+    p->frost = lim->frost;
+    p->vacation = s->v[SH_SET_VACATION] != 0;
+    p->vac_protect = lim->vac_protect;
+    p->cool = false;
 }
 
 /* monotonic seconds since boot (not the time of day) */
@@ -90,15 +95,109 @@ static const char *temp_str(char *buf, size_t size, int16_t t_tenths, bool fault
     return buf;
 }
 
+/* The log of the modes: the season, the start and end of a cooling session; the learned values and
+ * the recognised season kept in NVS when they change. */
+static void modes_log(const sh_modes_t *m, const sh_state_t *st, bool was_winter)
+{
+    char tank[12], goal[12];
+    temp_str(tank, sizeof(tank), st->t_tank, st->tank_fault);
+    if (m->changed & SH_MODES_CH_SEASON) {
+        sh_settings_set_auto_winter(m->season.winter);
+    }
+    if (m->winter != was_winter) {
+        ESP_LOGI(TAG, "season: %s", m->winter ? "winter" : "summer");
+    }
+    if (m->changed & SH_MODES_CH_LEARNED) {
+        sh_learned_save(&m->learned);
+    }
+    if (m->sun_evt & SH_SUN_EVT_RISE) {
+        ESP_LOGI(TAG, "sunrise (collector rises with the pump off)");
+    }
+    if (m->sun_evt & SH_SUN_EVT_SET) {
+        ESP_LOGI(TAG, "sunset (collector below the tank)");
+    }
+    const sh_cool_t *c = &m->cool;
+    if (c->events & SH_COOL_EVT_END) {
+        ESP_LOGI(TAG, "night cooling ended (%s): %s, tank %s °C", sh_cool_why_name(c->ended),
+                 sh_cool_end_name(c->end), tank);
+    }
+    if (c->events & SH_COOL_EVT_START) {
+        if (c->why == SH_COOL_VACATION) {
+            ESP_LOGI(TAG, "night cooling started (vacation): until equalisation, tank %s °C", tank);
+        } else {
+            ESP_LOGI(TAG, "night cooling started (%s): target %s °C, tank %s °C", sh_cool_why_name(c->why),
+                     temp_str(goal, sizeof(goal), c->target, false), tank);
+        }
+    }
+    if (c->events & SH_COOL_EVT_LEARNED) {
+        ESP_LOGW(TAG, "E4 after a night with cooling: the cooling target is lowered (correction %d K)",
+                 m->learned.cool.offset / 10);
+    }
+}
+
+/* The state of the modes and of the air venting, published when it changes. */
+static void publish_modes(const sh_pump_ctl_t *pump, bool vacation, uint32_t now)
+{
+    const sh_modes_t *m = &s_modes;
+    sh_state_modes_t pm;
+    memset(&pm, 0, sizeof(pm));     /* padding too: compared with memcmp() */
+    pm.winter = m->winter;
+    pm.cool_why = (uint8_t)m->cool.why;
+    pm.cool_goal = m->cool.why != SH_COOL_NONE ? m->cool.target : SH_TEMP_INVALID;
+    pm.cool_until = m->cool.why != SH_COOL_NONE ? m->cool.until : -1;
+    pm.cool_heater = m->cool.heater;
+    pm.cool_target = m->target;
+    pm.cool_learned = m->learned.cool.offset;
+    pm.sun_rise = m->sun.rise_min;
+    pm.sun_set = m->sun.set_min;
+    pm.avg_rise = sh_sun_list_avg(&m->learned.rise);
+    pm.avg_set = sh_sun_list_avg(&m->learned.set);
+    uint32_t left_s;
+    pm.air = sh_pump_ctl_air(pump, now, &pm.air_cycle, &pm.air_run, &left_s);
+    pm.air_left_s = left_s;
+    pm.air_start_s = pm.air ? pump->air_start_s : 0;
+    if (!s_published_done || vacation != s_published_vac || memcmp(&pm, &s_published, sizeof(pm)) != 0) {
+        sh_state_set_modes(vacation, &pm);
+        s_published = pm;
+        s_published_vac = vacation;
+        s_published_done = true;
+    }
+}
+
 /* One decision; `cmd` (may be NULL) is a button command applied first. */
 static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
 {
     sh_state_t st;
     sh_state_get(&st);              /* the last values published by the measurement task */
-    sh_pump_params_t params;
-    uint32_t test_s;
-    get_params(&params, &test_s);
+    sh_settings_t set;
+    sh_settings_get(&set);
+    sh_installer_t inst;
+    sh_limits_t lim;
+    sh_installer_get(&inst, &lim);
+    const uint32_t test_s = (uint32_t)set.v[SH_SET_TEST_S];
     const uint32_t now = now_s();
+
+    /* the modes: sunrise / sunset, the season, the night cooling, the vacation */
+    sh_clock_info_t ci;
+    sh_clock_get(&ci);
+    const bool col_ok = !st.col_fault && st.t_col != SH_TEMP_INVALID;
+    const bool tank_ok = !st.tank_fault && st.t_tank != SH_TEMP_INVALID;
+    const sh_modes_in_t modes_in = {
+        .t_col = col_ok ? st.t_col : SH_TEMP_INVALID, .t_tank = tank_ok ? st.t_tank : SH_TEMP_INVALID,
+        .pump_on = pump->on,
+        .charging = pump->on && (pump->reason == SH_PUMP_REASON_DIFF || pump->reason == SH_PUMP_REASON_MIN_RUN),
+        .tank_max = pump->norm.tank_max, .e4 = (s_alarm.active & SH_ALARM_BIT(SH_ALARM_E4)) != 0,
+        .set = &set, .inst = &inst,
+        .clock_set = ci.lt.set, .reliable = ci.trust == SH_CLOCK_RELIABLE, .day = ci.lt.day, .min = ci.lt.min,
+        .has_dst = ci.has_dst, .dst = ci.dst,
+    };
+    const bool was_winter = s_modes.winter;
+    sh_modes_step(&s_modes, &modes_in, now);
+    modes_log(&s_modes, &st, was_winter);
+
+    sh_pump_params_t params;
+    get_params(&set, &lim, s_modes.winter, &params);
+    params.cool = s_modes.cool.why != SH_COOL_NONE;
 
     /* the computed limits: at boot and whenever the installer data change them */
     static sh_pump_params_t s_logged = { .col_boiling = INT16_MIN };
@@ -132,6 +231,20 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
         case SH_CONTROL_TEST_STOP:
             sh_pump_ctl_stop(pump, now);
             break;
+        case SH_CONTROL_AIR_START:
+            sh_pump_ctl_air_start(pump, sh_air_pause_s(&inst), now);
+            break;
+        case SH_CONTROL_AIR_STOP:
+            if (pump->air) {
+                ESP_LOGI(TAG, "air venting: stop");
+            }
+            sh_pump_ctl_air_stop(pump, now);
+            break;
+        case SH_CONTROL_RESET_LEARNED:
+            sh_modes_reset_learned(&s_modes);
+            sh_learned_save(&s_modes.learned);
+            ESP_LOGW(TAG, "learned values reset (sunrise / sunset, cooling target)");
+            break;
         }
         if (was_test && pump->test && pump->test_end_s != was_end) {
             ESP_LOGI(TAG, "pump test: %lu s left", (unsigned long)sh_pump_ctl_test_left(pump, now));
@@ -157,7 +270,15 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     if (pump->events & SH_PUMP_EVT_SEIZE_END) {
         ESP_LOGI(TAG, "anti-seize run ended");
     }
+    if (pump->events & SH_PUMP_EVT_AIR_START) {
+        ESP_LOGI(TAG, "air venting started: %d x (%lu s run + %lu s pause)", SH_AIR_CYCLES,
+                 (unsigned long)SH_AIR_RUN_S, (unsigned long)pump->air_pause_s);
+    }
+    if (pump->events & SH_PUMP_EVT_AIR_END) {
+        ESP_LOGI(TAG, "air venting ended");
+    }
     pump->events = 0;
+    publish_modes(pump, set.v[SH_SET_VACATION] != 0, now);
 
     if (pump->test != was_test || pump->test_end_s != was_end) {
         sh_state_set_test(pump->test, pump->test_start_s, pump->test_end_s);
@@ -200,7 +321,8 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     iin.pump_on = pump->on;
     iin.t_col = st.t_col;
     iin.col_fault = st.col_fault;
-    iin.vacation = st.vacation;
+    iin.vacation = set.v[SH_SET_VACATION] != 0;
+    iin.cooling = pump->on && pump->reason == SH_PUMP_REASON_COOL;
     iin.wifi_connected = st.wifi_connected;
     iin.wifi_portal = st.wifi_portal;
     if (!s_ind_done || memcmp(&iin, &s_ind_in, sizeof(iin)) != 0) {
@@ -242,6 +364,9 @@ void sh_control_cmd(sh_control_cmd_t cmd)
 
 esp_err_t sh_control_start(void)
 {
+    sh_learned_t learned;
+    sh_learned_load(&learned);
+    sh_modes_init(&s_modes, sh_settings_auto_winter(), &learned, now_s());
     s_cmds = xQueueCreate(4, sizeof(sh_control_cmd_t));
     if (!s_cmds || xTaskCreate(control_task, "sh_control", 4096, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "control task not created");

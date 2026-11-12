@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "test_util.h"
+#include "sh_cool.h"
 #include "sh_state.h"
 #include "sh_alarm.h"
 #include "sh_web_api.h"
@@ -17,9 +18,9 @@
 static sh_web_config_t config(void)
 {
     const sh_web_config_t c = {
-        .settings = { .v = { 70, 25, 6, 4, 300 } },
+        .settings = { .v = { SH_SSN_AUTO, 0, 70, 25, 6, 4, 300, 15, 5, 3, 1, 0 } },
         .frost = true,
-        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120 } },
+        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150 } },
     };
     return c;
 }
@@ -31,6 +32,8 @@ static sh_web_status_t status(void)
         .cfg = config(), .col_protect = 1100,
         .name = "solar-heater", .version = "0.1.0", .serial = "E8F60A810841", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
+        .modes = { .cool_goal = SH_TEMP_INVALID, .cool_until = -1, .cool_target = 663,
+                   .sun_rise = -1, .sun_set = -1, .avg_rise = -1, .avg_set = -1 },
     };
     return s;
 }
@@ -55,19 +58,36 @@ static void test_status(void)
         "{\"name\":\"solar-heater\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810841\","
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
-        "\"chart\",\"learned\"],"
+        "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\","
+        "\"tank_vol\",\"vac_limit\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
-        "\"set\":{\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
+        "\"set\":{\"ssn\":{\"v\":2,\"min\":0,\"max\":2,\"step\":1},"
+        "\"hol\":{\"v\":0,\"min\":0,\"max\":1,\"step\":1},"
+        "\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
         "\"c_lo\":{\"v\":25,\"min\":10,\"max\":80,\"step\":1},"
         "\"d_on\":{\"v\":6,\"min\":5,\"max\":20,\"step\":1},"
         "\"d_of\":{\"v\":4,\"min\":1,\"max\":5,\"step\":1},"
-        "\"t_st\":{\"v\":300,\"min\":60,\"max\":900,\"step\":30}},\"fro\":1,"
-        "\"inst\":{\"fluid\":{\"v\":0,\"min\":0,\"max\":1},\"glycol\":{\"v\":0,\"min\":0,\"max\":60},"
-        "\"press\":{\"v\":15,\"min\":5,\"max\":60},\"col_max\":{\"v\":120,\"min\":100,\"max\":250}},"
-        "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40},"
+        "\"t_st\":{\"v\":300,\"min\":60,\"max\":900,\"step\":30},"
+        "\"c_lo_w\":{\"v\":15,\"min\":10,\"max\":80,\"step\":1},"
+        "\"d_on_w\":{\"v\":5,\"min\":4,\"max\":20,\"step\":1},"
+        "\"d_of_w\":{\"v\":3,\"min\":1,\"max\":4,\"step\":1},"
+        "\"nc\":{\"v\":1,\"min\":0,\"max\":1,\"step\":1},"
+        "\"nc_w\":{\"v\":0,\"min\":0,\"max\":1,\"step\":1}},\"fro\":1,"
+        "\"inst\":{\"fluid\":{\"v\":0,\"min\":0,\"max\":1,\"step\":1},"
+        "\"glycol\":{\"v\":0,\"min\":0,\"max\":60,\"step\":1},"
+        "\"press\":{\"v\":15,\"min\":5,\"max\":60,\"step\":1},"
+        "\"col_max\":{\"v\":120,\"min\":100,\"max\":250,\"step\":1},"
+        "\"col_type\":{\"v\":0,\"min\":0,\"max\":1,\"step\":1},"
+        "\"area\":{\"v\":20,\"min\":5,\"max\":200,\"step\":1},"
+        "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10}},"
+        "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900,"
+        "\"cool\":663},"
+        "\"sea\":0,\"cool\":{\"why\":\"\",\"goal\":null,\"until\":null,\"heater\":0,\"tgt\":663,\"learn\":0},"
+        "\"sun\":{\"rise\":null,\"set\":null,\"arise\":null,\"aset\":null},"
+        "\"air\":{\"on\":0,\"cyc\":0,\"run\":0,\"left\":0,\"n\":3,\"run_s\":300,\"pause_s\":600},"
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
-        "\"run\":[0,0,0]}") == 0);
+        "\"run\":[0,0,0,0]}") == 0);
 }
 
 static void test_status_values(void)
@@ -125,10 +145,12 @@ static void test_status_values(void)
 
     /* the installer data and what is computed from them; the protection limited by the cap */
     s = status();
-    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 9, 22, 150 } };
+    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 9, 22, 150, SH_COL_FLAT, 20, 150 } };
     s.col_protect = 1400;
-    HAS(&s, "\"inst\":{\"fluid\":{\"v\":1,\"min\":0,\"max\":1},\"glycol\":{\"v\":9,");
-    HAS(&s, "\"calc\":{\"boil\":1365,\"cap\":1265,\"prot\":1265,\"prot_set\":1400,\"frost\":13}");
+    HAS(&s, "\"inst\":{\"fluid\":{\"v\":1,\"min\":0,\"max\":1,\"step\":1},\"glycol\":{\"v\":9,");
+    HAS(&s, "\"calc\":{\"boil\":1365,\"cap\":1265,\"prot\":1265,\"prot_set\":1400,\"frost\":13,"
+            "\"vac\":1125,\"cool\":663}");
+    HAS(&s, "\"pause_s\":762}");                  /* 9 % glycol: 1.27 x 10 min */
 
     /* text values are escaped; no network -> empty strings */
     s = status();
@@ -144,13 +166,14 @@ static void test_status_values(void)
     /* a missing function is not in the list (the page greys it out) */
     s = status();
     HAS(&s, "\"frost\"");
-    HAS_NOT(&s, "\"vacation\"");
+    HAS(&s, "\"vacation\"");
     HAS_NOT(&s, "\"ota\"");
+    HAS_NOT(&s, "\"mount\"");
 
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"learned\",\"history\"],");
+    HAS(&s, "\"vac_limit\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -159,14 +182,86 @@ static void test_status_values(void)
     s.run_s[SH_RUN_CHARGE] = 7229;          /* 120.5 min */
     s.run_s[SH_RUN_PROTECT] = 29;
     s.run_s[SH_RUN_OTHER] = 30;
+    s.run_s[SH_RUN_COOL] = 5400;
     HAS(&s, "\"clock\":{\"st\":\"ok\",\"sntp\":1,\"min\":872,\"tz\":\"Europe/Sofia\",\"tzok\":1,"
-            "\"peak\":790},\"run\":[120,0,1]}");
+            "\"peak\":790},\"run\":[120,0,1,90]}");
     s.clock.trust = SH_CLOCK_TZ_UNCONFIRMED;
     HAS(&s, "\"st\":\"tz\"");
     s.clock.trust = SH_CLOCK_UNRELIABLE;
     HAS(&s, "\"st\":\"bad\"");
     s.clock.trust = SH_CLOCK_UNSET;         /* not set: no time */
     HAS(&s, "\"st\":\"unset\",\"sntp\":1,\"min\":null,");
+}
+
+/* Group C: the season, the night cooling, the sunrise / sunset, the air venting, the vacation */
+static void test_status_modes(void)
+{
+    sh_web_status_t s = status();
+    s.modes.winter = true;
+    s.cfg.settings.v[SH_SET_VACATION] = 1;
+    HAS(&s, "\"sea\":1,");
+    HAS(&s, "\"hol\":{\"v\":1,");
+
+    s = status();
+    s.modes.cool_why = SH_COOL_TMAX;
+    s.modes.cool_goal = 627;
+    s.modes.cool_until = 420;
+    s.modes.cool_target = 627;
+    s.modes.cool_learned = -30;
+    HAS(&s, "\"cool\":{\"why\":\"tmax\",\"goal\":627,\"until\":420,\"heater\":0,\"tgt\":627,\"learn\":-30}");
+    s.modes.cool_why = SH_COOL_E4;
+    HAS(&s, "\"why\":\"e4\"");
+    s.modes.cool_why = SH_COOL_VACATION;            /* equalisation, until the sunrise */
+    s.modes.cool_goal = SH_TEMP_INVALID;
+    s.modes.cool_until = -1;
+    HAS(&s, "\"cool\":{\"why\":\"vac\",\"goal\":null,\"until\":null,");
+    s.modes.cool_why = SH_COOL_NONE;                /* no session: no target, no end */
+    s.modes.cool_goal = 627;
+    s.modes.cool_until = 420;
+    s.modes.cool_heater = true;
+    HAS(&s, "\"cool\":{\"why\":\"\",\"goal\":null,\"until\":null,\"heater\":1,");
+
+    s = status();
+    s.modes.sun_rise = 401;
+    s.modes.sun_set = 1012;
+    s.modes.avg_rise = 0;                           /* midnight is a time, not "none" */
+    s.modes.avg_set = 1020;
+    HAS(&s, "\"sun\":{\"rise\":401,\"set\":1012,\"arise\":0,\"aset\":1020}");
+
+    s = status();
+    s.modes.air = true;
+    s.modes.air_cycle = 2;
+    s.modes.air_run = false;
+    s.modes.air_left_s = 1234;
+    HAS(&s, "\"air\":{\"on\":1,\"cyc\":2,\"run\":0,\"left\":1234,\"n\":3,\"run_s\":300,\"pause_s\":600}");
+
+    s = status();
+    s.reason = SH_PUMP_REASON_COOL;
+    HAS(&s, "\"why\":\"cool\"");
+    s.reason = SH_PUMP_REASON_VACATION;
+    s.pump_on = false;
+    HAS(&s, "\"why\":\"vacation\"");
+    s.reason = SH_PUMP_REASON_AIR_PAUSE;
+    HAS(&s, "\"why\":\"air_pause\"");
+}
+
+/* "set": the group C values */
+static void test_set_group_c(void);
+
+/* "air" */
+static void test_air(void)
+{
+    sh_web_air_t cmd = SH_WEB_AIR_NONE;
+    CHECK_EQ(sh_web_air("cmd=start", false, &cmd), SH_WEB_OK);      /* no code */
+    CHECK_EQ(cmd, SH_WEB_AIR_START);
+    CHECK_EQ(sh_web_air("cmd=start", true, &cmd), SH_WEB_OK);       /* already running */
+    CHECK_EQ(cmd, SH_WEB_AIR_NONE);
+    CHECK_EQ(sh_web_air("cmd=stop", true, &cmd), SH_WEB_OK);
+    CHECK_EQ(cmd, SH_WEB_AIR_STOP);
+    CHECK_EQ(sh_web_air("cmd=stop", false, &cmd), SH_WEB_OK);
+    CHECK_EQ(cmd, SH_WEB_AIR_NONE);
+    CHECK_EQ(sh_web_air("cmd=go", false, &cmd), SH_WEB_BAD);
+    CHECK_EQ(sh_web_air("x=start", false, &cmd), SH_WEB_BAD);
 }
 
 static void test_status_buffer(void)
@@ -179,8 +274,8 @@ static void test_status_buffer(void)
     s.alarms = 0x7F;
     s.test_on = true;
     s.test_left_s = 900;
-    s.cfg.settings = (sh_settings_t){ .v = { 85, 80, 20, 15, 900 } };
-    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250 } };
+    s.cfg.settings = (sh_settings_t){ .v = { SH_SSN_AUTO, 0, 85, 80, 20, 15, 900, 15, 5, 3, 1, 0 } };
+    s.cfg.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 60, 60, 250, SH_COL_FLAT, 20, 150 } };
     s.col_protect = 1600;
     s.name = "0123456789012345678901234567890";
     s.version = "0123456789012345678901234567890";
@@ -189,8 +284,16 @@ static void test_status_buffer(void)
     s.rssi = -100;
     s.clock = (sh_web_clock_t){ .trust = SH_CLOCK_UNRELIABLE, .sntp = true, .min = 1439,
                                 .tz = "0123456789012345678901234567890", .tz_confirmed = true, .peak = 1439 };
-    s.run_s[0] = s.run_s[1] = s.run_s[2] = 86400;
+    s.run_s[0] = s.run_s[1] = s.run_s[2] = s.run_s[3] = 86400;
     s.history = true;
+    s.cfg.settings.v[SH_SET_COL_MIN_W] = -1234;
+    s.cfg.inst.v[SH_INST_TANK_VOL] = 1000;
+    s.cfg.inst.v[SH_INST_AREA] = 200;
+    s.modes = (sh_state_modes_t){ .winter = true, .cool_why = SH_COOL_VACATION, .cool_goal = -1234,
+                                  .cool_until = 1439, .cool_heater = true, .cool_target = -1234,
+                                  .cool_learned = -200, .sun_rise = 1439, .sun_set = 1439, .avg_rise = 1439,
+                                  .avg_set = 1439, .air = true, .air_cycle = 3, .air_run = true,
+                                  .air_left_s = 10800 };
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
 
@@ -300,13 +403,53 @@ static void test_set_installer(void)
     CHECK_EQ(set("fluid=1&glycol=61&code=" CODE, &c, &ch), SH_WEB_BAD);
     CHECK_EQ(set("glycol=30&code=" CODE, &c, &ch), SH_WEB_BAD);     /* the fluid is water */
     CHECK_EQ(set("fluid=0&glycol=30&code=" CODE, &c, &ch), SH_WEB_BAD);
-    c.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 40, 22, 150 } };
+    c.inst = (sh_installer_t){ .v = { SH_FLUID_GLYCOL, 40, 22, 150, SH_COL_FLAT, 20, 150 } };
     CHECK_EQ(sh_web_set("glycol=45&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
     CHECK_EQ(c.inst.v[SH_INST_GLYCOL], 45);
     CHECK_EQ(sh_web_set("fluid=0&code=" CODE, CODE, &c, &ch), SH_WEB_OK);
     CHECK_EQ(c.inst.v[SH_INST_FLUID], SH_FLUID_WATER);
     CHECK_EQ(c.inst.v[SH_INST_GLYCOL], 0);
     CHECK_EQ(c.inst.v[SH_INST_PRESSURE], 22);                       /* the others stay */
+}
+
+static void test_set_group_c(void)
+{
+    sh_web_config_t c;
+    unsigned ch;
+
+    /* season, vacation, the winter values, the night cooling switches: no code */
+    CHECK_EQ(set("ssn=1", &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.settings.v[SH_SET_SEASON], SH_SSN_WINTER);
+    CHECK_EQ(ch, SH_WEB_CH_SETTINGS);
+    CHECK_EQ(set("ssn=3", &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("hol=1", &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.settings.v[SH_SET_VACATION], 1);
+    CHECK_EQ(set("hol=2", &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("c_lo_w=12&d_on_w=7&d_of_w=6", &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.settings.v[SH_SET_COL_MIN_W], 12);
+    CHECK_EQ(c.settings.v[SH_SET_DIFF_ON_W], 7);
+    CHECK_EQ(c.settings.v[SH_SET_DIFF_OFF_W], 6);
+    CHECK_EQ(c.settings.v[SH_SET_COL_MIN], 25);                     /* the summer values stay */
+    CHECK_EQ(set("d_of_w=5", &c, &ch), SH_WEB_BAD);                 /* not below the winter d.on 5 */
+    CHECK_EQ(set("d_of_w=4", &c, &ch), SH_WEB_OK);
+    CHECK_EQ(set("nc=0&nc_w=1", &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.settings.v[SH_SET_NIGHT_COOL], 0);
+    CHECK_EQ(c.settings.v[SH_SET_NIGHT_COOL_W], 1);
+    CHECK_EQ(set("nc=2", &c, &ch), SH_WEB_BAD);
+
+    /* the collector type and area, the tank volume: installer data, with the code */
+    CHECK_EQ(set("col_type=1", &c, &ch), SH_WEB_DENIED);
+    CHECK_EQ(set("col_type=1&area=18&tank_vol=120&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_COL_TYPE], SH_COL_TUBES);
+    CHECK_EQ(c.inst.v[SH_INST_AREA], 18);
+    CHECK_EQ(c.inst.v[SH_INST_TANK_VOL], 120);
+    CHECK_EQ(ch, SH_WEB_CH_INSTALLER);
+    CHECK_EQ(set("col_type=2&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("area=4&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("area=201&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("tank_vol=125&code=" CODE, &c, &ch), SH_WEB_BAD);  /* off the 10 l step */
+    CHECK_EQ(set("tank_vol=1010&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("tank_vol=50&code=" CODE, &c, &ch), SH_WEB_OK);
 }
 
 static void test_set_malformed(void)
@@ -407,7 +550,7 @@ static void test_chart(void)
     int len = sh_web_chart_json(s_big, sizeof(s_big), &d, &lt, t);
     CHECK(len > 0);
     /* (the temperatures at the end: taken at the first step of the next interval) */
-    CHECK(strcmp(s_big, "{\"day\":1,\"pts\":[[10,600,400,10,0,0],[20,1150,null,10,0,0]]}") == 0);
+    CHECK(strcmp(s_big, "{\"day\":1,\"pts\":[[10,600,400,10,0,0,0],[20,1150,null,10,0,0,0]]}") == 0);
 
     /* without a clock: from now, in minutes */
     sh_day_init(&d);
@@ -416,7 +559,16 @@ static void test_chart(void)
         sh_day_step(&d, &warm, &none, t, &done);
     }
     len = sh_web_chart_json(s_big, sizeof(s_big), &d, &none, 1830);
-    CHECK(strcmp(s_big, "{\"day\":0,\"pts\":[[-20,600,400,10,0,0],[-10,600,400,10,0,0],[0,600,400,10,0,0]]}") == 0);
+    CHECK(strcmp(s_big, "{\"day\":0,\"pts\":[[-20,600,400,10,0,0,0],[-10,600,400,10,0,0,0],[0,600,400,10,0,0,0]]}") == 0);
+
+    /* the night cooling: its own column (orange on the page) */
+    sh_day_init(&d);
+    const sh_day_in_t cool = { .t_col = 500, .t_tank = 700, .pump_on = true, .reason = SH_PUMP_REASON_COOL };
+    for (t = 0; t <= 660; t += 60) {
+        sh_day_step(&d, &cool, &none, t, &done);
+    }
+    len = sh_web_chart_json(s_big, sizeof(s_big), &d, &none, 660);
+    CHECK(strcmp(s_big, "{\"day\":0,\"pts\":[[-1,500,700,0,0,0,10]]}") == 0);
 
     /* a full chart fits the buffer of the firmware */
     sh_day_init(&d);
@@ -439,6 +591,7 @@ static void test_days(void)
     r[0].tank_min = 402;
     r[0].run_min[0] = 190;
     r[0].run_min[1] = 4;
+    r[0].cool_min = 95;
     r[0].alarms = SH_ALARM_BIT(SH_ALARM_E1) | SH_ALARM_BIT(SH_ALARM_HOT);
     r[0].peak_min = 790;
     r[0].clock_reliable = true;
@@ -448,9 +601,9 @@ static void test_days(void)
     CHECK(sh_web_days_json(buf, sizeof(buf), true, r, 2) > 0);
     CHECK(strcmp(buf, "{\"on\":1,\"days\":["
                       "{\"d\":\"2026-11-11\",\"cx\":853,\"cn\":-52,\"tx\":611,\"tn\":402,\"run\":[190,4,0],"
-                      "\"al\":[\"E1\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
+                      "\"cool\":95,\"al\":[\"E1\",\"Hot\"],\"pk\":790,\"rel\":1,\"part\":0},"
                       "{\"d\":\"2026-11-10\",\"cx\":null,\"cn\":null,\"tx\":null,\"tn\":null,\"run\":[0,0,0],"
-                      "\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
+                      "\"cool\":0,\"al\":[],\"pk\":null,\"rel\":0,\"part\":1}]}") == 0);
     CHECK(sh_web_days_json(buf, sizeof(buf), false, r, 0) > 0);
     CHECK(strcmp(buf, "{\"on\":0,\"days\":[]}") == 0);
 
@@ -458,7 +611,7 @@ static void test_days(void)
     for (int i = 0; i < SH_WEB_DAYS; i++) {
         sh_hist_rec_init(&r[i], 0xFFFE);
         r[i].col_max = r[i].col_min = r[i].tank_max = r[i].tank_min = -1234;
-        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = 65535;
+        r[i].run_min[0] = r[i].run_min[1] = r[i].run_min[2] = r[i].cool_min = 65535;
         r[i].alarms = 0x7F;
         r[i].peak_min = 1439;
     }
@@ -506,10 +659,13 @@ int main(void)
 {
     test_status();
     test_status_values();
+    test_status_modes();
     test_status_buffer();
     test_set_settings();
     test_set_installer();
+    test_set_group_c();
     test_set_malformed();
+    test_air();
     test_code();
     test_pump_test();
     test_reset();

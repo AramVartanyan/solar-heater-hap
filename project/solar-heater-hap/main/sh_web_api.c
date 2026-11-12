@@ -7,6 +7,7 @@
 #include "sh_state.h"           /* SH_TEMP_INVALID */
 #include "sh_alarm.h"
 #include "sh_tz.h"
+#include "sh_cool.h"
 #include "sh_web_api.h"
 
 /* The functions this firmware has. A step that adds a function adds its name here and wires its
@@ -16,6 +17,7 @@ static const char *const FEATURES[] = {
     "alarms", "temps", "pump", "pump_test", "settings", "frost",
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
+    "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -124,14 +126,39 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
 
     put(&o, "\"inst\":{");
     for (int id = 0; id < SH_INST_COUNT; id++) {
-        put(&o, "%s\"%s\":{\"v\":%d,\"min\":%d,\"max\":%d}", id ? "," : "", sh_inst_info[id].key,
-            s->cfg.inst.v[id], sh_inst_info[id].min, sh_inst_info[id].max);
+        put(&o, "%s\"%s\":{\"v\":%d,\"min\":%d,\"max\":%d,\"step\":%d}", id ? "," : "", sh_inst_info[id].key,
+            s->cfg.inst.v[id], sh_inst_info[id].min, sh_inst_info[id].max, sh_inst_info[id].step);
     }
     sh_limits_t lim;
     sh_limits_calc(&s->cfg.inst, &lim);
     const int16_t used = s->col_protect < lim.protect_cap ? s->col_protect : lim.protect_cap;
-    put(&o, "},\"calc\":{\"boil\":%d,\"cap\":%d,\"prot\":%d,\"prot_set\":%d,\"frost\":%d},",
-        lim.boiling, lim.protect_cap, used, s->col_protect, lim.frost);
+    put(&o, "},\"calc\":{\"boil\":%d,\"cap\":%d,\"prot\":%d,\"prot_set\":%d,\"frost\":%d,\"vac\":%d,"
+        "\"cool\":%d},", lim.boiling, lim.protect_cap, used, s->col_protect, lim.frost, lim.vac_protect,
+        sh_cool_target(&s->cfg.inst, (int16_t)(s->cfg.settings.v[SH_SET_TANK_MAX] * 10), 0));
+
+    /* group C: the season in use, the night cooling, the sunrise / sunset, the air venting */
+    const sh_state_modes_t *m = &s->modes;
+    static const char *const why[] = {
+        [SH_COOL_NONE] = "", [SH_COOL_TMAX] = "tmax", [SH_COOL_E4] = "e4", [SH_COOL_VACATION] = "vac",
+    };
+    put(&o, "\"sea\":%d,\"cool\":{\"why\":\"%s\",\"goal\":", m->winter,
+        m->cool_why <= SH_COOL_VACATION ? why[m->cool_why] : "");
+    put_or_null(&o, m->cool_why != SH_COOL_NONE && m->cool_goal != SH_TEMP_INVALID, m->cool_goal);
+    put(&o, ",\"until\":");
+    put_or_null(&o, m->cool_why != SH_COOL_NONE && m->cool_until >= 0, m->cool_until);
+    put(&o, ",\"heater\":%d,\"tgt\":", m->cool_heater);
+    put_or_null(&o, m->cool_target != SH_TEMP_INVALID, m->cool_target);
+    put(&o, ",\"learn\":%d},\"sun\":{\"rise\":", m->cool_learned);
+    put_or_null(&o, m->sun_rise >= 0, m->sun_rise);
+    put(&o, ",\"set\":");
+    put_or_null(&o, m->sun_set >= 0, m->sun_set);
+    put(&o, ",\"arise\":");
+    put_or_null(&o, m->avg_rise >= 0, m->avg_rise);
+    put(&o, ",\"aset\":");
+    put_or_null(&o, m->avg_set >= 0, m->avg_set);
+    put(&o, "},\"air\":{\"on\":%d,\"cyc\":%u,\"run\":%d,\"left\":%lu,\"n\":%d,\"run_s\":%lu,\"pause_s\":%lu},",
+        m->air, m->air_cycle, m->air_run, (unsigned long)m->air_left_s, SH_AIR_CYCLES,
+        (unsigned long)SH_AIR_RUN_S, (unsigned long)sh_air_pause_s(&s->cfg.inst));
 
     put(&o, "\"net\":{\"ssid\":");
     put_str(&o, s->ssid);
@@ -150,8 +177,11 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, c->tz);
     put(&o, ",\"tzok\":%d,\"peak\":", c->tz_confirmed);
     put_or_null(&o, c->peak >= 0, c->peak);
-    put(&o, "},\"run\":[%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
-        (unsigned long)((s->run_s[1] + 30) / 60), (unsigned long)((s->run_s[2] + 30) / 60));
+    put(&o, "},\"run\":[");
+    for (int k = 0; k < SH_RUN_KINDS; k++) {
+        put(&o, "%s%lu", k ? "," : "", (unsigned long)((s->run_s[k] + 30) / 60));
+    }
+    put(&o, "]}");
 
     return o.full ? -1 : (int)o.len;
 }
@@ -173,7 +203,10 @@ static void chart_slot(void *ctx, const sh_chart_slot_t *s)
     put_or_null(c->o, s->t_col != SH_TEMP_INVALID, s->t_col);
     put(c->o, ",");
     put_or_null(c->o, s->t_tank != SH_TEMP_INVALID, s->t_tank);
-    put(c->o, ",%u,%u,%u]", (s->run_s[0] + 30u) / 60u, (s->run_s[1] + 30u) / 60u, (s->run_s[2] + 30u) / 60u);
+    for (int k = 0; k < SH_RUN_KINDS; k++) {
+        put(c->o, ",%u", (s->run_s[k] + 30u) / 60u);
+    }
+    put(c->o, "]");
     c->first = false;
 }
 
@@ -212,7 +245,8 @@ int sh_web_days_json(char *buf, size_t size, bool on, const sh_hist_rec_t *days,
         put_hist_temp(&o, "cn", r->col_min);
         put_hist_temp(&o, "tx", r->tank_max);
         put_hist_temp(&o, "tn", r->tank_min);
-        put(&o, ",\"run\":[%u,%u,%u],\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2]);
+        put(&o, ",\"run\":[%u,%u,%u],\"cool\":%u,\"al\":[", r->run_min[0], r->run_min[1], r->run_min[2],
+            r->cool_min);
         bool first = true;
         for (int a = 0; a < SH_ALARM_COUNT; a++) {
             if (r->alarms & SH_ALARM_BIT(a)) {
@@ -419,6 +453,22 @@ sh_web_res_t sh_web_test(const char *body, bool test_on, sh_web_test_t *cmd)
     return SH_WEB_OK;
 }
 
+sh_web_res_t sh_web_air(const char *body, bool air_on, sh_web_air_t *cmd)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "cmd", v)) {
+        return SH_WEB_BAD;
+    }
+    if (strcmp(v, "start") == 0) {
+        *cmd = air_on ? SH_WEB_AIR_NONE : SH_WEB_AIR_START;
+    } else if (strcmp(v, "stop") == 0) {
+        *cmd = air_on ? SH_WEB_AIR_STOP : SH_WEB_AIR_NONE;
+    } else {
+        return SH_WEB_BAD;
+    }
+    return SH_WEB_OK;
+}
+
 sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *what)
 {
     char v[VALUE_MAX];
@@ -486,6 +536,9 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_MIN_RUN]      = "min_run",
         [SH_PUMP_REASON_MIN_OFF]      = "min_off",
         [SH_PUMP_REASON_COL_MIN]      = "col_min",
+        [SH_PUMP_REASON_COOL]         = "cool",
+        [SH_PUMP_REASON_COOL_WAIT]    = "cool_wait",
+        [SH_PUMP_REASON_VACATION]     = "vacation",
         [SH_PUMP_REASON_TEST]         = "test",
         [SH_PUMP_REASON_ANTI_SEIZE]   = "seize",
         [SH_PUMP_REASON_BOTH_FAULT]   = "both_fault",
@@ -497,6 +550,8 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_CF_RUN]       = "cf_run",
         [SH_PUMP_REASON_CF_WAIT]      = "cf_wait",
         [SH_PUMP_REASON_CF_HEATER]    = "cf_heater",
+        [SH_PUMP_REASON_AIR_RUN]      = "air_run",
+        [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];
