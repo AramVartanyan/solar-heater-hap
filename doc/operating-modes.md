@@ -717,11 +717,11 @@ HomeKit — накрая.
   [firmware.md](firmware.md), т. 4). Светодиодът — дишане само при отворен прозорец за сдвояване.
 - **Identify — прието (група F):** светодиодът премигва по шаблона на `outputwrite` (`ledIdentify()`: 3 × по 2
   мигания през 200 ms, пауза 300 ms); дисплеят — без промяна.
-- **Известия към HomeKit — прието (група F):** температурите (`Current Temperature` на основната услуга и на
-  датчиците `Collector` / `Tank`) и `Status Fault` **не се изпращат сами** — стойностите се дават само когато
-  контролерът ги поиска (четене). Известия (`notify`) — **само за промени в основната услуга (Heater Cooler)**, които
-  идват отвън: `Active` (ваканцията от менюто / уеб интерфейса → Heater изкл.), `Current Heater Cooler State`
-  (Idle / Heating / Cooling), `Heating Threshold` (Tmax от менюто / уеб), `Lock Physical Controls`.
+- **Известия към HomeKit — прието (група F):** **температурите** (`Current Temperature` на основната услуга и на
+  датчиците `Collector` / `Tank`) **не се изпращат сами** — по протокола контролерът периодично ги иска (четене).
+  Известия (`notify`) при промяна: в основната услуга (Heater Cooler) — `Active` (ваканцията от менюто / уеб
+  интерфейса → Heater изкл.), `Current Heater Cooler State` (Idle / Heating / Cooling), `Heating Threshold` (Tmax от
+  менюто / уеб), `Lock Physical Controls`; и **`Status Fault`** на датчиците `Collector` / `Tank`.
 
 ### 3.1 Часовник — решения от група B (прието)
 
