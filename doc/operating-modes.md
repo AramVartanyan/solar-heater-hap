@@ -651,7 +651,7 @@ HomeKit — накрая.
 | Характеристика | Значение |
 |---|---|
 | Active | вкл. = нормален режим, **изкл. = Ваканция** (контролерът продължава да пази системата) |
-| Current State | Idle = помпата стои; Heating = зарежда бойлера; Cooling = нощно охлаждане |
+| Current State | Idle = помпата стои; Heating = помпата работи (зареждане, защитите, тестът, импулсът, обезвъздушаването — уточнено при група F); Cooling = нощно охлаждане |
 | Target State | само **Heat** (охладителна кула — само **Cool**) |
 | Current Temperature | бойлерът |
 | Heating Threshold | Tmax (30 – 85 °C) |
@@ -676,7 +676,7 @@ HomeKit — накрая.
   | Характеристика | | Граници / стойности |
   |---|---|---|
   | Active | да | вкл. = нормален, изкл. = ваканция |
-  | Current Heater Cooler State | да | Idle / Heating / Cooling |
+  | Current Heater Cooler State | да | Idle (помпата стои) / Heating (помпата работи по каквато и да е причина освен нощното охлаждане — прието при група F) / Cooling (нощно охлаждане) |
   | Target Heater Cooler State | да | само Heat (охладителна кула — само Cool) |
   | Current Temperature | да | бойлерът, 0 – 100 °C, стъпка 0.1 |
   | Heating Threshold Temperature | да | Tmax, 30 – 85 °C, стъпка 1 |
