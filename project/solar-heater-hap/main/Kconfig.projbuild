@@ -306,8 +306,4 @@ menu "Device Settings"
             The LED is yellow while the pump is stopped and the collector is above this
             temperature; it returns below it - 2 K.
 
-    config SH_HOSTNAME
-        string "Network hostname"
-        default "solar-heater"
-
 endmenu

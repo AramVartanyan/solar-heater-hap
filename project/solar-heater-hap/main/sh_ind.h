@@ -3,6 +3,7 @@
  * host test as well. sh_led drives the LED.
  *
  * Colour, by priority (first match wins):
+ *   white    a firmware update is being written (OTA) — blinking 500 / 500 ms, before everything
  *   red      any alarm (E1, E2, E4, E5, E6) — blinking only
  *   orange   the pump runs because of a protection (Hot, Fro) or cools the tank at night
  *   purple   vacation
@@ -11,7 +12,9 @@
  *   white    collector < 20 °C (released above 22 °C)
  *   blue     idle
  * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
- * other colours -> steady with Wi-Fi, heartbeat without it (or while the setup portal is open).
+ * other colours -> while the own access point is on (nEt -> AP) steady with a short dark wink (the
+ * mirror of the heartbeat), otherwise steady with Wi-Fi, heartbeat without it (or while the setup
+ * portal is open).
  * Temperatures are tenths of °C, times ms. */
 #pragma once
 
@@ -28,6 +31,9 @@
 #define SH_IND_DOUBLE_DARK_MS   1000u
 #define SH_IND_BEAT_ON_MS       80u     /* heartbeat: 80 ms on every 2 s */
 #define SH_IND_BEAT_PERIOD_MS   2000u
+#define SH_IND_BLINK_MS         500u    /* OTA: 500 on / 500 off */
+#define SH_IND_WINK_OFF_MS      80u     /* own access point: 80 ms dark every 2 s */
+#define SH_IND_WINK_PERIOD_MS   2000u
 
 typedef enum {
     SH_COLOR_OFF = 0,
@@ -46,6 +52,8 @@ typedef enum {
     SH_IND_HEARTBEAT,   /* no Wi-Fi / setup portal */
     SH_IND_FAST,        /* E4, E5 */
     SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
+    SH_IND_BLINK,       /* firmware update */
+    SH_IND_WINK,        /* own access point on */
 } sh_ind_pattern_t;
 
 typedef struct {
@@ -62,6 +70,8 @@ typedef struct {
     bool cooling;       /* the pump runs by the night cooling */
     bool wifi_connected;
     bool wifi_portal;
+    bool ap;            /* the own access point is on (nEt -> AP) */
+    bool ota;           /* a firmware update is being written */
 } sh_ind_in_t;
 
 /* The memory of the white / yellow return zones; all zeros at boot. */

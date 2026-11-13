@@ -20,6 +20,7 @@ static const char *const FEATURES[] = {
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
     "heater", "mount",
+    "net_mode", "ota",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -182,7 +183,15 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ssid);
     put(&o, ",\"ip\":");
     put_str(&o, s->ip);
-    put(&o, ",\"rssi\":%d},", s->rssi);
+    put(&o, ",\"rssi\":%d,\"mode\":\"%s\",\"pend\":%d,\"host\":", s->rssi, s->ap ? "ap" : "cp", s->ap_pending);
+    put_str(&o, s->host ? s->host : "");
+    put(&o, ",\"ap\":");
+    put_str(&o, s->ap_ssid ? s->ap_ssid : "");
+    put(&o, "},\"ota\":{\"st\":\"%s\",\"ver\":", sh_web_ota_key(s->ota, s->ap));
+    put_str(&o, s->ota_version ? s->ota_version : "");
+    put(&o, ",\"pct\":");
+    put_or_null(&o, s->ota == SH_OTA_RUNNING && s->ota_pct >= 0, s->ota_pct);
+    put(&o, "},");
 
     static const char *const trust[] = {
         [SH_CLOCK_UNSET] = "unset", [SH_CLOCK_TZ_UNCONFIRMED] = "tz",
@@ -535,6 +544,40 @@ sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz)
     }
     *tz = i;
     return SH_WEB_OK;
+}
+
+sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "cmd", v)) {
+        return SH_WEB_BAD;
+    }
+    if (strcmp(v, "check") == 0) {
+        *cmd = SH_OTA_CMD_CHECK;
+    } else if (strcmp(v, "update") == 0) {
+        *cmd = SH_OTA_CMD_UPDATE;
+    } else {
+        return SH_WEB_BAD;
+    }
+    return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
+}
+
+const char *sh_web_ota_key(sh_ota_phase_t phase, bool ap)
+{
+    static const char *const keys[] = {
+        [SH_OTA_IDLE] = "idle", [SH_OTA_CHECKING] = "check", [SH_OTA_CURRENT] = "ok",
+        [SH_OTA_AVAILABLE] = "new", [SH_OTA_WAITING] = "wait", [SH_OTA_RUNNING] = "run",
+        [SH_OTA_DONE] = "done", [SH_OTA_NO_SERVER] = "noconn", [SH_OTA_FAILED] = "fail",
+    };
+    if ((unsigned)phase >= sizeof(keys) / sizeof(keys[0])) {
+        return "idle";
+    }
+    /* on the own access point there is no internet: nothing can be checked or installed; a
+     * confirmed update keeps waiting for the router */
+    if (ap && phase != SH_OTA_WAITING && phase != SH_OTA_RUNNING && phase != SH_OTA_DONE) {
+        return "ap";
+    }
+    return keys[phase];
 }
 
 const char *sh_web_reason_key(sh_pump_reason_t reason)

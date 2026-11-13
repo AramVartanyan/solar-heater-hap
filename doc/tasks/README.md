@@ -14,7 +14,7 @@
 | 10 (C) | [step10-cooling-vacation-seasons.md](step10-cooling-vacation-seasons.md) — нощно охлаждане, ваканция, сезони, обезвъздушаване | след #41 / #42 |
 | 12 (D) | [step12-heater-leak-e8.md](step12-heater-leak-e8.md) — нагревател, теч от нагревателя, обратен термосифон (`E8`) | след #48 / #49 |
 | 13 (D2) | [step13-pulse-mode.md](step13-pulse-mode.md) — импулсен режим (датчиците на тръбите) | след #52 / #53 |
-| 7 (E) | [step7-network-ota.md](step7-network-ota.md) — мрежата (`nEt`, режим `AP`, име), обновяване (OTA, `FUp`) | — |
+| 7 (E) | [step7-network-ota.md](step7-network-ota.md) — мрежата (`nEt`, режим `AP`, име), обновяване (OTA, `FUp`) | след #57 / #60 |
 
 ## Групи на оставащите стъпки (прието)
 
