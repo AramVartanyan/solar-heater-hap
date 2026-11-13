@@ -59,9 +59,9 @@
 - **Платформа:** ESP-IDF **5.5.x**, target `esp32s3`; HomeKit —
   [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (подмодул `components/homekit`, клонът
   `homekit` на форка [AramVartanyan/esp-homekit-sdk](https://github.com/AramVartanyan/esp-homekit-sdk)).
-- **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `solar-heater-hap.bin`. Едно име от основния MAC адрес —
-  `Solar-xxxxxx`: в рутера, по mDNS (`Solar-xxxxxx.local`) и на точката за достъп (за настройка на Wi-Fi и за режим
-  `AP`).
+- **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `build/solheat1.bin` (същото име като на сървъра за
+  обновяване, `otafw/solheat1.bin`). Едно име от основния MAC адрес — `Solar-xxxxxx`: в рутера, по mDNS
+  (`Solar-xxxxxx.local`) и на точката за достъп (за настройка на Wi-Fi и за режим `AP`).
 - Драйвер за WS2812 светодиода: `espressif/led_strip` (RMT, минимална конфигурация) — виж
   [doc/firmware.md](doc/firmware.md).
 
