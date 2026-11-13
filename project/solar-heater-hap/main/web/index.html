@@ -573,7 +573,7 @@ function drawDays(){
  if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=6;c.textContent=t('no_days');return}
  const tv=v=>v==null?'—':deg(v)+'°';
  D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?' *':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?'\u00a0*':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}
