@@ -102,6 +102,10 @@
   стрелка, като „Нулиране“); под него резултатът: **„Версията е актуална“** (Up to date) или **„Налична е по-нова
   версия x.y.z“** (A newer version x.y.z is available) с бутон **„Обнови“** (Update — една дума с „обновяване“ и
   `FUp`); докато трае — напредъкът и „не изключвайте захранването“.
+- **Източникът — прието (група E):** `general-ota` (като mppt-1k), файлът се качва ръчно в хранилището
+  `AramVartanyan/otafw`: `https://raw.githubusercontent.com/AramVartanyan/otafw/master/solheat1.bin`
+  (`CONFIG_GENERAL_OTA_URL` в `sdkconfig.defaults` — сменя се без промяна в кода); инсталира се само строго по-нова
+  версия (`major.minor.patch`, `CONFIG_APP_PROJECT_VER`).
 
 ## 6. Нулиране („Система“, прието)
 
