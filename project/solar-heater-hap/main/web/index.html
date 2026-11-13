@@ -46,6 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:16px}
 th,td{padding:11px 10px;text-align:left}th{color:var(--sub);font-weight:500;font-size:13px}
 td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
 td+td{white-space:nowrap}
+.days td:first-child{white-space:nowrap}   /* the date and the star of a partial day: one line */
 td input{font:inherit;color:var(--blue);background:none;border:0;text-align:right;width:2.4em;padding:2px 0}
 .cur{background:rgba(63,136,242,.12)}
 td select,.v select{font:inherit}
@@ -573,7 +574,7 @@ function drawDays(){
  if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=6;c.textContent=t('no_days');return}
  const tv=v=>v==null?'—':deg(v)+'°';
  D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?'\u00a0*':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?'*':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}
