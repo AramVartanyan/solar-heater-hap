@@ -29,6 +29,15 @@ typedef struct {
     bool    leak_last_stop;     /* ... its result: stopped */
     int16_t leak_last_drop;     /* ... the collector fell by, 0.1 K */
     int16_t e8_normal;          /* learned normal night cooling of the tank, 0.1 K/h, INT16_MIN: none */
+    /* group D2: the pulse mode (the sensors on the pipes) */
+    bool    pulse;              /* the pulse mode is on */
+    bool    rel_any;            /* there are reliable values ... */
+    int16_t rel_col, rel_tank;  /* ... (SH_TEMP_INVALID: none / faulty) */
+    uint32_t rel_s;             /* ... taken then, monotonic s */
+    bool    rel_pulse;          /* ... at a pulse (otherwise during a longer run) */
+    bool    rel_now;            /* ... taken now: the pump runs for >= 30 s */
+    uint32_t pulse_next_s;      /* the next pulse, monotonic s; 0: none planned */
+    bool    pulse_hot;          /* no pulses after an overheated collector (a warning) */
 } sh_modes_t;
 
 typedef struct {
@@ -52,6 +61,9 @@ typedef struct {
 
 void sh_state_init(void);
 void sh_state_get(sh_state_t *out);                 /* consistent copy */
+/* The same with the temperatures to be shown (display, web interface, chart, history, LED): in the
+ * pulse mode the last reliable values instead of the pipes. */
+void sh_state_get_shown(sh_state_t *out);
 void sh_state_set_temps(int16_t t_col, int16_t t_tank, bool col_fault, bool tank_fault);
 void sh_state_set_pump(bool on, sh_pump_reason_t reason);
 void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s);

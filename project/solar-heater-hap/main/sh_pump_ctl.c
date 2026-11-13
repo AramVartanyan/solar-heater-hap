@@ -10,6 +10,9 @@ static void set(sh_pump_ctl_t *c, bool on, sh_pump_reason_t reason, uint32_t now
 {
     if (on != c->on) {
         c->switched_s = now_s;
+        if (on) {
+            c->on_s = now_s;
+        }
     }
     c->on = on;
     c->reason = reason;
@@ -255,6 +258,46 @@ static bool col_fault_mode(sh_pump_ctl_t *c, const sh_pump_params_t *p, int16_t 
     return true;
 }
 
+/* Pulse mode: the reliable values — the pipes once the pump has run for 30 s, as long as it runs.
+ * A faulty sensor (SH_TEMP_INVALID) drops its value. */
+static void rel_track(sh_pump_ctl_t *c, int16_t col, int16_t tank, uint32_t now_s)
+{
+    sh_pump_rel_t *r = &c->rel;
+    if (col == SH_TEMP_INVALID) {
+        r->col = SH_TEMP_INVALID;
+    }
+    if (tank == SH_TEMP_INVALID) {
+        r->tank = SH_TEMP_INVALID;
+    }
+    r->fresh = c->on && now_s - c->on_s >= SH_PULSE_RUN_S &&
+               (col != SH_TEMP_INVALID || tank != SH_TEMP_INVALID);
+    if (r->fresh) {
+        r->col = col;
+        r->tank = tank;
+        r->at_s = now_s;
+        r->any = true;
+        r->by_pulse = c->pulse;
+    }
+}
+
+/* Pulse mode, a stopped pump without current values: a pulse when it is due, otherwise wait. */
+static bool pulse_wait(sh_pump_ctl_t *c, const sh_pump_params_t *p, uint32_t now_s, sh_pump_reason_t *reason)
+{
+    c->norm.col_protect = false;
+    c->norm.frost = false;
+    c->norm.cool = false;
+    c->tf_probe = false;
+    if (p->pulse_due) {
+        c->pulse = true;
+        c->pulse_s = now_s;
+        c->events |= SH_PUMP_EVT_PULSE_START;
+        *reason = SH_PUMP_REASON_PULSE;
+        return true;
+    }
+    *reason = SH_PUMP_REASON_PULSE_WAIT;
+    return false;
+}
+
 static bool seize_due(const sh_pump_ctl_t *c, int16_t col, int16_t tank, uint32_t now_s)
 {
     if (c->on || c->mode == SH_PUMP_MODE_BOTH_FAULT) {
@@ -275,20 +318,35 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
                       uint32_t now_s)
 {
     /* A faulty sensor's last valid value is not used for any decision. */
-    const int16_t col = t->col_fault ? SH_TEMP_INVALID : t->t_col;
-    const int16_t tank = t->tank_fault ? SH_TEMP_INVALID : t->t_tank;
+    const int16_t raw_col = t->col_fault ? SH_TEMP_INVALID : t->t_col;
+    const int16_t raw_tank = t->tank_fault ? SH_TEMP_INVALID : t->t_tank;
+
+    const sh_pump_mode_t mode = mode_of(t);
+    if (mode != c->mode) {
+        enter_mode(c, mode, now_s);
+    }
+
+    /* Pulse mode: the reliable values (they start over when the mounting changes). With the
+     * collector sensor faulty the probes are runs judged by the tank pipe as it is. */
+    if (p->pulse != c->pulse_mode) {
+        c->pulse_mode = p->pulse;
+        c->rel = (sh_pump_rel_t){ .col = SH_TEMP_INVALID, .tank = SH_TEMP_INVALID };
+    }
+    if (p->pulse) {
+        rel_track(c, raw_col, raw_tank, now_s);
+    } else {
+        c->rel.fresh = false;
+    }
+    const bool pulses = p->pulse && (c->mode == SH_PUMP_MODE_NORMAL || c->mode == SH_PUMP_MODE_TANK_FAULT);
+    const int16_t col = pulses ? c->rel.col : raw_col;
+    const int16_t tank = pulses ? c->rel.tank : raw_tank;
 
     sh_pump_track_limits(p, &c->norm, col, tank);
     c->heater_rise = p->heater_rise;
     if (col != SH_TEMP_INVALID) {
         c->tf_hot = sh_pump_latch(c->tf_hot, col, SH_TF_HOT);
     }
-    track_history(c, tank, now_s);
-
-    const sh_pump_mode_t mode = mode_of(t);
-    if (mode != c->mode) {
-        enter_mode(c, mode, now_s);
-    }
+    track_history(c, raw_tank, now_s);       /* the heater sign: the tank (pipe) with the pump stopped */
 
     sh_pump_reason_t reason;
     bool restart = false;               /* the test or the anti-seize run just ended */
@@ -326,24 +384,39 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
         restart = true;
     }
 
-    /* After the test / anti-seize run: like a stopped pump whose minimum off time is over. */
+    /* The pulse: 30 s, then decided like the end of the test, with the values just taken. */
+    if (c->pulse) {
+        if (pulses && now_s - c->pulse_s < SH_PULSE_RUN_S) {
+            set(c, true, SH_PUMP_REASON_PULSE, now_s);
+            return;
+        }
+        c->pulse = false;
+        c->events |= SH_PUMP_EVT_PULSE_END;
+        restart = true;
+    }
+
+    /* After the test / anti-seize run / pulse: like a stopped pump whose minimum off time is over. */
     const bool was_on = restart ? false : c->on;
     const uint32_t elapsed_s = restart ? LONG_AGO_S : now_s - c->switched_s;
     bool on;
-    switch (c->mode) {
-    case SH_PUMP_MODE_NORMAL:
-        on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
-        break;
-    case SH_PUMP_MODE_TANK_FAULT:
-        on = tank_fault_mode(c, p, col, was_on, elapsed_s, now_s, &reason);
-        break;
-    case SH_PUMP_MODE_COL_FAULT:
-        on = col_fault_mode(c, p, tank, was_on, elapsed_s, now_s, &reason);
-        break;
-    default:
-        on = false;
-        reason = SH_PUMP_REASON_BOTH_FAULT;
-        break;
+    if (pulses && !was_on && !c->rel.fresh) {
+        on = pulse_wait(c, p, now_s, &reason);
+    } else {
+        switch (c->mode) {
+        case SH_PUMP_MODE_NORMAL:
+            on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
+            break;
+        case SH_PUMP_MODE_TANK_FAULT:
+            on = tank_fault_mode(c, p, col, was_on, elapsed_s, now_s, &reason);
+            break;
+        case SH_PUMP_MODE_COL_FAULT:
+            on = col_fault_mode(c, p, tank, was_on, elapsed_s, now_s, &reason);
+            break;
+        default:
+            on = false;
+            reason = SH_PUMP_REASON_BOTH_FAULT;
+            break;
+        }
     }
 
     if (!on && seize_due(c, col, tank, now_s)) {
@@ -389,6 +462,7 @@ void sh_pump_ctl_air_start(sh_pump_ctl_t *c, uint32_t pause_s, uint32_t now_s)
     c->seize = false;
     c->tf_probe = false;
     c->cf_probe = false;
+    c->pulse = false;
     c->events |= SH_PUMP_EVT_AIR_START;
 }
 
@@ -430,6 +504,7 @@ void sh_pump_ctl_plus(sh_pump_ctl_t *c, uint32_t test_s, uint32_t now_s)
         c->seize = false;
         c->tf_probe = false;
         c->cf_probe = false;
+        c->pulse = false;
         c->events |= SH_PUMP_EVT_TEST_START;
         return;
     }

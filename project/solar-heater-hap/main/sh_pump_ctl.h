@@ -21,6 +21,16 @@
  *                             heater sign is active — the threshold of sh_heater)
  *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
+ * Pulse mode (sensors on the pipes, `p->pulse`; doc/tasks/step13-pulse-mode.md 3.2 - 3.4): the
+ * decisions take the reliable values (sh_pump_rel_t: the pipes 30 s after the pump started and as
+ * long as it runs; a faulty sensor drops its value), with the collector sensor faulty the pipes as
+ * they are (the probes are runs of 10 min). In the normal mode and with the tank sensor faulty a
+ * stopped pump without current values does not start by the rules of the mode: it starts a pulse
+ * when sh_pulse says so (`p->pulse_due`), otherwise it waits. The pulse runs 30 s (only the test
+ * and the air venting replace it); its end is handled like the end of the test, with the values
+ * just taken: the pump goes on if the mode would start it (difference, collector protection,
+ * frost, night cooling ...), otherwise it stops until the next pulse. The heater sign keeps the
+ * tank pipe with the pump stopped.
  * The end of the test and of the anti-seize run is handled like a stopped pump whose minimum off
  * time is over: the pump keeps running if the mode would start it (its minimum run time counts from
  * then), otherwise it stops and the minimum off time counts from then. */
@@ -29,6 +39,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "sh_pump_logic.h"
+#include "sh_pulse.h"           /* SH_PULSE_RUN_S */
 
 /* Pump test */
 #define SH_PUMP_TEST_STEP_S         60          /* "+" / "-" during the test */
@@ -80,6 +91,17 @@ typedef enum {
 #define SH_PUMP_EVT_SEIZE_END       0x08
 #define SH_PUMP_EVT_AIR_START       0x10
 #define SH_PUMP_EVT_AIR_END         0x20
+#define SH_PUMP_EVT_PULSE_START     0x40
+#define SH_PUMP_EVT_PULSE_END       0x80
+
+/* The reliable values of the pulse mode. */
+typedef struct {
+    int16_t col, tank;          /* SH_TEMP_INVALID: none (or the sensor faulty since) */
+    uint32_t at_s;              /* when they were taken (with `any`) */
+    bool any;                   /* a value was taken since boot / since the mounting changed */
+    bool by_pulse;              /* taken at a pulse (otherwise during a longer run) */
+    bool fresh;                 /* taken in this step: the pump runs for >= 30 s */
+} sh_pump_rel_t;
 
 /* Everything the control keeps between the steps; all zeros at boot (pump off since 0 s). */
 typedef struct {
@@ -125,6 +147,13 @@ typedef struct {
     uint8_t hist_head;          /* next slot */
     uint32_t hist_next_s;       /* next sample */
     int16_t heater_rise;        /* the threshold of the heater sign (parameters of the last step) */
+
+    /* pulse mode */
+    bool pulse_mode;            /* of the last step (a change starts the reliable values over) */
+    bool pulse;                 /* a pulse runs ... */
+    uint32_t pulse_s;           /* ... since */
+    uint32_t on_s;              /* when the relay last went on */
+    sh_pump_rel_t rel;
 } sh_pump_ctl_t;
 
 /* One step: decides `ctl->on` / `ctl->reason` at `now_s`. `p` are the current parameters. */

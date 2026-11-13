@@ -8,7 +8,8 @@
  *   kinds    charging (difference, minimum run time, charging with a faulty sensor) / protection
  *            (collector protection, frost protection, the probe at the collector emergency
  *            temperature with a faulty tank sensor — Hot) / other (pump test, anti-seize run, the
- *            probe with a faulty collector sensor, air venting) / cooling (night cooling)
+ *            probe with a faulty collector sensor, air venting, the pulse of the pulse mode) /
+ *            cooling (night cooling)
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
  *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
  *            day, the minute of the collector maximum (the first one), the time with the heater

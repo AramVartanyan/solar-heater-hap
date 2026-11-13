@@ -224,7 +224,7 @@ static void display_task(void *arg)
         sh_menu_view_t view;
         sh_buttons_menu_view(&view);
         sh_state_t st;
-        sh_state_get(&st);
+        sh_state_get_shown(&st);     /* pulse mode: the last reliable values */
 
         screen_t scr = { 0 };
         const bool normal = view.mode == SH_MENU_NORMAL;
