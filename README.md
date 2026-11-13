@@ -145,6 +145,7 @@ solar-heater-hap/
 
 Съдържанието е в [doc/README.md](doc/README.md):
 
+- [Кратко упътване за монтаж и употреба](doc/quick-guide.md)
 - [Логиката на контролера](doc/operating-modes.md) — режими, защити, меню и бутони, HomeKit
 - [Светлинна индикация](doc/led-indication.md)
 - [Уеб интерфейс](doc/web-interface.md)
