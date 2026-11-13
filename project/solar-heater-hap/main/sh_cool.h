@@ -105,6 +105,8 @@ typedef struct {
     int8_t offset;              /* learned correction of the target, K (-20 ... 0) */
     uint8_t quiet;              /* mornings in a row without an E4 */
     uint8_t events;             /* SH_COOL_EVT_* of the last step */
+    bool pulse;                 /* pulse mode: a session runs or may start by these values (its
+                                 * window, the tank above the target / Tmax) — a pulse every 30 min */
 } sh_cool_t;
 
 /* One step at `now_s`. The pump may cool while `c->trigger != SH_COOL_NONE`. */

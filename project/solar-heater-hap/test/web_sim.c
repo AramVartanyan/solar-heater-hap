@@ -26,6 +26,11 @@
  *   http://localhost:8080/sim?leak=1                 a leak check of the heater starts now (5 min);
  *                                                    leak=2: the leak is stopped; leak=0: idle
  *   http://localhost:8080/sim?e8=1                   E8 (3 nights with the reverse thermosiphon sign)
+ * The pulse mode (group D2, doc/tasks/step13-pulse-mode.md 3.6): "Service" -> "Sensor mounting" ->
+ * "On the pipes". /sim?col=...&tank=... are then the pipes: the page shows the values taken 30 s
+ * after a pulse started ("measured at the pulse at ..."), the pump waits for the next pulse ("in ...
+ * min"); a pulse with the collector at the boiling point - 10 K stops the pulses (the warning).
+ * The control runs at every request of the page (every 5 s), so a pulse lasts 30 - 35 s here.
  * The heater (group D, doc/tasks/step12-heater-leak-e8.md 3.5): the sign follows the tank with the
  * pump stopped (/sim?tank=... rising by the threshold in 10 min), the leak checks run as in the
  * firmware (outside 09:00 - 16:00 / the learned daylight), E8 is judged at the end of the night.
@@ -58,6 +63,7 @@
 #include "sh_cool.h"
 #include "sh_heater.h"
 #include "sh_e8.h"
+#include "sh_pulse.h"
 
 #define CODE    "810841"
 
@@ -75,6 +81,8 @@ static sh_cool_t s_cool;
 static sh_heater_t s_heater;
 static sh_leak_t s_leak;
 static sh_e8_t s_e8;
+static sh_pulse_t s_pulse;
+static bool s_pulse_mode;
 static bool s_winter, s_dst;
 static uint16_t s_sunrises, s_sunsets;
 static int16_t s_cool_target;
@@ -277,29 +285,39 @@ static void control(void)
     const bool reliable = trust() == SH_CLOCK_RELIABLE;
     const int16_t col = s_temps.col_fault ? SH_TEMP_INVALID : s_temps.t_col;
     const int16_t tank = s_temps.tank_fault ? SH_TEMP_INVALID : s_temps.t_tank;
+    const bool pulse = s_cfg.inst.v[SH_INST_MOUNT] == SH_MOUNT_PIPES;
+    if (pulse != s_pulse_mode) {
+        s_pulse_mode = pulse;
+        memset(&s_pulse, 0, sizeof(s_pulse));
+        printf("sensors %s\n", pulse ? "on the pipes: pulse mode" : "in the sleeves");
+    }
+    const bool rel = pulse && s_pump.pulse_mode && s_pump.rel.any;
+    const int16_t v_col = pulse ? (rel && !s_temps.col_fault ? s_pump.rel.col : SH_TEMP_INVALID) : col;
+    const int16_t v_tank = pulse ? (rel && !s_temps.tank_fault ? s_pump.rel.tank : SH_TEMP_INVALID) : tank;
 
     /* sunrise / sunset, season, night cooling — in the order of sh_control */
     const uint8_t sun = sh_sun_step(&s_sun, col, tank, s_pump.on, &lt, reliable, now);
     s_sunrises = (uint16_t)(s_sunrises + ((sun & SH_SUN_EVT_RISE) ? 1 : 0));
     s_sunsets = (uint16_t)(s_sunsets + ((sun & SH_SUN_EVT_SET) ? 1 : 0));
     const bool has_dst = strchr(sh_tz_list[s_tz].rule, ',') != NULL;
-    s_winter = sh_season_step(&s_season, (sh_season_mode_t)set[SH_SET_SEASON], s_winter, col, s_pump.on,
+    s_winter = sh_season_step(&s_season, (sh_season_mode_t)set[SH_SET_SEASON], s_winter, v_col, s_pump.on,
                               reliable && has_dst, s_dst, now);
     const bool vacation = set[SH_SET_VACATION] != 0;
     sh_pump_params_t p = {
         .diff_on = (int16_t)(set[sh_settings_seasonal(SH_SET_DIFF_ON, s_winter)] * 10),
         .diff_off = (int16_t)(set[sh_settings_seasonal(SH_SET_DIFF_OFF, s_winter)] * 10),
-        .min_run_s = 180, .min_off_s = 120,
+        .min_run_s = pulse ? SH_PULSE_RUN_S : 180, .min_off_s = 120,
         .tank_max = (int16_t)(set[SH_SET_TANK_MAX] * 10),
         .col_min = (int16_t)(set[sh_settings_seasonal(SH_SET_COL_MIN, s_winter)] * 10),
         .col_protect = vacation ? lim.vacation : 1100, .col_protect_cap = lim.protect_cap,
         .col_boiling = lim.boiling, .frost_on = s_cfg.frost, .frost = lim.frost, .charge_off = vacation,
         .heater_rise = sh_heater_rise(s_cfg.inst.v[SH_INST_HEATER], s_cfg.inst.v[SH_INST_TANK_VOL]),
+        .pulse = pulse,
     };
     s_cool_target = sh_cool_target(s_cfg.inst.v[SH_INST_COL_TYPE] == SH_COL_TUBES, s_cfg.inst.v[SH_INST_COL_AREA],
                                    s_cfg.inst.v[SH_INST_TANK_VOL], p.tank_max, s_cool.offset);
     const sh_cool_in_t cin = {
-        .reliable = reliable, .min = lt.min, .t_col = col, .t_tank = tank, .tank_max = p.tank_max,
+        .reliable = reliable, .min = lt.min, .t_col = v_col, .t_tank = v_tank, .tank_max = p.tank_max,
         .target = s_cool_target, .tmax_on = set[sh_settings_seasonal(SH_SET_NCOOL, s_winter)] != 0,
         .vacation = vacation, .e4 = (s_alarm.active & SH_ALARM_BIT(SH_ALARM_E4)) != 0,
         .night = sh_sun_night(&s_sun, &lt, reliable), .dark = s_sun.dark, .sunset_s = s_sun.sunset_s,
@@ -321,7 +339,7 @@ static void control(void)
         printf("heater detected with 0 kW\n");
     }
     const sh_leak_in_t lin = {
-        .heater = sh_heater_present(&s_heater, power), .reliable = reliable, .min = lt.min,
+        .heater = !pulse && sh_heater_present(&s_heater, power), .reliable = reliable, .min = lt.min,
         .rise = sh_sun_avg(s_sun.days.rise), .set = sh_sun_avg(s_sun.days.set), .t_col = col, .pump_on = s_pump.on,
         .charging = s_pump.on && s_pump.mode == SH_PUMP_MODE_NORMAL &&
                     (s_pump.reason == SH_PUMP_REASON_DIFF || s_pump.reason == SH_PUMP_REASON_MIN_RUN),
@@ -345,7 +363,20 @@ static void control(void)
         printf("E8: events 0x%02x, %u sign / %u normal nights, active %d\n", s_e8.events, s_e8.l.sign_nights,
                s_e8.l.normal_nights, s_e8.l.active);
     }
+    if (pulse) {
+        const sh_pulse_in_t pin = {
+            .reliable = reliable, .lt = lt, .rise = sh_sun_avg(s_sun.days.rise), .set = sh_sun_avg(s_sun.days.set),
+            .risen = s_sun.risen, .pump_on = s_pump.on, .pipe_col = col,
+            .rel = rel, .rel_col = v_col, .rel_s = s_pump.rel.at_s, .fresh = rel && s_pump.rel.fresh,
+            .cool = s_cool.pulse, .frost_on = p.frost_on, .frost = p.frost, .boiling = p.col_boiling,
+        };
+        sh_pulse_step(&s_pulse, &pin, now);
+        p.pulse_due = s_pulse.due;
+    }
     sh_pump_ctl_step(&s_pump, &p, &s_temps, now);
+    if (s_pump.events & SH_PUMP_EVT_PULSE_END) {
+        printf("pulse: collector %d, tank %d\n", s_pump.rel.col, s_pump.rel.tank);
+    }
     s_pump.events = 0;
     const sh_alarm_in_t in = {
         .t_col = s_temps.t_col, .t_tank = s_temps.t_tank,
@@ -357,7 +388,7 @@ static void control(void)
 
     /* the day, as sh_history does it every second */
     const sh_day_in_t din = {
-        .t_col = s_temps.t_col, .t_tank = s_temps.t_tank, .col_fault = s_temps.col_fault,
+        .t_col = pulse ? s_pump.rel.col : s_temps.t_col, .t_tank = pulse ? s_pump.rel.tank : s_temps.t_tank, .col_fault = s_temps.col_fault,
         .tank_fault = s_temps.tank_fault, .pump_on = s_pump.on, .reason = s_pump.reason,
         .alarms = s_alarm.active, .sunrises = s_sunrises, .sunsets = s_sunsets, .heater = heater_on,
     };
@@ -402,8 +433,9 @@ static void reply_state(int fd)
     const uint32_t now = now_s();
     sh_local_t lt;
     local_at(sim_epoch(), &lt);
+    const bool pulse = s_pulse_mode;
     sh_web_status_t s = {
-        .t_col = s_temps.t_col, .t_tank = s_temps.t_tank,
+        .t_col = pulse ? s_pump.rel.col : s_temps.t_col, .t_tank = pulse ? s_pump.rel.tank : s_temps.t_tank,
         .col_fault = s_temps.col_fault, .tank_fault = s_temps.tank_fault,
         .pump_on = s_pump.on, .reason = s_pump.reason, .alarms = s_alarm.active,
         .test_on = s_pump.test, .test_left_s = sh_pump_ctl_test_left(&s_pump, now),
@@ -421,6 +453,10 @@ static void reply_state(int fd)
         .heater_on = sh_pump_ctl_heater(&s_pump), .heater_det = s_heater.detected, .leak = (uint8_t)s_leak.phase,
         .leak_left_s = sh_leak_left(&s_leak, now), .leak_last = s_leak.last, .leak_last_stop = s_leak.last_stop,
         .leak_last_drop = s_leak.last_drop, .e8_normal = sh_e8_normal(&s_e8.l),
+        .pulse = pulse, .meas = pulse && s_pump.rel.any, .meas_age_s = now - s_pump.rel.at_s,
+        .meas_pulse = s_pump.rel.by_pulse, .meas_now = pulse && s_pump.rel.fresh,
+        .pulse_next = pulse && !s_pump.on && s_pulse.next_s != SH_PULSE_NONE,
+        .pulse_left_s = s_pulse.next_s > now ? s_pulse.next_s - now : 0, .pulse_hot = pulse && s_pulse.hot,
     };
     sh_air_view_t air;
     sh_pump_ctl_air(&s_pump, now, &air);

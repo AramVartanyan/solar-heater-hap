@@ -33,6 +33,7 @@ idf_component_register(
         "sh_learn_store.c"
         "sh_heater.c"
         "sh_e8.c"
+        "sh_pulse.c"
     INCLUDE_DIRS "."
     # the page of the web interface (sh_web), served as it is
     EMBED_FILES "web/index.html" "web/favicon.svg"

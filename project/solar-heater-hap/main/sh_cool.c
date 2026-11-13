@@ -140,6 +140,11 @@ void sh_cool_step(sh_cool_t *c, const sh_cool_in_t *in, uint32_t now_s)
     }
     c->target = in->target;
 
+    /* pulse mode: a pulse every 30 min while a session runs or may start by the last values */
+    c->pulse = c->trigger != SH_COOL_NONE ||
+               (temps_ok && !c->heater && !in->vacation && !c->tonight && in->t_tank > in->target &&
+                ((win_b && c->e4_pending) || (win_a && in->tmax_on && in->t_tank >= in->tank_max)));
+
     if (c->was_window && !win_b) {
         morning(c, in->e4);
     }

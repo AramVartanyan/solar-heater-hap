@@ -94,6 +94,7 @@ section{display:none}section.on{display:block}
   <div class="tile"><div class="l" data-t="tank"></div><div class="t" id="t-tank">---</div><div class="s" id="s-tank"></div></div>
   <div class="tile"><div class="l" data-t="col"></div><div class="t" id="t-col">---</div><div class="s" id="s-col"></div></div>
  </div>
+ <p class="note hide" data-f="mount" id="meas-note"></p>
  <h2 data-t="pump"></h2>
  <div class="grp">
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
@@ -175,17 +176,18 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <label class="row" data-f="fluid"><span data-t="kind"></span><span class="v"><select data-p id="i-fluid"><option value="0" data-t="water"></option><option value="1" data-t="glycol"></option></select></span></label>
   <label class="row" data-f="fluid"><span data-t="conc"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="glycol"> %</span></label>
-  <label class="row" data-f="pressure"><span data-t="press"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="press" data-m="10"> bar</span></label>
+  <label class="row" data-f="pressure"><span data-t="press"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="press" data-m="10"> bar</span></label>
  </div>
  <h2 data-t="col_tank"></h2>
  <div class="grp">
   <label class="row" data-f="col_type"><span data-t="col_kind"></span><span class="v"><select data-p data-k="col_type"><option value="0" data-t="flat"></option><option value="1" data-t="tubes"></option></select></span></label>
-  <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="col_area" data-m="10"> m²</span></label>
+  <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
-  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="heater" data-m="10"> kW</span></label>
-  <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
+  <label class="row" data-f="mount"><span data-t="mount"></span><span class="v"><select data-p data-k="mount"><option value="0" data-t="sleeves"></option><option value="1" data-t="pipes"></option></select></span></label>
  </div>
+ <p class="note" data-f="mount" data-t="mount_note"></p>
  <h2 data-t="calc"></h2>
  <div class="grp">
   <div class="row" data-f="calc"><span data-t="boil"></span><span class="v calc" id="c-boil">—</span></div>
@@ -269,7 +271,7 @@ last7:'Последните 7 дни',date:'Дата',no_days:'Още няма �
 cool_h:'Охл.',heat_h:'Нагр.',days_note:'Колектор: най-високата температура за деня.\nБойлер: най-ниската и най-високата температура за деня.\nПомпа: общото време на работа за деня.\nОхл.: минутите нощно охлаждане (част от времето на помпата).\nНагр.: минутите, в които е работил нагревателят (бойлерът се топли при спряна помпа).\n* — непълен ден (часовникът е сверен след полунощ, напр. след спиране на тока).',
 system:'Система',mode:'Режим',season:'Сезон',heater:'Нагревател',clock:'Часовник',
 vac:'Ваканция',vac_mode:'Режим „Ваканция“',vac_note:'Денем пази колектора ({vac} °C) и не зарежда бойлера, нощем охлажда бойлера. Изключва се само ръчно.',
-m_normal:'Нормален',m_vac:'Ваканция',s_auto:'Автоматичен',s_is_auto:'автоматично',s_hand:'ръчно',
+m_normal:'Нормален',m_vac:'Ваканция',m_pulse:'импулсен',s_auto:'Автоматичен',s_is_auto:'автоматично',s_hand:'ръчно',
 cool_1:'бойлерът е над Tmax',cool_2:'E4 през деня',cool_3:'ваканция',cool_to:'цел {t} °C',cool_eq:'до изравняване',
 cool_until:'до {h}',cool_rise:'до изгрев',
 a_heat:'Нощното охлаждане е спряно',d_heat:'Бойлерът се топли, докато помпата го охлажда — работи нагревателят. Охлаждането е спряно до следващата нощ.',
@@ -317,6 +319,11 @@ a_leak:'Течът от нагревателя е спрян',d_leak:'При п�
 a_det:'Засечен нагревател',d_det:'В данните на монтажника нагревателят е „0 kW“, но бойлерът се топли при спряна помпа. Контролерът приема, че има нагревател; въведете мощността му в „Сервизни“.',
 leak:'Теч от нагревателя',leak_chk:'проверка — помпата е спряна, остават {s} s',leak_last:'последна проверка: колекторът {dir} с {d} K — {res}',
 fell:'падна',rose:'се покачи',res_go:'помпата продължи',res_stop:'спряно',
+sleeves:'В гилзи',pipes:'На тръбите',
+mount_note:'На тръбите — импулсен режим: помпата работи на импулси от 30 s и решава по стойностите, измерени 30 s след пускането. Колекторът — на изходящата (горещата) тръба на колектора, възможно най-близо до него; бойлерът — на тръбата от изхода на бойлера (серпентината) към колектора, непосредствено до бойлера. Само при метални тръби (мед, бронз).',
+meas_pulse:'измерено при импулса в {h}',meas_run:'измерено при работа на помпата в {h}',meas_now:'измерено сега (помпата работи)',
+meas_ago:'измерено преди {m} min',meas_none:'още няма измерване — първият импулс предстои',
+a_phot:'Импулсите са спрени',d_phot:'Колекторът е бил над {lim} °C (точката на кипене − 10 K). Между импулсите тръбата не показва колектора, затова нови импулси няма до залеза (или поне 5 h).',
 heater_kw:'Нагревател (0 = няма)',h_none:'няма',h_on:'работи',h_off:'не работи',h_det:'засечен (0 kW)',
 r_none:'—',r_diff_on:'зареждане',r_diff_off:'малка темп. разлика',r_min_run:'минимално време на работа',r_min_off:'минимален престой',
 r_col_min:'колекторът е под минималната си температура',r_tmax:'бойлерът е на Tmax',r_protect:'защита на колектора',
@@ -327,7 +334,8 @@ r_tf_hot:'колекторът е горещ (повреден датчик на
 r_cf_probe:'проба (повреден датчик на колектора)',r_cf_run:'бойлерът се топли (повреден датчик на колектора)',
 r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена',
 r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой',
-r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян'
+r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян',
+r_pulse:'импулс (измерване)',r_pulse_wait:'изчакване до следващия импулс',pw_in:'след {m} min'
 },en:{
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
@@ -340,7 +348,7 @@ last7:'Last 7 days',date:'Date',no_days:'No day stored yet.',
 cool_h:'Cool.',heat_h:'Heat.',days_note:'Collector: the highest temperature of the day.\nTank: the lowest and the highest temperature of the day.\nPump: the total run time of the day.\nCool.: minutes of night cooling (part of the pump time).\nHeat.: minutes the heater worked (the tank warmed with the pump stopped).\n* — partial day (the clock was set after midnight, e.g. after a power cut).',
 system:'System',mode:'Mode',season:'Season',heater:'Heater',clock:'Clock',
 vac:'Vacation',vac_mode:'Vacation mode',vac_note:'By day protects the collector ({vac} °C) and does not charge the tank, at night cools the tank. Switched off by hand only.',
-m_normal:'Normal',m_vac:'Vacation',s_auto:'Automatic',s_is_auto:'automatic',s_hand:'by hand',
+m_normal:'Normal',m_vac:'Vacation',m_pulse:'pulse mode',s_auto:'Automatic',s_is_auto:'automatic',s_hand:'by hand',
 cool_1:'tank above Tmax',cool_2:'E4 during the day',cool_3:'vacation',cool_to:'target {t} °C',cool_eq:'until equal',
 cool_until:'until {h}',cool_rise:'until sunrise',
 a_heat:'Night cooling stopped',d_heat:'The tank warms up while the pump cools it — the heater is on. The cooling is stopped until the next night.',
@@ -388,6 +396,11 @@ a_leak:'Heater leak stopped',d_leak:'During the check the collector fell by {d} 
 a_det:'Heater detected',d_det:'The installer data say the heater is "0 kW", but the tank warms with the pump stopped. The controller takes it that there is a heater; enter its power in "Service".',
 leak:'Heater leak',leak_chk:'check — the pump is stopped, {s} s left',leak_last:'last check: the collector {dir} by {d} K — {res}',
 fell:'fell',rose:'rose',res_go:'the pump went on',res_stop:'stopped',
+sleeves:'In the sleeves',pipes:'On the pipes',
+mount_note:'On the pipes — pulse mode: the pump runs in pulses of 30 s and decides by the values measured 30 s after it started. Collector: on the outlet (hot) pipe of the collector, as close to it as possible; tank: on the pipe from the tank outlet (the coil) to the collector, right at the tank. Metal pipes only (copper, bronze).',
+meas_pulse:'measured at the pulse at {h}',meas_run:'measured while the pump ran at {h}',meas_now:'measured now (the pump runs)',
+meas_ago:'measured {m} min ago',meas_none:'no measurement yet — the first pulse is coming',
+a_phot:'Pulses stopped',d_phot:'The collector was above {lim} °C (the boiling point − 10 K). Between the pulses the pipe does not show the collector, so there are no new pulses until the sunset (or at least 5 h).',
 heater_kw:'Heater (0 = none)',h_none:'none',h_on:'on',h_off:'off',h_det:'detected (0 kW)',
 r_none:'—',r_diff_on:'charging',r_diff_off:'difference too small',r_min_run:'minimum run time',r_min_off:'minimum off time',
 r_col_min:'collector below its minimum temperature',r_tmax:'tank at Tmax',r_protect:'collector protection',
@@ -398,17 +411,16 @@ r_tf_hot:'collector hot (tank sensor fault)',r_tf_probe:'probe at a hot collecto
 r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector sensor fault)',
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed',
 r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause',
-r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped'
+r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped',
+r_pulse:'pulse (measuring)',r_pulse_wait:'waiting for the next pulse',pw_in:'in {m} min'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
 let BZ='';try{BZ=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
 const t=k=>T[lang][k]||k;
 const deg=v=>(v/10).toFixed(1).replace('-','−');
-/* decimal fields: typed with "," or "." (the phone keyboard follows its locale), shown with the separator of the page language */
-const num=x=>Number(String(x).trim().replace(/\s/g,'').replace(',','.'));
-const dec=x=>{const s=String(x);return lang=='bg'?s.replace('.',','):s};
 const p2=n=>String(n).padStart(2,'0'),hm=m=>p2(Math.floor(m/60))+':'+p2(m%60);
+const c0min=()=>S.clock.min==null?null:S.clock.min;
 const dur=m=>m>=60?Math.floor(m/60)+' h '+m%60+' min':m+' min';
 
 /* The only place that greys out: every element names its function (data-f); the ones the
@@ -478,7 +490,12 @@ function render(){
  const ssn=t(S.winter?'winter':'summer');
  $('#hd-season').textContent=ssn;
  $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
- $('#mode-v').textContent=t(vac?'m_vac':'m_normal');
+ const pu=S.pulse;
+ $('#mode-v').textContent=t(vac?'m_vac':'m_normal')+(pu.on?' · '+t('m_pulse'):'');
+ if(pu.on&&pu.hot)card(' info',t('a_phot'),fill('d_phot',{lim:deg(S.calc.boil-100)}));
+ const mn=$('#meas-note');mn.classList.toggle('hide',!pu.on);
+ if(pu.on)mn.textContent=pu.age==null?t('meas_none'):pu.now?t('meas_now'):
+  c0min()==null?fill('meas_ago',{m:Math.round(pu.age/60)}):fill(pu.at?'meas_pulse':'meas_run',{h:hm(((c0min()-Math.floor(pu.age/60))%1440+1440)%1440)});
  $('#cool-row').classList.toggle('hide',!co.on);
  if(co.on)$('#cool-v').textContent=[t('cool_'+co.on),co.target==null?t('cool_eq'):fill('cool_to',{t:deg(co.target)}),
   co.until==null?t('cool_rise'):fill('cool_until',{h:hm(co.until)})].join(' · ');
@@ -500,12 +517,13 @@ function render(){
  $('#s-col').textContent=S.col==null?t('no_sensor'):'';
  const prot=['protect','frost','tf_probe','cool'].includes(S.why);
  $('#p-dot').style.background=S.pump?(prot?'var(--orange)':'var(--green)'):'';
- $('#p-txt').textContent=t(S.pump?'runs':'idle')+' — '+t('r_'+S.why+(S.why=='diff'?(S.pump?'_on':'_off'):''));
+ $('#p-txt').textContent=t(S.pump?'runs':'idle')+' — '+t('r_'+S.why+(S.why=='diff'?(S.pump?'_on':'_off'):''))+
+  (S.why=='pulse_wait'&&pu.next!=null?' ('+fill('pw_in',{m:Math.max(1,Math.ceil((pu.next-Math.round((Date.now()-leftAt)/1000))/60))})+')':'');
  testText();
  $('#b-start').classList.toggle('hide',!!S.test);$('#test-ctl').classList.toggle('hide',!S.test);
  $('#sw-fro').classList.toggle('off',!S.fro);$('#sw-fro').setAttribute('aria-checked',!!S.fro);
  $$('[data-k]').forEach(e=>{const o=S.set[e.dataset.k]||S.inst[e.dataset.k],m=+e.dataset.m||1;
-  e.min=o.min/m;e.max=o.max/m;e.step=(o.step||1)/m;if(document.activeElement!=e)e.value=e.type=='text'?dec(o.v/m):o.v/m});
+  e.min=o.min/m;e.max=o.max/m;e.step=(o.step||1)/m;if(document.activeElement!=e)e.value=o.v/m});
  const f=$('#i-fluid');if(document.activeElement!=f)f.value=S.inst.fluid.v;
  $$('[data-p]').forEach(e=>e.disabled=!unlocked);
  if(!S.inst.fluid.v)$('[data-k=glycol]').disabled=true;
@@ -570,8 +588,8 @@ $$('.tabs div').forEach(d=>d.onclick=()=>{
  $$('section').forEach(s=>s.classList.toggle('on',s.id==d.dataset.s));scrollTo(0,0)});
 $('#l-bg').onclick=()=>setLang('bg');$('#l-en').onclick=()=>setLang('en');
 $$('[data-k]').forEach(e=>e.onchange=async()=>{
- const v=Math.round(num(e.value)*(+e.dataset.m||1));e.blur();
- if(e.value.trim()!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
+ const v=Math.round(e.value*(+e.dataset.m||1));e.blur();
+ if(e.value!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
 $('#i-fluid').onchange=async e=>{const v=+e.target.value;e.target.blur();
  await post('/api/set',v?{fluid:1,glycol:S.inst.glycol.v}:{fluid:0});refresh()};
 $('#sw-fro').onclick=async()=>{await post('/api/set',{fro:S&&S.fro?0:1});refresh()};

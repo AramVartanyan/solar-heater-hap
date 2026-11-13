@@ -129,7 +129,7 @@ static void history_task(void *arg)
     TickType_t next = xTaskGetTickCount();
     for (;;) {
         sh_state_t st;
-        sh_state_get(&st);
+        sh_state_get_shown(&st);     /* pulse mode: the last reliable values */
         sh_clock_info_t ci;
         sh_clock_get(&ci);
         const sh_day_in_t in = {

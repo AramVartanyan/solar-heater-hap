@@ -13,7 +13,7 @@
 | 9 (B) | [step9-clock-history.md](step9-clock-history.md) — часовник, история | след #35 / #36 |
 | 10 (C) | [step10-cooling-vacation-seasons.md](step10-cooling-vacation-seasons.md) — нощно охлаждане, ваканция, сезони, обезвъздушаване | след #41 / #42 |
 | 12 (D) | [step12-heater-leak-e8.md](step12-heater-leak-e8.md) — нагревател, теч от нагревателя, обратен термосифон (`E8`) | след #48 / #49 |
-| 13 (D2) | [step13-pulse-mode.md](step13-pulse-mode.md) — импулсен режим (датчиците на тръбите) | — |
+| 13 (D2) | [step13-pulse-mode.md](step13-pulse-mode.md) — импулсен режим (датчиците на тръбите) | след #52 / #53 |
 
 ## Групи на оставащите стъпки (прието)
 

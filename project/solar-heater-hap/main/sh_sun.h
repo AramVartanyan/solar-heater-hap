@@ -48,6 +48,7 @@ typedef struct {
     uint32_t next_s;
     bool above;                 /* the collector has been above the tank since the last sunset */
     bool dark;                  /* sunset detected, no sunrise since */
+    bool risen;                 /* sunrise detected, no sunset since (the pulses without a clock) */
     uint32_t sunset_s;          /* when (valid while dark) */
     bool rise_done;             /* the sunrise of this day / of this night is taken */
     uint16_t rise_day;          /* its local date (with a set clock) */
@@ -61,6 +62,11 @@ typedef struct {
  * then). Returns SH_SUN_EVT_*. */
 uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, const sh_local_t *lt,
                     bool reliable, uint32_t now_s);
+/* The same for the pulse mode (the sensors on the pipes): `flow` — the pump has run for 30 s, so the
+ * values are those of the liquid and count for the sunset like those of a stopped pump (the collector
+ * pipe falls below the tank pipe). The sunrise is still seen only with the pump stopped. */
+uint8_t sh_sun_step_flow(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, bool flow,
+                         const sh_local_t *lt, bool reliable, uint32_t now_s);
 
 /* Night (from the sunset to the sunrise): with a reliable clock and both learned averages by the
  * local minute, otherwise what was detected in this night. */

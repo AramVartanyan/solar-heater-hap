@@ -223,6 +223,8 @@ const char *sh_pump_reason_name(sh_pump_reason_t reason)
         [SH_PUMP_REASON_AIR_PAUSE]    = "air venting: pause",
         [SH_PUMP_REASON_LEAK_CHECK]   = "heater leak check",
         [SH_PUMP_REASON_LEAK_STOP]    = "heater leak stopped",
+        [SH_PUMP_REASON_PULSE]        = "pulse",
+        [SH_PUMP_REASON_PULSE_WAIT]   = "waiting for the next pulse",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && names[reason] != NULL) {
         return names[reason];
