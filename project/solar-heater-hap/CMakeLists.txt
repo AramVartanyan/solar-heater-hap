@@ -33,4 +33,4 @@ endif()
 set(COMPONENTS main)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(solar-heater-hap)
+project(solheat1)          # the image: build/solheat1.bin — the same name as on the OTA server (otafw/solheat1.bin)
