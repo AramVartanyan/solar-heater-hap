@@ -46,7 +46,8 @@ table{width:100%;border-collapse:collapse;font-size:16px}
 th,td{padding:11px 10px;text-align:left}th{color:var(--sub);font-weight:500;font-size:13px}
 td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
 td+td{white-space:nowrap}
-.days td:first-child{white-space:nowrap}   /* the date and the star of a partial day: one line */
+.days td:first-child{white-space:nowrap}
+.days th{vertical-align:top}.days .u{display:block;font-size:11px;font-weight:400;color:var(--sub)}   /* the unit under the column name */   /* the date and the star of a partial day: one line */
 td input{font:inherit;color:var(--blue);background:none;border:0;text-align:right;width:2.4em;padding:2px 0}
 .cur{background:rgba(63,136,242,.12)}
 td select,.v select{font:inherit}
@@ -117,7 +118,7 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="last7" data-f="history"></h2>
  <div class="grp" style="padding:4px 6px" data-f="history">
-  <table class="days"><thead><tr><th data-t="date"></th><th data-t="col"></th><th data-t="tank"></th><th data-t="pump"></th><th data-t="cool_h"></th><th data-f="heater" data-t="heat_h"></th></tr></thead><tbody id="days"></tbody></table>
+  <table class="days"><thead><tr><th data-t="date"></th><th><span data-t="col"></span><span class="u">°C</span></th><th><span data-t="tank"></span><span class="u">°C</span></th><th><span data-t="pump"></span><span class="u">h:min</span></th><th><span data-t="cool_h"></span><span class="u">min</span></th><th data-f="heater"><span data-t="heat_h"></span><span class="u">min</span></th></tr></thead><tbody id="days"></tbody></table>
  </div>
  <p class="note" data-f="history" data-t="days_note"></p>
 </section>
@@ -572,9 +573,9 @@ function drawChart(){
 function drawDays(){
  const b=$('#days');if(!D)return;b.textContent='';
  if(!D.days.length){const r=b.insertRow(),c=r.insertCell();c.colSpan=6;c.textContent=t('no_days');return}
- const tv=v=>v==null?'—':deg(v)+'°';
+ const tv=v=>v==null?'—':deg(v);   /* the units are under the column names */
  D.days.forEach(d=>{const r=b.insertRow(),run=d.run[0]+d.run[1]+d.run[2]+d.cool;
-  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?'*':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60)+' h',d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
+  [d.d.slice(8,10)+'.'+d.d.slice(5,7)+(d.part?'*':''),tv(d.cx),(d.tn==null?'—':deg(d.tn))+' – '+tv(d.tx),Math.floor(run/60)+':'+p2(run%60),d.cool||'—',d.heat||'—'].forEach(x=>r.insertCell().textContent=x)});
 }
 async function getJ(u){try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}}
 async function loadChart(){const c=await getJ('/api/chart');if(c){C=c;drawChart()}}
