@@ -75,7 +75,7 @@ static esp_err_t send_json(httpd_req_t *req, const char *json, int len)
 static esp_err_t state_get(httpd_req_t *req)
 {
     sh_state_t st;
-    sh_state_get(&st);
+    sh_state_get_shown(&st);     /* pulse mode: the last reliable values */
     const uint32_t now_s = (uint32_t)(esp_timer_get_time() / 1000000);
 
     wifi_ap_record_t ap;
@@ -117,6 +117,12 @@ static esp_err_t state_get(httpd_req_t *req)
         .heater_on = st.modes.heater_on, .heater_det = st.modes.heater_det, .leak = st.modes.leak,
         .leak_last = st.modes.leak_last, .leak_last_stop = st.modes.leak_last_stop,
         .leak_last_drop = st.modes.leak_last_drop, .e8_normal = st.modes.e8_normal,
+        .pulse = st.modes.pulse, .meas = st.modes.rel_any,
+        .meas_age_s = st.modes.rel_any && now_s > st.modes.rel_s ? now_s - st.modes.rel_s : 0,
+        .meas_pulse = st.modes.rel_pulse, .meas_now = st.modes.rel_now,
+        .pulse_next = st.modes.pulse_next_s != 0,
+        .pulse_left_s = st.modes.pulse_next_s > now_s ? st.modes.pulse_next_s - now_s : 0,
+        .pulse_hot = st.modes.pulse_hot,
     };
     if (st.modes.leak == SH_LEAK_CHECK) {
         const sh_leak_t l = { .phase = SH_LEAK_CHECK, .check_s = st.modes.leak_start_s };

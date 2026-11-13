@@ -3,13 +3,16 @@
  * compiled into the host test too. sh_web serves them over HTTP.
  *
  *   status   one JSON object with everything the page shows; temperatures in tenths of °C
- *            (null: faulty sensor or no value yet), the pressure in tenths of bar
+ *            (null: faulty sensor or no value yet), the pressure in tenths of bar; in the pulse
+ *            mode the temperatures are the last reliable values and "pulse" says when they were
+ *            taken and when the next pulse comes
  *   requests bodies are forms ("key=value&key=value"), values are whole numbers or short words:
  *              set    user settings by their NVS keys (tbo, c_lo, d_on, d_of, t_st and the winter
  *                     set c_lo_w, d_on_w, d_of_w — the checks of the button menu; ssn 0 / 1 / 2
  *                     season, hol 0 / 1 vacation, nc / nc_w 0 / 1 night cooling above Tmax in
  *                     summer / winter), fro (0 / 1), installer data (fluid, glycol, press,
- *                     col_max, col_type, col_area, tank_vol, heater — only with the access code)
+ *                     col_max, col_type, col_area, tank_vol, heater, mount — only with the access
+ *                     code)
  *              test   cmd=start | plus | minus | stop
  *              air    cmd=start | stop: the air venting
  *              reset  what=wifi | defaults | factory | history | learned (only with the access
@@ -92,6 +95,15 @@ typedef struct {
     bool leak_last, leak_last_stop;
     int16_t leak_last_drop;     /* 0.1 K */
     int16_t e8_normal;          /* learned normal night cooling, 0.1 K/h, INT16_MIN: none */
+    /* the pulse mode (group D2): t_col / t_tank are the last reliable values */
+    bool pulse;
+    bool meas;                  /* they exist ... */
+    uint32_t meas_age_s;        /* ... taken this long ago ... */
+    bool meas_pulse;            /* ... at a pulse (otherwise during a longer run) */
+    bool meas_now;              /* ... now: the pump runs for >= 30 s */
+    bool pulse_next;            /* a next pulse is planned ... */
+    uint32_t pulse_left_s;      /* ... in */
+    bool pulse_hot;             /* no pulses after an overheated collector */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */

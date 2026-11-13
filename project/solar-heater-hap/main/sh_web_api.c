@@ -19,7 +19,7 @@ static const char *const FEATURES[] = {
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
-    "heater",
+    "heater", "mount",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -144,6 +144,14 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, ",\"e8n\":");
     put_or_null(&o, s->e8_normal != INT16_MIN, s->e8_normal);
     put(&o, "},");
+
+    /* the pulse mode: the age of the shown values (taken at a pulse / during a run / now), the
+     * next pulse, no pulses after an overheated collector */
+    put(&o, "\"pulse\":{\"on\":%d,\"age\":", s->pulse);
+    put_or_null(&o, s->pulse && s->meas, (int)s->meas_age_s);
+    put(&o, ",\"at\":%d,\"now\":%d,\"next\":", s->meas_pulse, s->meas_now);
+    put_or_null(&o, s->pulse && s->pulse_next, (int)s->pulse_left_s);
+    put(&o, ",\"hot\":%d},", s->pulse_hot);
 
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
@@ -560,6 +568,8 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
         [SH_PUMP_REASON_LEAK_CHECK]   = "leak_check",
         [SH_PUMP_REASON_LEAK_STOP]    = "leak_stop",
+        [SH_PUMP_REASON_PULSE]        = "pulse",
+        [SH_PUMP_REASON_PULSE_WAIT]   = "pulse_wait",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];

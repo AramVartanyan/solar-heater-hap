@@ -70,6 +70,7 @@ uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, co
         s->rise_day = lt->set ? lt->day : SH_DAY_NONE;
         if (!lt->set || lt->min < SH_SUN_RISE_BEFORE_MIN) {
             s->dark = false;
+            s->risen = true;
             evt |= SH_SUN_EVT_RISE;
             if (lt->set && reliable) {
                 days_add(s->days.rise, lt->min);
@@ -85,6 +86,7 @@ uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, co
         } else if (s->above && !pump_on && t_col < t_tank) {
             s->above = false;
             s->dark = true;
+            s->risen = false;
             s->sunset_s = now_s;
             if (!lt->set) {
                 s->rise_done = false;   /* without a clock: the next rise is the sunrise */

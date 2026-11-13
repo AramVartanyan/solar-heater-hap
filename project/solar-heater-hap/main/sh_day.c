@@ -22,6 +22,7 @@ int sh_run_kind(bool pump_on, sh_pump_reason_t reason)
     case SH_PUMP_REASON_ANTI_SEIZE:
     case SH_PUMP_REASON_CF_PROBE:
     case SH_PUMP_REASON_AIR_RUN:
+    case SH_PUMP_REASON_PULSE:      /* the pulse measures: like a probe */
         return SH_RUN_OTHER;
     case SH_PUMP_REASON_COOL:
         return SH_RUN_COOL;
