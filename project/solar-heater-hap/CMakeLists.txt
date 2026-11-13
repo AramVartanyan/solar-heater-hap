@@ -4,7 +4,9 @@ cmake_minimum_required(VERSION 3.16)
 
 # HOMEKIT_PATH: esp-homekit-sdk root (components/, components/homekit/).
 # Default: this repository, whose components/ holds button (own fixed version that
-# replaces the one of esp-homekit-sdk, git submodule) and homekit (the SDK).
+# replaces the one of esp-homekit-sdk, git submodule) and homekit (git submodule: the
+# branch "homekit" of the fork AramVartanyan/esp-homekit-sdk — its components/homekit
+# folder, kept up to date from master by a GitHub Action).
 # project/common (git submodules: captive-wifi, outputwrite, esp_tm1637,
 # container_nvs, general-ota) is found next to this project folder.
 get_filename_component(REPO_COMPONENTS ${CMAKE_CURRENT_LIST_DIR}/../../components ABSOLUTE)
