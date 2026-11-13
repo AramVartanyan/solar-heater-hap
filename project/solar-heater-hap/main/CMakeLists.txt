@@ -34,6 +34,9 @@ idf_component_register(
         "sh_heater.c"
         "sh_e8.c"
         "sh_pulse.c"
+        "sh_net.c"
+        "sh_fw.c"
+        "sh_link.c"
     INCLUDE_DIRS "."
     # the page of the web interface (sh_web), served as it is
     EMBED_FILES "web/index.html" "web/favicon.svg"
@@ -43,4 +46,4 @@ idf_component_register(
         # project/common (git submodules)
         button outputwrite captive-wifi container_nvs general-ota esp_tm1637 ds18b20
         # managed components (idf_component.yml)
-        led_strip)
+        led_strip mdns)

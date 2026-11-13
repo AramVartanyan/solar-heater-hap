@@ -1,6 +1,7 @@
 /* Web interface (doc/web-interface.md; doc/tasks/step6-installer-web.md 3.4): one page embedded
  * in the firmware and a small JSON API, on an own esp_http_server (port 80). The server runs only
- * while the device is connected to the router and the Wi-Fi setup portal is closed — the portal
+ * while the device is connected to the router or its own access point (AP) is on, and the Wi-Fi
+ * setup portal is closed — the portal
  * has its own server on the same port. With HomeKit the handlers move to the server of
  * esp-homekit-sdk.
  *
@@ -17,8 +18,10 @@
  *   GET  /api/tz      the supported time zones
  *   POST /api/time    the time of the browser (no code; taken only without SNTP in the last 24 h)
  *   POST /api/tz      the time zone, by its index — with the access code
+ *   POST /api/ota     the firmware update: check / update — with the access code, not in AP
  * Answers of the POSTs: 200, 400 (bad request, nothing changed), 403 (access code).
- * The access code: the last 6 characters of the setup network name ("SOLAR-810841" -> 810841). */
+ * The server runs also on the own access point (network mode AP, http://192.168.4.1).
+ * The access code: the last 6 characters of the network name ("Solar-810840" -> 810840). */
 #pragma once
 
 #include <stdbool.h>

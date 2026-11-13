@@ -20,7 +20,10 @@
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
- *            the access code ("code") is the last 6 characters of the setup network name
+ *              ota    cmd=check | update: the firmware update (with the code; not in the network
+ *                     mode AP — no internet there)
+ *            the access code ("code") is the last 6 characters of the network name ("Solar-810840"),
+ *            in lower or upper case; the network mode (CP / AP) is only shown
  *   chart    the day in RAM (sh_day): the 10-min intervals of today / of the last 24 h
  *   days     the last daily summaries (sh_hist), newest first
  *   features the functions the firmware has; the page greys out every element whose function is
@@ -36,6 +39,7 @@
 #include "sh_clock_rules.h"
 #include "sh_day.h"
 #include "sh_hist.h"
+#include "sh_fw.h"
 
 #define SH_WEB_CODE_LEN         6
 #define SH_WEB_STATUS_MAX       3072    /* a buffer of this size always holds the status */
@@ -67,12 +71,22 @@ typedef struct {
     uint32_t test_left_s;
     sh_web_config_t cfg;
     int16_t col_protect;        /* collector protection setting, 0.1 °C (limited by the cap here) */
-    const char *name;           /* device name */
+    const char *name;           /* the name in the network ("Solar-810840"; mDNS "<name>.local") */
     const char *version;        /* firmware version */
-    const char *serial;         /* serial number: the MAC of the setup network, 12 hex digits (its last 6 are the access code) */
+    const char *serial;         /* serial number: the base MAC, 12 hex digits in upper case */
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;
+    /* the network mode (group E): AP (the own access point) or CP; mDNS works in CP with the router */
+    bool net_ap;
+    bool net_pending;           /* AP waits for the end of the firmware update */
+    bool mdns;                  /* "<name>.local" answers (CP, connected) */
+    uint8_t ap_clients;
+    uint32_t ap_left_s;         /* the idle access point ends in */
+    /* the firmware update */
+    sh_fw_state_t fw;
+    uint8_t fw_pct;
+    const char *fw_ver;         /* the newer version on the server */
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
     bool history;               /* the history partition is there */
@@ -179,6 +193,15 @@ sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s);
 
 /* "tz": a time zone of sh_tz_list by its index; needs the access code. */
 sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz);
+
+typedef enum {
+    SH_WEB_OTA_CHECK = 0,       /* check for a newer version */
+    SH_WEB_OTA_UPDATE,          /* install the newer version found by the check */
+} sh_web_ota_t;
+
+/* "ota": needs the access code; refused (SH_WEB_BAD) in the network mode AP (no internet) and for
+ * "update" without a newer version found (`fw`: the state of the update). */
+sh_web_res_t sh_web_ota(const char *body, const char *code, bool net_ap, sh_fw_state_t fw, sh_web_ota_t *cmd);
 
 /* Key of a pump reason for the page (it holds the texts). */
 const char *sh_web_reason_key(sh_pump_reason_t reason);

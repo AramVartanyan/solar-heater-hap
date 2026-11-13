@@ -19,7 +19,7 @@ static const char *const FEATURES[] = {
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
-    "heater", "mount",
+    "heater", "mount", "net_mode", "ota",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -182,7 +182,14 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ssid);
     put(&o, ",\"ip\":");
     put_str(&o, s->ip);
-    put(&o, ",\"rssi\":%d},", s->rssi);
+    put(&o, ",\"rssi\":%d,\"mode\":\"%s\",\"pend\":%d,\"host\":", s->rssi, s->net_ap ? "AP" : "CP",
+        s->net_pending);
+    put_str(&o, s->name);
+    put(&o, ",\"mdns\":%d,\"cl\":%d,\"left\":", s->mdns, s->ap_clients);
+    put_or_null(&o, s->net_ap && s->ap_clients == 0, (int)s->ap_left_s);
+    put(&o, "},\"ota\":{\"st\":\"%s\",\"pct\":%d,\"ver\":", sh_fw_state_key(s->fw), s->fw_pct);
+    put_str(&o, s->fw_ver ? s->fw_ver : "");
+    put(&o, "},");
 
     static const char *const trust[] = {
         [SH_CLOCK_UNSET] = "unset", [SH_CLOCK_TZ_UNCONFIRMED] = "tz",
@@ -534,6 +541,30 @@ sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz)
         return SH_WEB_DENIED;
     }
     *tz = i;
+    return SH_WEB_OK;
+}
+
+sh_web_res_t sh_web_ota(const char *body, const char *code, bool net_ap, sh_fw_state_t fw, sh_web_ota_t *cmd)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "cmd", v)) {
+        return SH_WEB_BAD;
+    }
+    if (strcmp(v, "check") == 0) {
+        *cmd = SH_WEB_OTA_CHECK;
+    } else if (strcmp(v, "update") == 0) {
+        *cmd = SH_WEB_OTA_UPDATE;
+    } else {
+        return SH_WEB_BAD;
+    }
+    if (!sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
+    if (net_ap || (*cmd == SH_WEB_OTA_UPDATE && fw != SH_FW_AVAILABLE) ||
+        (*cmd == SH_WEB_OTA_CHECK && (fw == SH_FW_CHECKING || fw == SH_FW_WAITING || fw == SH_FW_UPDATING ||
+                                      fw == SH_FW_DONE))) {
+        return SH_WEB_BAD;
+    }
     return SH_WEB_OK;
 }
 

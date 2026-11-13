@@ -60,7 +60,7 @@ static void test_status(void)
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\",\"heater\",\"mount\"],"
+        "\"vac_limit\",\"heater\",\"mount\",\"net_mode\",\"ota\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
@@ -84,7 +84,8 @@ static void test_status(void)
         "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10},"
         "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5},\"mount\":{\"v\":0,\"min\":0,\"max\":1}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
-        "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
+        "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"CP\",\"pend\":0,"
+        "\"host\":\"solar-heater\",\"mdns\":0,\"cl\":0,\"left\":null},\"ota\":{\"st\":\"idle\",\"pct\":0,\"ver\":\"\"},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
         "\"run\":[0,0,0,0]}") == 0);
 }
@@ -158,7 +159,7 @@ static void test_status_values(void)
     s.ssid = "";
     s.ip = NULL;
     s.rssi = 0;
-    HAS(&s, "\"net\":{\"ssid\":\"\",\"ip\":\"\",\"rssi\":0},");
+    HAS(&s, "\"net\":{\"ssid\":\"\",\"ip\":\"\",\"rssi\":0,");
 
     /* a missing function is not in the list (the page greys it out) */
     s = status();
@@ -170,13 +171,15 @@ static void test_status_values(void)
     HAS(&s, "\"col_type\"");
     HAS(&s, "\"tank_vol\"");
     HAS(&s, "\"vac_limit\"");
-    HAS_NOT(&s, "\"ota\"");
+    HAS(&s, "\"ota\"");                     /* group E: now there */
+    HAS(&s, "\"net_mode\"");
     HAS_NOT(&s, "\"homekit\"");
+    HAS_NOT(&s, "\"city\"");
 
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"vac_limit\",\"heater\",\"mount\",\"history\"],");
+    HAS(&s, "\"heater\",\"mount\",\"net_mode\",\"ota\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -240,6 +243,12 @@ static void test_status_buffer(void)
     s.pulse = s.meas = s.meas_pulse = s.meas_now = s.pulse_next = s.pulse_hot = true;
     s.meas_age_s = 999999;
     s.pulse_left_s = 99999;
+    s.net_ap = s.net_pending = s.mdns = true;          /* group E */
+    s.ap_clients = 255;
+    s.ap_left_s = 900;
+    s.fw = SH_FW_NO_SERVER;
+    s.fw_pct = 100;
+    s.fw_ver = "0123456789012345678901234567890";
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
 

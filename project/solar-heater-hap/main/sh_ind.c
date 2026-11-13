@@ -24,6 +24,11 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
     }
 
     sh_ind_out_t out;
+    if (in->ota) {
+        out.color = SH_COLOR_WHITE;
+        out.pattern = SH_IND_OTA;
+        return out;
+    }
     if (in->alarms & SH_ALARM_OVERHEAT) {
         out.color = SH_COLOR_RED;
         out.pattern = SH_IND_FAST;
@@ -47,7 +52,8 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
     } else {
         out.color = SH_COLOR_BLUE;
     }
-    out.pattern = in->wifi_connected && !in->wifi_portal ? SH_IND_STEADY : SH_IND_HEARTBEAT;
+    out.pattern = in->ap ? SH_IND_AP
+                : in->wifi_connected && !in->wifi_portal ? SH_IND_STEADY : SH_IND_HEARTBEAT;
     return out;
 }
 
@@ -64,6 +70,10 @@ bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms)
     }
     case SH_IND_HEARTBEAT:
         return ms % SH_IND_BEAT_PERIOD_MS < SH_IND_BEAT_ON_MS;
+    case SH_IND_OTA:
+        return ms % (2 * SH_IND_OTA_MS) < SH_IND_OTA_MS;
+    case SH_IND_AP:
+        return ms % SH_IND_BEAT_PERIOD_MS >= SH_IND_BEAT_ON_MS;
     case SH_IND_STEADY:
     default:
         return true;

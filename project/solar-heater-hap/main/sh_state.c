@@ -86,3 +86,13 @@ void sh_state_set_modes(const sh_modes_t *modes)
     s_state.modes = *modes;
     xSemaphoreGive(s_lock);
 }
+
+void sh_state_set_link(bool net_ap, bool fw_prompt, bool fw_wait, bool ota_running)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.net_ap = net_ap;
+    s_state.fw_prompt = fw_prompt;
+    s_state.fw_wait = fw_wait;
+    s_state.ota_running = ota_running;
+    xSemaphoreGive(s_lock);
+}

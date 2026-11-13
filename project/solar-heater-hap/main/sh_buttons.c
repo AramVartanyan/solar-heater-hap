@@ -11,6 +11,7 @@
 #include "sh_settings_store.h"
 #include "sh_control.h"
 #include "sh_reset.h"
+#include "sh_link.h"
 #include "sh_buttons.h"
 
 static const char *TAG = "sh_buttons";
@@ -77,6 +78,7 @@ static void menu_key(sh_key_t key)
     xSemaphoreTake(s_menu_lock, portMAX_DELAY);
     const sh_menu_ctx_t ctx = {
         .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
+        .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fw_prompt = st.fw_prompt,
     };
     const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
     const sh_setting_t id = (sh_setting_t)s_menu.id;
@@ -98,6 +100,12 @@ static void menu_key(sh_key_t key)
         break;
     case SH_MENU_ACT_SAVE:
         sh_settings_set(id, value);     /* logs the result */
+        break;
+    case SH_MENU_ACT_NET:
+        sh_link_select(value ? SH_NET_AP : SH_NET_CP);
+        break;
+    case SH_MENU_ACT_FW_CONFIRM:
+        sh_link_fw_confirm();
         break;
     case SH_MENU_ACT_NONE:
         break;

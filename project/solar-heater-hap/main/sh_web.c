@@ -21,6 +21,8 @@
 #include "sh_pump_ctl.h"
 #include "sh_cool.h"
 #include "sh_heater.h"
+#include "sh_link.h"
+#include "sh_net.h"
 #include "sh_web_api.h"
 #include "sh_web.h"
 
@@ -78,24 +80,31 @@ static esp_err_t state_get(httpd_req_t *req)
     sh_state_get_shown(&st);     /* pulse mode: the last reliable values */
     const uint32_t now_s = (uint32_t)(esp_timer_get_time() / 1000000);
 
+    sh_link_info_t li;
+    sh_link_get(&li);
+    const bool ap_mode = li.mode == SH_NET_AP;
     wifi_ap_record_t ap;
     char ssid[sizeof(ap.ssid) + 1] = "";
-    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
-        memcpy(ssid, ap.ssid, sizeof(ap.ssid));     /* 32 characters have no NUL */
-    }
     char ip[16] = "";
-    captive_wifi_get_ip(ip, sizeof(ip));
+    if (ap_mode) {                                  /* the own access point */
+        strlcpy(ssid, captive_wifi_ap_ssid(), sizeof(ssid));
+        strlcpy(ip, captive_wifi_portal_ip(), sizeof(ip));
+    } else {
+        if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
+            memcpy(ssid, ap.ssid, sizeof(ap.ssid));     /* 32 characters have no NUL */
+        }
+        captive_wifi_get_ip(ip, sizeof(ip));
+    }
 
     sh_clock_info_t ci;
     sh_clock_get(&ci);
 
-    /* serial number: the MAC of the setup network (as its name and the access code), as in HomeKit */
+    /* serial number: the base MAC (its last 6 characters are in the name and the access code) */
     static char serial[13];
     if (!serial[0]) {
         uint8_t mac[6];
-        esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
-        snprintf(serial, sizeof(serial), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
-                 mac[5]);
+        esp_read_mac(mac, ESP_MAC_BASE);
+        sh_net_serial(serial, sizeof(serial), mac);
     }
     sh_web_status_t s = {
         .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
@@ -103,8 +112,11 @@ static esp_err_t state_get(httpd_req_t *req)
         .test_on = st.test_on,
         .test_left_s = st.test_on && st.test_end_s > now_s ? st.test_end_s - now_s : 0,
         .col_protect = SH_CONTROL_COL_PROTECT,
-        .name = SH_HOSTNAME, .version = esp_app_get_description()->version, .serial = serial,
-        .ssid = ssid, .ip = ip, .rssi = captive_wifi_rssi(),
+        .name = sh_link_hostname(), .version = esp_app_get_description()->version, .serial = serial,
+        .ssid = ssid, .ip = ip, .rssi = ap_mode ? 0 : captive_wifi_rssi(),
+        .net_ap = ap_mode, .net_pending = li.ap_pending, .mdns = !ap_mode && captive_wifi_is_connected(),
+        .ap_clients = li.clients, .ap_left_s = li.ap_left_s,
+        .fw = li.fw, .fw_pct = li.fw_pct, .fw_ver = li.fw_ver,
         .clock = {
             .trust = ci.trust, .sntp = ci.sntp, .min = ci.lt.set ? (int16_t)ci.lt.min : -1,
             .tz = ci.tz, .tz_confirmed = ci.tz_confirmed, .peak = ci.peak.peak,
@@ -237,7 +249,9 @@ static esp_err_t csv_get(httpd_req_t *req)
     c->req = req;
     c->fail = false;
     httpd_resp_set_type(req, "text/csv; charset=utf-8");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"" SH_HOSTNAME "-history.csv\"");
+    static char disp[80];
+    snprintf(disp, sizeof(disp), "attachment; filename=\"%s-history.csv\"", sh_link_hostname());
+    httpd_resp_set_hdr(req, "Content-Disposition", disp);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     c->len = strlcpy(c->buf, sh_hist_csv_header, sizeof(c->buf));
     sh_history_walk(false, 0, csv_line, c);
@@ -440,6 +454,27 @@ static esp_err_t tz_post(httpd_req_t *req)
     return answer(req, res);
 }
 
+/* The firmware update: check, or install the newer version (with the code; not in AP). */
+static esp_err_t ota_post(httpd_req_t *req)
+{
+    char body[BODY_MAX];
+    if (!read_body(req, body)) {
+        return ESP_FAIL;
+    }
+    sh_link_info_t li;
+    sh_link_get(&li);
+    sh_web_ota_t cmd;
+    const sh_web_res_t res = sh_web_ota(body, s_code, li.mode == SH_NET_AP, li.fw, &cmd);
+    if (res == SH_WEB_OK) {
+        if (cmd == SH_WEB_OTA_CHECK) {
+            sh_link_fw_check();
+        } else {
+            sh_link_fw_update();
+        }
+    }
+    return answer(req, res);
+}
+
 static esp_err_t auth_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -457,7 +492,7 @@ static void server_start(void)
      * the oldest one is purged while the browser still uses it and its request fails */
     cfg.max_open_sockets = 7;
     cfg.lru_purge_enable = true;
-    cfg.max_uri_handlers = 16;
+    cfg.max_uri_handlers = 17;
     esp_err_t err = httpd_start(&s_httpd, &cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start: %s", esp_err_to_name(err));
@@ -480,12 +515,17 @@ static void server_start(void)
         { .uri = "/api/tz",    .method = HTTP_GET,  .handler = tz_get },
         { .uri = "/api/time",  .method = HTTP_POST, .handler = time_post },
         { .uri = "/api/tz",    .method = HTTP_POST, .handler = tz_post },
+        { .uri = "/api/ota",   .method = HTTP_POST, .handler = ota_post },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(s_httpd, &uris[i]);
     }
     char ip[16] = "";
-    captive_wifi_get_ip(ip, sizeof(ip));
+    if (captive_wifi_ap_active()) {
+        strlcpy(ip, captive_wifi_portal_ip(), sizeof(ip));
+    } else {
+        captive_wifi_get_ip(ip, sizeof(ip));
+    }
     ESP_LOGI(TAG, "web interface: http://%s/ (access code %s)", ip, s_code);
 }
 
@@ -521,10 +561,8 @@ void sh_web_enable(bool on)
 
 esp_err_t sh_web_init(void)
 {
-    /* the access code: the last 6 characters of "<prefix>-XXXXXX" */
-    const char *ssid = captive_wifi_ap_ssid();
-    const size_t len = strlen(ssid);
-    strlcpy(s_code, len >= SH_WEB_CODE_LEN ? ssid + len - SH_WEB_CODE_LEN : ssid, sizeof(s_code));
+    /* the access code: the last 6 characters of the name "<prefix>-xxxxxx" */
+    sh_net_code(s_code, sizeof(s_code), captive_wifi_ap_ssid());
 
     /* above the captive-wifi worker (3): the server is down before the portal can start its own */
     if (xTaskCreate(web_task, "sh_web", 4096, NULL, 5, &s_task) != pdPASS) {

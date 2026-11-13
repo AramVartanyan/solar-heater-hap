@@ -11,7 +11,9 @@
  *   white    collector < 20 °C (released above 22 °C)
  *   blue     idle
  * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
- * other colours -> steady with Wi-Fi, heartbeat without it (or while the setup portal is open).
+ * other colours -> steady with Wi-Fi, heartbeat without it (or while the setup portal is open); while
+ * the own access point (AP) is on: the mirror of the heartbeat — lit, dark for 80 ms every 2 s.
+ * A firmware update (OTA) comes before everything: white, blinking 500 ms / 500 ms.
  * Temperatures are tenths of °C, times ms. */
 #pragma once
 
@@ -28,6 +30,7 @@
 #define SH_IND_DOUBLE_DARK_MS   1000u
 #define SH_IND_BEAT_ON_MS       80u     /* heartbeat: 80 ms on every 2 s */
 #define SH_IND_BEAT_PERIOD_MS   2000u
+#define SH_IND_OTA_MS           500u    /* OTA: 500 on / 500 off */
 
 typedef enum {
     SH_COLOR_OFF = 0,
@@ -46,6 +49,8 @@ typedef enum {
     SH_IND_HEARTBEAT,   /* no Wi-Fi / setup portal */
     SH_IND_FAST,        /* E4, E5 */
     SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
+    SH_IND_AP,          /* the own access point (AP): lit, dark 80 ms every 2 s */
+    SH_IND_OTA,         /* firmware update: blinking 500 ms */
 } sh_ind_pattern_t;
 
 typedef struct {
@@ -62,6 +67,8 @@ typedef struct {
     bool cooling;       /* the pump runs by the night cooling */
     bool wifi_connected;
     bool wifi_portal;
+    bool ap;            /* the own access point (network mode AP) is on */
+    bool ota;           /* a firmware update is being written */
 } sh_ind_in_t;
 
 /* The memory of the white / yellow return zones; all zeros at boot. */

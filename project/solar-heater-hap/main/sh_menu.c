@@ -1,11 +1,15 @@
 /* User menu transitions — see sh_menu.h. */
 
+#include "sh_alarm.h"
 #include "sh_menu.h"
 
 void sh_menu_update(sh_menu_t *m, uint32_t now_ms)
 {
     if (m->mode == SH_MENU_SAVED && now_ms - m->mark_ms >= SH_MENU_SAVED_MS) {
         m->mode = SH_MENU_LIST;
+    }
+    if (m->mode == SH_MENU_CODE && now_ms - m->mark_ms >= 2 * SH_MENU_CODE_PART_MS) {
+        m->mode = SH_MENU_NORMAL;       /* the code shown: the normal screen */
     }
     if (m->mode != SH_MENU_NORMAL && now_ms - m->key_ms >= SH_MENU_TIMEOUT_MS) {
         m->mode = SH_MENU_NORMAL;       /* an unconfirmed value is dropped */
@@ -19,7 +23,7 @@ sh_setting_t sh_menu_setting(uint8_t pos, bool winter)
         [SH_MENU_CLO] = SH_SET_COL_MIN, [SH_MENU_DON] = SH_SET_DIFF_ON, [SH_MENU_DOF] = SH_SET_DIFF_OFF,
         [SH_MENU_TST] = SH_SET_TEST_S,
     };
-    return sh_settings_seasonal(ids[pos < SH_MENU_END ? pos : SH_MENU_TBO], winter);
+    return sh_settings_seasonal(ids[pos < SH_MENU_NET ? pos : SH_MENU_TBO], winter);
 }
 
 sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_menu_ctx_t *ctx,
@@ -32,6 +36,9 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
     switch (m->mode) {
     case SH_MENU_NORMAL:
         if (key == SH_KEY_MENU) {
+            if (ctx->fw_prompt) {
+                return SH_MENU_ACT_FW_CONFIRM;      /* "FUp": the update is confirmed */
+            }
             if (ctx->test_running) {
                 return SH_MENU_ACT_STOP;
             }
@@ -56,6 +63,10 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
         if (key == SH_KEY_MENU) {
             if (m->pos == SH_MENU_END) {
                 m->mode = SH_MENU_NORMAL;
+            } else if (m->pos == SH_MENU_NET) {
+                m->mode = SH_MENU_EDIT;
+                m->value = ctx->net_ap;     /* the mode in use */
+                m->mark_ms = now_ms;
             } else {
                 m->mode = SH_MENU_EDIT;
                 m->id = (uint8_t)sh_menu_setting(m->pos, ctx->winter);
@@ -69,6 +80,22 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
 
     case SH_MENU_EDIT:
         m->key_ms = now_ms;
+        if (m->pos == SH_MENU_NET) {
+            if (key == SH_KEY_MENU) {
+                m->mark_ms = now_ms;
+                if (m->value && !ctx->net_ap && ctx->net_connected) {
+                    m->value = 0;           /* connected to the router: AP refused, "CP" for 1 s */
+                    m->mode = SH_MENU_SAVED;
+                    return SH_MENU_ACT_NONE;
+                }
+                const bool changed = m->value != (int16_t)ctx->net_ap;
+                m->mode = m->value ? SH_MENU_CODE : SH_MENU_SAVED;      /* AP: the access code */
+                return changed ? SH_MENU_ACT_NET : SH_MENU_ACT_NONE;
+            }
+            m->value = dir > 0 ? 1 : 0;     /* CP, AP: no wrap */
+            m->mark_ms = now_ms;
+            return SH_MENU_ACT_NONE;
+        }
         if (key == SH_KEY_MENU) {
             m->mode = SH_MENU_SAVED;
             m->mark_ms = now_ms;
@@ -79,8 +106,9 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
         return SH_MENU_ACT_NONE;
 
     case SH_MENU_SAVED:
+    case SH_MENU_CODE:
     default:
-        return SH_MENU_ACT_NONE;        /* the 1 s steady value: keys are ignored */
+        return SH_MENU_ACT_NONE;        /* the 1 s steady value, the code: keys are ignored */
     }
 }
 
@@ -91,6 +119,28 @@ void sh_menu_view(const sh_menu_t *m, uint32_t now_ms, sh_menu_view_t *out)
     out->value = m->value;
     out->value_visible = m->mode != SH_MENU_EDIT ||
                          (now_ms - m->mark_ms) % (2 * SH_MENU_BLINK_MS) < SH_MENU_BLINK_MS;
+    out->code_part = m->mode == SH_MENU_CODE && now_ms - m->mark_ms >= SH_MENU_CODE_PART_MS;
+}
+
+sh_menu_tail_t sh_menu_tail(uint8_t alarms, bool vacation, bool ap, bool fup, uint32_t ms, uint8_t *code)
+{
+    const sh_alarm_t a = sh_alarm_code_at(alarms, ms);
+    if (a != SH_ALARM_COUNT) {
+        *code = (uint8_t)a;
+        return SH_MENU_TAIL_CODE;
+    }
+    unsigned slot = ms / SH_ALARM_CODE_MS - sh_alarm_count(alarms);    /* after the codes */
+    const bool show[] = { vacation, ap, fup };
+    const sh_menu_tail_t what[] = { SH_MENU_TAIL_HOL, SH_MENU_TAIL_AP, SH_MENU_TAIL_FUP };
+    for (unsigned i = 0; i < sizeof(show) / sizeof(show[0]); i++) {
+        if (show[i]) {
+            if (slot == 0) {
+                return what[i];
+            }
+            slot--;
+        }
+    }
+    return SH_MENU_TAIL_END;
 }
 
 bool sh_menu_test_label(uint32_t elapsed_s)

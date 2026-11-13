@@ -11,6 +11,7 @@
 #include "sh_menu.h"
 #include "sh_pump_ctl.h"
 #include "sh_buttons.h"
+#include "captive_wifi.h"
 #include "sh_display.h"
 
 static const char *TAG = "sh_display";
@@ -37,6 +38,13 @@ static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */
 static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
 static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
 static const uint8_t s_pau[DIGITS]  = { 0x73 /* P */, 0x77 /* A */, 0x1C /* u */ };
+/* The network mode (nEt: CP / AP; "AP" also after the cycle) and the firmware update "FUp" */
+static const uint8_t s_cp[DIGITS]   = { 0, 0x39 /* C */, 0x73 /* P */ };
+static const uint8_t s_ap[DIGITS]   = { 0, 0x77 /* A */, 0x73 /* P */ };
+static const uint8_t s_fup[DIGITS]  = { 0x71 /* F */, 0x1C /* u */, 0x73 /* P */ };
+/* Hex digits of the access code: 0 - 9, A, b, C, d, E, F */
+static const uint8_t s_hex[16] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,
+                                   0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71 };
 /* Values of SSn (in the order of sh_season_mode_t) and of HoL (off, on) */
 static const uint8_t s_seasons[SH_SEASON_MODES][DIGITS] = {
     [SH_SEASON_SUMMER] = { 0x6D /* S */, 0x1C /* u */, 0x54 /* n */ },
@@ -69,6 +77,7 @@ static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
     [SH_MENU_DON] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x54 /* n */ },
     [SH_MENU_DOF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
     [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
+    [SH_MENU_NET] = { 0x54 /* n */, 0x79 /* E */, 0x78 /* t */ },
     [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
@@ -135,9 +144,26 @@ static bool same(const screen_t *a, const screen_t *b)
     return a->is_temp ? a->temp == b->temp : memcmp(a->seg, b->seg, DIGITS) == 0;
 }
 
+/* Half of the access code (the last 6 characters of the network name): 3 hex digits */
+static void code_screen(screen_t *s, unsigned part)
+{
+    const char *name = captive_wifi_ap_ssid();
+    const size_t len = strlen(name);
+    s->is_temp = false;
+    for (unsigned i = 0; i < DIGITS; i++) {
+        const size_t k = len - 6 + part * DIGITS + i;
+        const char c = len >= 6 ? name[k] : '0';
+        const int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                    : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0;
+        s->seg[i] = s_hex[d];
+    }
+}
+
 static void menu_screen(screen_t *s, const sh_menu_view_t *v)
 {
-    if (v->mode == SH_MENU_LIST) {
+    if (v->mode == SH_MENU_CODE) {
+        code_screen(s, v->code_part);
+    } else if (v->mode == SH_MENU_LIST) {
         set_seg(s, s_items[v->pos < SH_MENU_ITEMS ? v->pos : SH_MENU_END]);
     } else if (!v->value_visible) {
         const uint8_t blank[DIGITS] = { 0 };
@@ -146,6 +172,8 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
         set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
     } else if (v->pos == SH_MENU_HOL) {
         set_seg(s, s_on_off[v->value != 0]);
+    } else if (v->pos == SH_MENU_NET) {
+        set_seg(s, v->value ? s_ap : s_cp);
     } else {
         set_number(s, v->value);
     }
@@ -182,16 +210,27 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
 }
 
 /* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
- * codes and "HoL" in the vacation (1 s each). Returns false when the cycle is over (the caller starts it again). */
+ * codes, "HoL" in the vacation, "AP" in the network mode AP, "FUp" while a confirmed firmware update
+ * waits (1 s each, sh_menu_tail). Returns false when the cycle is over (the caller starts it again). */
 static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
 {
     if (ms >= CYCLE_MS) {
-        const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
-        if (code != SH_ALARM_COUNT) {
-            set_seg(s, s_codes[code]);
-        } else if (st->vacation && (ms - CYCLE_MS) / SH_ALARM_CODE_MS == sh_alarm_count(st->alarms)) {
-            set_seg(s, s_hol);          /* vacation: after the codes */
-        } else {
+        uint8_t code = 0;
+        switch (sh_menu_tail(st->alarms, st->vacation, st->net_ap, st->fw_wait, ms - CYCLE_MS, &code)) {
+        case SH_MENU_TAIL_CODE:
+            set_seg(s, s_codes[code < SH_ALARM_COUNT ? code : SH_ALARM_E1]);
+            break;
+        case SH_MENU_TAIL_HOL:
+            set_seg(s, s_hol);
+            break;
+        case SH_MENU_TAIL_AP:
+            set_seg(s, s_ap);
+            break;
+        case SH_MENU_TAIL_FUP:
+            set_seg(s, s_fup);
+            break;
+        case SH_MENU_TAIL_END:
+        default:
             return false;
         }
     } else if (ms < LABEL_MS) {
@@ -214,7 +253,7 @@ static void display_task(void *arg)
     (void)arg;
     screen_t shown = { 0 };
     bool written = false;
-    bool was_normal = true, was_test = false;       /* was_test: the test or the air venting */
+    bool was_normal = true, was_test = false;       /* was_test: the test, the air venting or "FUp" */
     uint32_t cycle_ms = (uint32_t)(esp_timer_get_time() / 1000);
 
     for (;;) {
@@ -231,11 +270,13 @@ static void display_task(void *arg)
         if (!normal) {
             menu_screen(&scr, &view);   /* no alarms or test in the menu */
         } else {
-            const bool special = st.test_on || st.modes.air_on;
+            const bool special = st.test_on || st.modes.air_on || st.fw_prompt;
             if (!was_normal || (was_test && !special)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
-            if (st.test_on) {
+            if (st.fw_prompt) {
+                set_seg(&scr, s_fup);   /* a newer firmware: "menu" confirms (5 s) */
+            } else if (st.test_on) {
                 test_screen(&scr, &st, now_s);
             } else if (st.modes.air_on) {
                 air_screen(&scr, &st, now_s);

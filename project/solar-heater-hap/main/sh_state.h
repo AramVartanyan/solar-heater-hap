@@ -54,7 +54,10 @@ typedef struct {
     bool    wifi_portal;        /* captive-wifi setup portal active */
     bool    hap_pair_window;    /* HomeKit pairing window open */
     bool    vacation;
-    bool    ota_running;
+    bool    ota_running;        /* a firmware update is being written */
+    bool    net_ap;             /* the network mode in use is AP (the own access point) */
+    bool    fw_prompt;          /* "FUp" asks for the confirmation of a firmware update */
+    bool    fw_wait;            /* a confirmed firmware update waits for its start */
     uint8_t alarms;             /* active codes: SH_ALARM_BIT() of sh_alarm_t (sh_alarm.h) */
     sh_modes_t modes;           /* season, night cooling, air venting */
 } sh_state_t;
@@ -71,3 +74,5 @@ void sh_state_set_wifi(bool connected, bool portal);
 void sh_state_set_alarms(uint8_t alarms);
 void sh_state_set_vacation(bool on);
 void sh_state_set_modes(const sh_modes_t *modes);
+/* The network mode and the firmware update (sh_link). */
+void sh_state_set_link(bool net_ap, bool fw_prompt, bool fw_wait, bool ota_running);

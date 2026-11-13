@@ -35,25 +35,31 @@ CONFIG_LWIP_SO_REUSE=y
 CONFIG_LWIP_MAX_ACTIVE_TCP=12
 CONFIG_LWIP_MAX_LISTENING_TCP=12
 CONFIG_LWIP_UDP_RECVMBOX_SIZE=10
-CONFIG_LWIP_LOCAL_HOSTNAME="solar-heater"
 CONFIG_LWIP_DHCPS=y
 
 # SNTP (sh_clock): pool.ntp.org at every connection to the router, then every 12 h
 CONFIG_LWIP_SNTP_UPDATE_DELAY=43200000
 
 # OTA (general-ota); server certificates come from the mbedTLS bundle below
-CONFIG_GENERAL_OTA_URL="https://raw.githubusercontent.com/AramVartanyan/otafw/master/solar-heater-hap.bin"
+CONFIG_GENERAL_OTA_URL="https://raw.githubusercontent.com/AramVartanyan/otafw/master/solheat1.bin"
 
 # mbedTLS (certificate bundle is required by general-ota)
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 
-# captive-wifi: setup SoftAP "SOLAR-XXXXXX"
-CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
+# captive-wifi: the name "Solar-xxxxxx" (the last 3 bytes of the base MAC): the network of the portal and
+# of the access point (AP), the host name (DHCP) and mDNS; the access point only mode for the web
+# interface (nEt -> AP); with no network stored the portal closes after 15 min without a client
+CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="Solar"
+CONFIG_CAPTIVE_WIFI_AP_ONLY=y
+CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN=15
 
 # HomeKit SDK (enabled together with HomeKit in a later phase):
 # room for application web page handlers next to the 8 HAP URIs
 # CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
 
-# mDNS (pulled in by esp-homekit-sdk): no console CLI, the console component is not built
+# mDNS ("Solar-xxxxxx.local", the web service): no console CLI, the console component is not built;
+# only on the station (CP with the router), not on the access point
 CONFIG_MDNS_ENABLE_CONSOLE_CLI=n
+CONFIG_MDNS_PREDEF_NETIF_AP=n
+CONFIG_MDNS_PREDEF_NETIF_ETH=n

@@ -34,6 +34,14 @@
  * The heater (group D, doc/tasks/step12-heater-leak-e8.md 3.5): the sign follows the tank with the
  * pump stopped (/sim?tank=... rising by the threshold in 10 min), the leak checks run as in the
  * firmware (outside 09:00 - 16:00 / the learned daylight), E8 is judged at the end of the night.
+ * The network and the firmware update (group E, doc/tasks/step7-network-ota.md 3.4): the name
+ * Solar-810840, the code 810840; the mode is chosen as with the menu (nEt):
+ *   http://localhost:8080/sim?router=0               not connected to the router (AP allowed); router=1
+ *   http://localhost:8080/sim?ap=1                   nEt -> AP (refused while connected); ap=0: CP
+ *   http://localhost:8080/sim?cl=1                   a phone joined the access point; cl=0: left
+ *   http://localhost:8080/sim?srv=2                  the server has 0.2.0 (newer); srv=0: the same 0.1.0;
+ *                                                    srv=-1: no connection to the server
+ * The update writes 10 % at every request of the page; the auto check runs 1 min after the start.
  * Night cooling in the browser: /sim?col=150&tank=720 and /sim?hhmm=0400 (tank above Tmax), or
  * /sim?e4=1 and /sim?hhmm=0300; the vacation at night: switch it on and /sim?hhmm=2300 (the learned
  * sunset is 16:50); the season follows the daylight saving time of the zone (Aut) or the choice.
@@ -64,8 +72,10 @@
 #include "sh_heater.h"
 #include "sh_e8.h"
 #include "sh_pulse.h"
+#include "sh_net.h"
+#include "sh_fw.h"
 
-#define CODE    "810841"
+#define CODE    "810840"
 
 static sh_web_config_t s_cfg = {
     .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } },
@@ -90,6 +100,12 @@ static const sh_alarm_params_t ALARM = {
     .e6_time_s = 600, .e6_col_rise = 100, .e6_tank_rise = 5, .e6_diff = 200, .e6_clear_diff = 100,
 };
 static time_t s_start, s_silent_until;
+
+/* the network and the firmware update */
+static sh_net_t s_net;
+static sh_fw_t s_fw;
+static bool s_router = true;            /* connected to the router */
+static int s_srv = 2;                   /* the server: 2 newer, 0 the same, -1 not reachable */
 
 /* monotonic s since the "boot", which was a day before the start (room for the made-up day) */
 static uint32_t now_s(void)
@@ -274,6 +290,39 @@ static void made_up_start(void)
 }
 
 /* One step of the control, as sh_control does it every second. */
+static void sim_check(void)
+{
+    sh_fw_check_done(&s_fw, s_srv < 0 ? SH_FW_RES_ERROR : s_srv ? SH_FW_RES_AVAILABLE : SH_FW_RES_CURRENT,
+                     "0.2.0", now_s());
+}
+
+/* the network mode and the firmware update, once per request */
+static void link_step(void)
+{
+    const uint32_t now = now_s();
+    const sh_net_act_t act = sh_net_tick(&s_net, now, true);
+    if (act != SH_NET_ACT_NONE) {
+        printf("network: the access point ended (no client for 15 min)\n");
+    }
+    sh_fw_link(&s_fw, s_router && s_net.mode == SH_NET_CP, now - 86400u);   /* "boot" = the start */
+    if (s_net.mode == SH_NET_CP && sh_fw_auto_due(&s_fw, now - 86400u) && sh_fw_check_start(&s_fw, true)) {
+        sim_check();
+        printf("firmware: automatic check -> %s\n", sh_fw_state_key(s_fw.state));
+    }
+    if (sh_fw_step(&s_fw, s_pump.on, s_alarm.active)) {
+        printf("firmware: updating\n");
+    } else if (s_fw.state == SH_FW_UPDATING) {
+        sh_fw_progress(&s_fw, s_fw.pct + 10);
+        if (s_fw.pct >= 100) {
+            sh_fw_update_done(&s_fw, s_srv > 0);
+            printf("firmware: %s\n", s_fw.state == SH_FW_DONE ? "written (restart)" : "failed");
+        }
+    }
+    if (!sh_fw_busy(&s_fw)) {
+        sh_net_fw_done(&s_net, now);
+    }
+}
+
 static void control(void)
 {
     sh_limits_t lim;
@@ -430,6 +479,8 @@ static void reply_res(int fd, sh_web_res_t res)
 static void reply_state(int fd)
 {
     control();
+    link_step();
+    const bool ap = s_net.mode == SH_NET_AP;
     const uint32_t now = now_s();
     sh_local_t lt;
     local_at(sim_epoch(), &lt);
@@ -440,8 +491,11 @@ static void reply_state(int fd)
         .pump_on = s_pump.on, .reason = s_pump.reason, .alarms = s_alarm.active,
         .test_on = s_pump.test, .test_left_s = sh_pump_ctl_test_left(&s_pump, now),
         .cfg = s_cfg, .col_protect = 1100,
-        .name = "solar-heater", .version = "0.1.0 (sim)", .serial = "E8F60A810841", .ssid = "A16blue", .ip = "192.168.1.57",
-        .rssi = -41,
+        .name = "Solar-810840", .version = "0.1.0 (sim)", .serial = "E8F60A810840",
+        .ssid = ap ? "Solar-810840" : s_router ? "A16blue" : "", .ip = ap ? "192.168.4.1" : "192.168.1.57",
+        .rssi = ap || !s_router ? 0 : -41,
+        .net_ap = ap, .net_pending = s_net.ap_pending, .mdns = !ap && s_router, .ap_clients = s_net.clients,
+        .ap_left_s = sh_net_ap_left(&s_net, now_s()), .fw = s_fw.state, .fw_pct = s_fw.pct, .fw_ver = s_fw.ver,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
@@ -532,6 +586,23 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "e8=")) && sscanf(p + 3, "%d", &v) == 1) {
         s_e8.l.active = v != 0;
+    }
+    if ((p = strstr(query, "router=")) && sscanf(p + 7, "%d", &v) == 1) {
+        s_router = v != 0;
+    }
+    if ((p = strstr(query, "ap=")) && sscanf(p + 3, "%d", &v) == 1) {   /* as nEt in the menu */
+        const bool connected = s_router && s_net.mode == SH_NET_CP;
+        const sh_net_act_t act = sh_net_select(&s_net, v ? SH_NET_AP : SH_NET_CP, connected, sh_fw_busy(&s_fw),
+                                               now_s());
+        printf("nEt %s: %s\n", v ? "AP" : "CP", act == SH_NET_ACT_START_AP ? "the access point"
+               : act == SH_NET_ACT_START_CP ? "back to the router" : s_net.ap_pending ? "after the update"
+               : v && connected ? "refused (connected to the router)" : "nothing");
+    }
+    if ((p = strstr(query, "cl=")) && sscanf(p + 3, "%d", &v) == 1) {
+        sh_net_client(&s_net, v != 0, now_s());
+    }
+    if ((p = strstr(query, "srv=")) && sscanf(p + 4, "%d", &v) == 1) {
+        s_srv = v;
     }
 }
 
@@ -629,7 +700,7 @@ static void handle(int fd, const char *page, size_t page_len)
         } else {
             sh_hist_walk(&s_hist, false, 0, csv_line, &c);
             reply_ex(fd, "200 OK", "text/csv; charset=utf-8",
-                     "Content-Disposition: attachment; filename=\"solar-heater-history.csv\"\r\n", csv, c.len);
+                     "Content-Disposition: attachment; filename=\"Solar-810840-history.csv\"\r\n", csv, c.len);
         }
     } else if (!post && strcmp(path, "/api/tz") == 0) {
         static char json[SH_WEB_TZ_MAX];
@@ -699,6 +770,15 @@ static void handle(int fd, const char *page, size_t page_len)
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/ota") == 0) {
+        sh_web_ota_t cmd;
+        const sh_web_res_t res = sh_web_ota(body, CODE, s_net.mode == SH_NET_AP, s_fw.state, &cmd);
+        if (res == SH_WEB_OK && cmd == SH_WEB_OTA_CHECK && sh_fw_check_start(&s_fw, false)) {
+            sim_check();
+        } else if (res == SH_WEB_OK && cmd == SH_WEB_OTA_UPDATE) {
+            sh_fw_confirm(&s_fw, now_s(), false);
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {

@@ -5,16 +5,16 @@
  *   2. NVS, shared state, user settings, installer data, time zone, history partition
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task, history task
- *   5. Wi-Fi (captive-wifi), SNTP (at every connection to the router) and the web interface
- *      (while connected to the router); HomeKit follows in a later phase
+ *   5. the network and the firmware update (sh_link): Wi-Fi (captive-wifi, always CP at the start),
+ *      the name "Solar-xxxxxx" (DHCP, mDNS), SNTP (at every connection to the router), the web
+ *      interface (with the router or on the own access point), general-ota; HomeKit follows in a
+ *      later phase
  */
 
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include "esp_app_desc.h"
 #include "nvs_flash.h"
-
-#include "captive_wifi.h"
 
 #include "sh_config.h"
 #include "sh_state.h"
@@ -26,38 +26,11 @@
 #include "sh_display.h"
 #include "sh_buttons.h"
 #include "sh_control.h"
-#include "sh_web.h"
+#include "sh_link.h"
 #include "sh_clock.h"
 #include "sh_history.h"
 
 static const char *TAG = "app_main";
-
-static void wifi_event(captive_wifi_event_t evt, void *ctx)
-{
-    (void)ctx;
-    switch (evt) {
-    case CAPTIVE_WIFI_EVT_STA_CONNECTED:
-        sh_state_set_wifi(true, false);
-        sh_clock_connected();
-        sh_web_enable(true);
-        break;
-    case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
-        sh_state_set_wifi(false, captive_wifi_portal_active());
-        sh_web_enable(false);
-        break;
-    case CAPTIVE_WIFI_EVT_PORTAL_STARTED:
-        ESP_LOGI(TAG, "Wi-Fi setup: join %s, open http://%s", captive_wifi_ap_ssid(),
-                 captive_wifi_portal_ip());
-        sh_state_set_wifi(false, true);
-        sh_web_enable(false);       /* the portal has its own server on port 80 */
-        break;
-    case CAPTIVE_WIFI_EVT_PORTAL_STOPPED:
-        sh_state_set_wifi(captive_wifi_is_connected(), false);
-        break;
-    default:
-        break;
-    }
-}
 
 void app_main(void)
 {
@@ -86,8 +59,5 @@ void app_main(void)
     sh_control_start();
     sh_history_start();
 
-    ESP_ERROR_CHECK(captive_wifi_init(SH_HOSTNAME, wifi_event, NULL));   /* 5. Wi-Fi, clock, web */
-    sh_clock_start();
-    ESP_ERROR_CHECK(sh_web_init());
-    ESP_ERROR_CHECK(captive_wifi_start());
+    ESP_ERROR_CHECK(sh_link_start());               /* 5. Wi-Fi, mDNS, clock, web, OTA */
 }

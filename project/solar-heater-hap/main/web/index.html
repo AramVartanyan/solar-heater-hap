@@ -212,8 +212,10 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="net"><span>Wi-Fi</span><span class="v" id="n-wifi">—</span></div>
   <div class="row" data-f="net"><span data-t="ip"></span><span class="v" id="n-ip">—</span></div>
-  <div class="row" data-f="net_mode"><span data-t="mode"></span><span class="v">CP ›</span></div>
+  <div class="row" data-f="net"><span data-t="hostname"></span><span class="v" id="n-host">—</span></div>
+  <div class="row" data-f="net_mode"><span data-t="mode"></span><span class="v" id="n-mode" style="white-space:normal">—</span></div>
  </div>
+ <p class="note" data-f="net_mode" data-t="mode_note"></p>
  <h2 data-t="time_place" data-f="timezone"></h2>
  <div class="grp">
   <label class="row" data-f="timezone"><span data-t="tz"></span><span class="v"><select data-p id="tz-sel"></select></span></label>
@@ -234,8 +236,10 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="fw"><span data-t="ver"></span><span class="v" id="fw-v">—</span></div>
   <div class="row" data-f="fw"><span data-t="sn"></span><span class="v" id="fw-sn">—</span></div>
-  <div class="row" data-f="ota"><span data-t="ota"></span><span class="v">›</span></div>
+  <button class="row" data-f="ota" data-p id="ota-chk"><span data-t="ota" class="act"></span></button>
+  <div class="row hide" data-f="ota" id="ota-row"><span id="ota-t" style="white-space:normal"></span><button class="sw-btn hide" data-p id="ota-up" data-t="update"></button></div>
  </div>
+ <p class="note hide" data-f="ota" id="ota-note"></p>
  <h2 data-f="homekit">HomeKit</h2>
  <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
  <h2 data-t="hist" data-f="history"></h2>
@@ -291,7 +295,7 @@ test_time:'Време за тест на помпата',by_season:'По сез�
 col_min:'Мин. температура на колектора',d_on:'Разлика за включване',d_off:'Разлика за изключване',
 night_s:'Нощно охлаждане',season_note:'Маркираната колона е текущият сезон.',
 code:'Код за достъп',unlock:'Отключи промените',
-code_note:'Последните 6 знака от името на собствената мрежа на контролера (напр. 810841 от SOLAR-810841). Без кода стойностите само се виждат.',
+code_note:'Последните 6 знака от името на контролера и на собствената му мрежа (напр. 810840 от Solar-810840). Без кода стойностите само се виждат.',
 bad_code:'Грешен код',
 fluid:'Топлоносител',kind:'Вид',water:'Вода',glycol:'Пропилен-гликол',conc:'Концентрация',press:'Мин. налягане (студена система)',
 col_tank:'Колектор и бойлер',col_max:'Макс. температура на колектора',tank_vol:'Обем на бойлера',mount:'Монтаж на датчиците',
@@ -299,7 +303,17 @@ calc:'Изчислено',boil:'Точка на кипене',cap:'Защита 
 no_start:'Забрана за пускане над',vac_limit:'Праг във ваканция',frost_below:'Защита от замръзване под',
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
 net:'Мрежа',ip:'IP адрес',time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
-fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
+fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',
+hostname:'Име',m_cp:'CP — през рутера',m_ap:'AP — собствена точка за достъп',m_ap_left:'изключва се след {m} min без свързване',
+m_ap_cl:'свързани: {n}',m_pend:'AP — след края на обновяването',
+mode_note:'Режимът се сменя от менюто на контролера (nEt). AP — само когато контролерът не е свързан с рутера: мрежата {ssid}, адрес http://192.168.4.1.',
+update:'Обнови',o_check:'Проверка…',o_current:'Версията е актуална',o_avail:'Налична е по-нова версия {v}',
+o_noserver:'Няма връзка със сървъра за обновяване',o_wait:'Обновяването на {v} изчаква — помпата работи или има активна защита',
+o_run:'Обновяване на {v} — {p} %',o_fail:'Обновяването не успя — работи старата версия',o_done:'Обновено — контролерът се рестартира',
+o_ap:'Няма интернет (собствена точка за достъп)',o_power:'Не изключвайте захранването.',
+a_fw:'Налична е по-нова версия на фърмуера',d_fw:'Версия {v} — „Система“ → „Фърмуер“ → „Обнови“.',
+a_fwrun:'Обновяване на фърмуера',d_fwrun:'{p} % — не изключвайте захранването.',a_fwwait:'Обновяването изчаква',
+d_fwwait:'Версия {v} се инсталира, когато помпата спре и няма активна защита.',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
 confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
@@ -368,7 +382,7 @@ test_time:'Pump test time',by_season:'By season',param:'Parameter',summer:'Summe
 col_min:'Min. collector temperature',d_on:'Switch-on difference',d_off:'Switch-off difference',
 night_s:'Night cooling',season_note:'The highlighted column is the current season.',
 code:'Access code',unlock:'Unlock changes',
-code_note:'The last 6 characters of the controller\'s own network name (e.g. 810841 from SOLAR-810841). Without the code the values are read-only.',
+code_note:'The last 6 characters of the name of the controller and of its own network (e.g. 810840 from Solar-810840). Without the code the values are read-only.',
 bad_code:'Wrong code',
 fluid:'Heat transfer fluid',kind:'Kind',water:'Water',glycol:'Propylene glycol',conc:'Concentration',press:'Min. pressure (cold system)',
 col_tank:'Collector and tank',col_max:'Max. collector temperature',tank_vol:'Tank volume',mount:'Sensor mounting',
@@ -376,7 +390,17 @@ calc:'Computed',boil:'Boiling point',cap:'Collector protection (ceiling)',prot:'
 no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost protection below',
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
 net:'Network',ip:'IP address',time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
-fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
+fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',
+hostname:'Name',m_cp:'CP — through the router',m_ap:'AP — own access point',m_ap_left:'switches off after {m} min without a connection',
+m_ap_cl:'connected: {n}',m_pend:'AP — after the end of the update',
+mode_note:'The mode is changed from the controller\'s menu (nEt). AP — only while the controller is not connected to the router: the network {ssid}, address http://192.168.4.1.',
+update:'Update',o_check:'Checking…',o_current:'Up to date',o_avail:'A newer version {v} is available',
+o_noserver:'No connection to the update server',o_wait:'The update to {v} waits — the pump runs or a protection is active',
+o_run:'Updating to {v} — {p} %',o_fail:'The update failed — the old version runs',o_done:'Updated — the controller restarts',
+o_ap:'No internet (own access point)',o_power:'Do not switch the power off.',
+a_fw:'A newer firmware version is available',d_fw:'Version {v} — "System" → "Firmware" → "Update".',
+a_fwrun:'Firmware update',d_fwrun:'{p} % — do not switch the power off.',a_fwwait:'The update waits',
+d_fwwait:'Version {v} is installed when the pump stops and no protection is active.',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
 confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
@@ -534,8 +558,21 @@ function render(){
  $('#c-frost').textContent=deg(S.calc.frost)+' °C';
  const n=$('#n-prot'),lim=S.calc.prot<S.calc.prot_set;n.classList.toggle('hide',!lim);
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
- $('#n-wifi').textContent=S.net.ssid?S.net.ssid+' · '+String(S.net.rssi).replace('-','−')+' dBm':'—';
+ $('#n-wifi').textContent=S.net.ssid?S.net.ssid+(S.net.mode=='AP'?'':' · '+String(S.net.rssi).replace('-','−')+' dBm'):'—';
  $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;$('#fw-sn').textContent=S.sn||'—';
+ const N=S.net,ap=N.mode=='AP';
+ $('#n-host').textContent=N.mdns?N.host+'.local':N.host||'—';
+ $('#n-mode').textContent=ap?[t('m_ap'),N.left!=null?fill('m_ap_left',{m:Math.ceil(N.left/60)}):fill('m_ap_cl',{n:N.cl})].join(' · '):t(N.pend?'m_pend':'m_cp');
+ $('[data-t=mode_note]').textContent=fill('mode_note',{ssid:N.host});
+ const O=S.ota,os={v:O.ver,p:O.pct};
+ $('#ota-chk').classList.toggle('na',ap||['check','wait','run','done'].includes(O.st));
+ const ot=ap?'':O.st=='idle'?'':t('o_'+O.st).replace(/\{(\w)\}/g,(m,x)=>os[x]);
+ $('#ota-row').classList.toggle('hide',!ot);$('#ota-t').textContent=ot;
+ $('#ota-up').classList.toggle('hide',ap||O.st!='avail');
+ const on=$('#ota-note');on.classList.toggle('hide',!(ap||O.st=='run'));on.textContent=ap?t('o_ap'):t('o_power');
+ if(O.st=='avail')card(' info',t('a_fw'),fill('d_fw',os));
+ if(O.st=='wait')card(' info',t('a_fwwait'),fill('d_fwwait',os));
+ if(O.st=='run')card(' info',t('a_fwrun'),fill('d_fwrun',os));
  const c=S.clock;
  $('#hd-time').textContent=(c.min==null?'--:--':hm(c.min))+(c.st=='ok'?'':' ('+t('c_'+c.st)+')');
  $('#clock-v').textContent=t('c_'+c.st);
@@ -608,6 +645,8 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
  if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
+$('#ota-chk').onclick=async()=>{if(await post('/api/ota',{cmd:'check'}))setTimeout(refresh,1500)};
+$('#ota-up').onclick=async()=>{if(await post('/api/ota',{cmd:'update'}))refresh()};
 $('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};
 $('#tz-ok').onclick=async e=>{const i=+e.target.dataset.i;if(i>=0&&await post('/api/tz',{tz:i}))toast(t('done'));refresh();loadChart()};
 

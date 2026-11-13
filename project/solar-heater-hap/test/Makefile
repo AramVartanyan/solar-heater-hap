@@ -17,6 +17,10 @@
 #   test_group_d      heater sign and detection, guaranteed daylight, heater leak checks, E8
 #                     (sh_heater, sh_e8, sh_pump_logic, sh_pump_ctl, sh_installer, sh_alarm, sh_ind,
 #                     sh_day, sh_hist)
+#   test_group_e      network mode CP / AP and its timers, the name / code / serial number, the menu nEt
+#                     and the code, "AP" / "FUp" on the display, the LED in AP and OTA, the firmware
+#                     update (automatic check, FUp, waiting for the pump), the web interface
+#                     (sh_net, sh_fw, sh_menu, sh_ind, sh_web_api)
 #   test_pulse        pulse mode (sensors on the pipes): when a pulse is due, the reliable values and
 #                     the decisions by them (sh_pulse, sh_pump_ctl, sh_pump_logic, sh_cool, sh_sun,
 #                     sh_heater, sh_e8, sh_installer, sh_alarm, sh_day)
@@ -26,9 +30,9 @@ CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O1
 MAIN    := ../main
 BUILD   := build
 TESTS   := test_pump_logic test_pump_ctl test_meas test_settings test_menu test_alarm test_ind \
-           test_installer test_web test_clock_history test_group_c test_group_d test_pulse
+           test_installer test_web test_clock_history test_group_c test_group_d test_pulse test_group_e
 HIST_SRC := $(MAIN)/sh_clock_rules.c $(MAIN)/sh_tz.c $(MAIN)/sh_day.c $(MAIN)/sh_hist.c $(MAIN)/sh_alarm.c
-WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
+WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_fw.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
            $(HIST_SRC)
 GROUP_C_SRC := $(MAIN)/sh_cool.c $(MAIN)/sh_sun.c $(MAIN)/sh_season.c
 GROUP_D_SRC := $(MAIN)/sh_heater.c $(MAIN)/sh_e8.c
@@ -43,7 +47,7 @@ $(BUILD)/test_pump_logic: test_pump_logic.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_pump_ctl:   test_pump_ctl.c $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_meas:       test_meas.c $(MAIN)/sh_meas.c $(HDRS)
 $(BUILD)/test_settings:   test_settings.c $(MAIN)/sh_settings.c $(HDRS)
-$(BUILD)/test_menu:       test_menu.c $(MAIN)/sh_menu.c $(MAIN)/sh_settings.c $(HDRS)
+$(BUILD)/test_menu:       test_menu.c $(MAIN)/sh_menu.c $(MAIN)/sh_settings.c $(MAIN)/sh_alarm.c $(HDRS)
 $(BUILD)/test_alarm:      test_alarm.c $(MAIN)/sh_alarm.c $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_ind:        test_ind.c $(MAIN)/sh_ind.c $(HDRS)
 $(BUILD)/test_installer:  test_installer.c $(MAIN)/sh_installer.c $(HDRS)
@@ -55,7 +59,9 @@ $(BUILD)/test_group_d:    test_group_d.c $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c $(
                           $(MAIN)/sh_installer.c $(MAIN)/sh_ind.c $(HIST_SRC) $(HDRS)
 $(BUILD)/test_pulse:      test_pulse.c $(MAIN)/sh_pulse.c $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c \
                           $(MAIN)/sh_pump_logic.c $(MAIN)/sh_installer.c $(HIST_SRC) $(HDRS)
-$(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pulse.c $(MAIN)/sh_pump_ctl.c \
+$(BUILD)/test_group_e:    test_group_e.c $(MAIN)/sh_net.c $(MAIN)/sh_menu.c $(MAIN)/sh_settings.c $(MAIN)/sh_ind.c \
+                          $(WEB_SRC) $(HDRS)
+$(BUILD)/web_sim:         web_sim.c $(MAIN)/sh_net.c $(WEB_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pulse.c $(MAIN)/sh_pump_ctl.c \
                           $(HDRS)
 
 $(BUILD)/%:
