@@ -83,7 +83,7 @@ Datasheet: [`XL-0807RGBC-WS2812B.pdf`](XL-0807RGBC-WS2812B.pdf)
   виж [led-indication.md](led-indication.md).
 - Datasheet-ът е само за светодиода; в източника (Waveshare wiki) е публикуван към страницата на ESP32-C3-Zero, но светодиодът е същият.
 
-Драйвер и настройки във фърмуера: виж [firmware.md](firmware.md#1-rgb-светодиод-ws2812).
+Драйвер и настройки във фърмуера: виж [firmware.md](firmware.md#22-rgb-светодиод-ws2812).
 
 ## 3. Температурни датчици — 2 × DS18B20
 
@@ -177,7 +177,7 @@ Datasheet: [`DS18B20.pdf`](DS18B20.pdf) (Maxim/Analog Devices, 19-7487 Rev 6, 7/
   Двата модела най-вероятно са с различно разположение на изводите — за платката се избира един от тях
   (или се предвижда отпечатък за двата).
 - Изводи към ESP32-S3: **CLK → GP5, DIO → GP6**.
-- Библиотека: [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) (собствена; бележки за обновяване — в [firmware.md](firmware.md#5-локално-управление--дисплей-и-бутони)).
+- Библиотека: [esp_tm1637](https://github.com/AramVartanyan/esp_tm1637) (собствена; бележки за обновяване — в [firmware.md](firmware.md#23-дисплей-tm1637-и-бутони)).
 - Datasheet: Titan Micro TM1637 V2.4 — [в хранилището на библиотеката](https://github.com/AramVartanyan/esp_tm1637/blob/main/pictures/Datasheet_TM1637.pdf).
 
 Данни от datasheet-а:
