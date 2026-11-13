@@ -32,7 +32,8 @@ static sh_web_status_t status(void)
     const sh_web_status_t s = {
         .t_col = 523, .t_tank = 418, .pump_on = true, .reason = SH_PUMP_REASON_DIFF,
         .cfg = config(), .col_protect = 1100,
-        .name = "solar-heater", .version = "0.1.0", .serial = "E8F60A810841", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
+        .name = "Solar-810840", .version = "0.1.0", .serial = "E8F60A810840", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
+        .host = "Solar-810840", .ap_ssid = "Solar-810840",
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
         .cool_until = -1, .cool_learned = 663, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
     };
@@ -56,11 +57,11 @@ static void test_status(void)
 {
     sh_web_status_t s = status();
     CHECK(strcmp(json(&s),
-        "{\"name\":\"solar-heater\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810841\","
+        "{\"name\":\"Solar-810840\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810840\","
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\",\"heater\",\"mount\"],"
+        "\"vac_limit\",\"heater\",\"mount\",\"net_mode\",\"ota\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
@@ -84,7 +85,9 @@ static void test_status(void)
         "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10},"
         "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5},\"mount\":{\"v\":0,\"min\":0,\"max\":1}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
-        "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
+        "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"cp\",\"pend\":0,"
+        "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
+        "\"ota\":{\"st\":\"idle\",\"ver\":\"\",\"pct\":null},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
         "\"run\":[0,0,0,0]}") == 0);
 }
@@ -158,7 +161,7 @@ static void test_status_values(void)
     s.ssid = "";
     s.ip = NULL;
     s.rssi = 0;
-    HAS(&s, "\"net\":{\"ssid\":\"\",\"ip\":\"\",\"rssi\":0},");
+    HAS(&s, "\"net\":{\"ssid\":\"\",\"ip\":\"\",\"rssi\":0,");
 
     /* a missing function is not in the list (the page greys it out) */
     s = status();
@@ -170,13 +173,15 @@ static void test_status_values(void)
     HAS(&s, "\"col_type\"");
     HAS(&s, "\"tank_vol\"");
     HAS(&s, "\"vac_limit\"");
-    HAS_NOT(&s, "\"ota\"");
+    HAS(&s, "\"net_mode\"");                    /* group E: now there */
+    HAS(&s, "\"ota\"");
+    HAS_NOT(&s, "\"city\"");
     HAS_NOT(&s, "\"homekit\"");
 
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"vac_limit\",\"heater\",\"mount\",\"history\"],");
+    HAS(&s, "\"heater\",\"mount\",\"net_mode\",\"ota\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -240,6 +245,11 @@ static void test_status_buffer(void)
     s.pulse = s.meas = s.meas_pulse = s.meas_now = s.pulse_next = s.pulse_hot = true;
     s.meas_age_s = 999999;
     s.pulse_left_s = 99999;
+    s.ap = s.ap_pending = true;
+    s.host = s.ap_ssid = "01234567890123456789012345678901";  /* 32 characters */
+    s.ota = SH_OTA_RUNNING;
+    s.ota_pct = 100;
+    s.ota_version = "0123456789012345678901234567890";
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
 

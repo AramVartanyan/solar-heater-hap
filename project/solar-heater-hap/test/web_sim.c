@@ -10,7 +10,7 @@
  *   make -C project/solar-heater-hap/test sim        ->  http://localhost:8080/
  *   build/web_sim ../main/web/index.html [port]
  *
- * The access code is 810841. The measurement is set by hand:
+ * The access code is 810840. The measurement is set by hand:
  *   http://localhost:8080/sim?col=1105&tank=720      temperatures, tenths of °C
  *   http://localhost:8080/sim?cf=1&tf=0              sensor faults (collector, tank)
  *   http://localhost:8080/sim?net=0                  answers stop for a while ("no connection")
@@ -37,6 +37,18 @@
  * Night cooling in the browser: /sim?col=150&tank=720 and /sim?hhmm=0400 (tank above Tmax), or
  * /sim?e4=1 and /sim?hhmm=0300; the vacation at night: switch it on and /sim?hhmm=2300 (the learned
  * sunset is 16:50); the season follows the daylight saving time of the zone (Aut) or the choice.
+ * The network and the firmware update (group E, doc/tasks/step7-network-ota.md 3.4) run on the
+ * rules of the firmware (sh_net_rules, sh_ota) with a made-up update server:
+ *   http://localhost:8080/sim?ap=1       nEt -> AP while the router does not answer: the own access
+ *                                        point (the page stays on localhost; the browser counts
+ *                                        as its client); ap=0: nEt -> CP
+ *   http://localhost:8080/sim?apidle=1   the 15 min without a client are over: back to CP
+ *   http://localhost:8080/sim?fw=0       the server has nothing newer; fw=1: version 0.2.0 (default)
+ *   http://localhost:8080/sim?srv=0      no internet: the check / the update fails; srv=1: back
+ *   http://localhost:8080/sim?fup=1      short "menu" while "FUp" is offered (the automatic check
+ *                                        comes 1 min after the start; the console says when)
+ * A check answers after 2 s, an update takes 30 s and "restarts" into the new version; with the pump
+ * running (/sim?col=900&tank=400) a confirmed update waits.
  * POSIX sockets, one request at a time. */
 
 #define _POSIX_C_SOURCE 200809L
@@ -64,8 +76,11 @@
 #include "sh_heater.h"
 #include "sh_e8.h"
 #include "sh_pulse.h"
+#include "sh_net_rules.h"
+#include "sh_ota.h"
 
-#define CODE    "810841"
+#define CODE    "810840"
+#define AP_SSID "Solar-" CODE    /* the one name: the network, the host name, mDNS */
 
 static sh_web_config_t s_cfg = {
     .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } },
@@ -95,6 +110,78 @@ static time_t s_start, s_silent_until;
 static uint32_t now_s(void)
 {
     return (uint32_t)(time(NULL) - s_start) + 86400u;
+}
+
+/* ---- network mode, firmware update (the server is made up) ---- */
+
+static sh_net_t s_net;
+static sh_ota_t s_ota;
+static char s_version[16] = "0.1.0";
+static bool s_fw_new = true, s_inet = true;
+static sh_ota_act_t s_job;              /* what the "server" is busy with ... */
+static uint32_t s_job_ms;               /* ... since */
+
+static uint32_t sim_ms(void)
+{
+    return (uint32_t)(time(NULL) - s_start) * 1000u;
+}
+
+static void net_do(sh_net_act_t act)
+{
+    static const char *const names[] = { "", "AP: the own access point starts", "CP: the router",
+                                         "CP: no stored network, the radio is off" };
+    if (act != SH_NET_ACT_NONE) {
+        printf("nEt -> %s\n", names[act]);
+    }
+    if (act == SH_NET_ACT_START_AP) {       /* the browser is its client */
+        sh_net_event(&s_net, SH_NET_EVT_AP_STARTED, true, now_s());
+        sh_net_event(&s_net, SH_NET_EVT_CLIENT_JOINED, true, now_s());
+    }
+}
+
+static void ota_do(sh_ota_act_t act)
+{
+    if (act != SH_OTA_ACT_NONE) {
+        s_job = act;
+        s_job_ms = sim_ms();
+        printf("firmware: %s\n", act == SH_OTA_ACT_CHECK ? "check" : "update started");
+    }
+}
+
+/* The rules, as the task sh_net steps them, and the answers of the made-up server. */
+static void net_step(const sh_ota_in_t *in)
+{
+    const uint32_t ms = sim_ms();
+    const bool was_offer = s_ota.offer;
+    ota_do(sh_ota_step(&s_ota, in, ms));
+    if (s_job == SH_OTA_ACT_CHECK && ms - s_job_ms >= 2000) {
+        s_job = SH_OTA_ACT_NONE;
+        sh_ota_event(&s_ota, !s_inet ? SH_OTA_EVT_FAILED : s_fw_new ? SH_OTA_EVT_AVAILABLE : SH_OTA_EVT_CURRENT,
+                     s_fw_new ? "0.2.0" : s_version, 0, ms);
+    } else if (s_job == SH_OTA_ACT_UPDATE && s_ota.phase == SH_OTA_RUNNING) {
+        const int pct = (int)((ms - s_job_ms) / 300);
+        if (!s_inet || !s_fw_new) {
+            s_job = SH_OTA_ACT_NONE;
+            sh_ota_event(&s_ota, s_inet ? SH_OTA_EVT_CURRENT : SH_OTA_EVT_FAILED, s_version, 0, ms);
+        } else if (pct >= 100) {
+            sh_ota_event(&s_ota, SH_OTA_EVT_SUCCESS, "0.2.0", 100, ms);
+        } else {
+            sh_ota_event(&s_ota, SH_OTA_EVT_AVAILABLE, "0.2.0", 0, ms);
+            sh_ota_event(&s_ota, SH_OTA_EVT_PROGRESS, "0.2.0", pct / 5 * 5, ms);
+        }
+    } else if (s_job == SH_OTA_ACT_UPDATE && s_ota.phase == SH_OTA_DONE && ms - s_job_ms >= 35000) {
+        printf("firmware: restart into 0.2.0\n");      /* the restart: nothing is kept but the version */
+        snprintf(s_version, sizeof(s_version), "0.2.0");
+        s_fw_new = false;
+        s_job = SH_OTA_ACT_NONE;
+        memset(&s_ota, 0, sizeof(s_ota));
+        s_ota.boot_done = true;
+        memset(&s_net, 0, sizeof(s_net));
+    }
+    if (s_ota.offer && !was_offer) {
+        printf("FUp: version %s offered for 5 s — /sim?fup=1 is the short \"menu\"\n", s_ota.version);
+    }
+    net_do(sh_net_step(&s_net, sh_ota_updating(&s_ota), true, now_s()));
 }
 
 /* ---- clock, day, history ---- */
@@ -386,6 +473,11 @@ static void control(void)
     };
     sh_alarm_step(&s_alarm, &ALARM, &in, now);
 
+    /* the network mode and the firmware update, as sh_net does it */
+    const sh_ota_in_t oin = { .online = s_net.mode == SH_NET_CP, .pump_on = s_pump.on, .alarms = s_alarm.active,
+                              .air = s_pump.air };
+    net_step(&oin);
+
     /* the day, as sh_history does it every second */
     const sh_day_in_t din = {
         .t_col = pulse ? s_pump.rel.col : s_temps.t_col, .t_tank = pulse ? s_pump.rel.tank : s_temps.t_tank, .col_fault = s_temps.col_fault,
@@ -440,8 +532,11 @@ static void reply_state(int fd)
         .pump_on = s_pump.on, .reason = s_pump.reason, .alarms = s_alarm.active,
         .test_on = s_pump.test, .test_left_s = sh_pump_ctl_test_left(&s_pump, now),
         .cfg = s_cfg, .col_protect = 1100,
-        .name = "solar-heater", .version = "0.1.0 (sim)", .serial = "E8F60A810841", .ssid = "A16blue", .ip = "192.168.1.57",
-        .rssi = -41,
+        .name = AP_SSID, .version = s_version, .serial = "E8F60A810840",
+        .ssid = s_net.mode == SH_NET_AP ? "" : "A16blue", .ip = s_net.mode == SH_NET_AP ? "192.168.4.1" : "192.168.1.57",
+        .rssi = s_net.mode == SH_NET_AP ? 0 : -41,
+        .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = AP_SSID, .ap_ssid = AP_SSID,
+        .ota = s_ota.phase, .ota_pct = s_ota.pct, .ota_version = s_ota.version,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
@@ -532,6 +627,27 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "e8=")) && sscanf(p + 3, "%d", &v) == 1) {
         s_e8.l.active = v != 0;
+    }
+    if ((p = strstr(query, "fw=")) && sscanf(p + 3, "%d", &v) == 1) {
+        s_fw_new = v != 0;
+    }
+    if ((p = strstr(query, "srv=")) && sscanf(p + 4, "%d", &v) == 1) {
+        s_inet = v != 0;
+    }
+    if ((p = strstr(query, "fup=")) && sscanf(p + 4, "%d", &v) == 1 && v) {
+        const sh_ota_in_t in = { .online = s_net.mode == SH_NET_CP, .pump_on = s_pump.on, .alarms = s_alarm.active,
+                                 .air = s_pump.air };
+        ota_do(sh_ota_cmd(&s_ota, SH_OTA_CMD_CONFIRM, &in, sim_ms()));
+        printf("FUp: \"menu\" -> %s\n", s_ota.phase == SH_OTA_RUNNING ? "the update starts"
+               : s_ota.phase == SH_OTA_WAITING ? "the update waits for the pump" : "nothing is offered");
+    }
+    if ((p = strstr(query, "ap=")) && sscanf(p + 3, "%d", &v) == 1) {
+        /* the choice of the menu; AP is possible because "the router does not answer" */
+        net_do(sh_net_choose(&s_net, v ? SH_NET_AP : SH_NET_CP, false, sh_ota_updating(&s_ota), now_s()));
+    }
+    if ((p = strstr(query, "apidle=")) && sscanf(p + 7, "%d", &v) == 1 && v && s_net.mode == SH_NET_AP) {
+        s_net.clients = 0;                              /* the last client left 15 min ago */
+        s_net.idle_s = now_s() - SH_NET_AP_IDLE_S;
     }
 }
 
@@ -629,7 +745,7 @@ static void handle(int fd, const char *page, size_t page_len)
         } else {
             sh_hist_walk(&s_hist, false, 0, csv_line, &c);
             reply_ex(fd, "200 OK", "text/csv; charset=utf-8",
-                     "Content-Disposition: attachment; filename=\"solar-heater-history.csv\"\r\n", csv, c.len);
+                     "Content-Disposition: attachment; filename=\"" AP_SSID "-history.csv\"\r\n", csv, c.len);
         }
     } else if (!post && strcmp(path, "/api/tz") == 0) {
         static char json[SH_WEB_TZ_MAX];
@@ -699,6 +815,15 @@ static void handle(int fd, const char *page, size_t page_len)
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/ota") == 0) {
+        sh_ota_cmd_t cmd = SH_OTA_CMD_CHECK;
+        const sh_web_res_t res = sh_web_ota(body, CODE, &cmd);
+        if (res == SH_WEB_OK) {
+            const sh_ota_in_t in = { .online = s_net.mode == SH_NET_CP, .pump_on = s_pump.on,
+                                     .alarms = s_alarm.active, .air = s_pump.air };
+            ota_do(sh_ota_cmd(&s_ota, cmd, &in, sim_ms()));
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {

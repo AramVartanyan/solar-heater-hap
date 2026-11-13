@@ -13,5 +13,3 @@
 #define SH_PIN_BTN_MINUS    ((gpio_num_t)CONFIG_SH_PIN_BTN_MINUS)
 #define SH_PIN_BTN_PLUS     ((gpio_num_t)CONFIG_SH_PIN_BTN_PLUS)
 #define SH_PIN_LED          ((gpio_num_t)CONFIG_SH_PIN_LED)
-
-#define SH_HOSTNAME         CONFIG_SH_HOSTNAME

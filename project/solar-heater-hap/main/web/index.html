@@ -212,8 +212,10 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="net"><span>Wi-Fi</span><span class="v" id="n-wifi">—</span></div>
   <div class="row" data-f="net"><span data-t="ip"></span><span class="v" id="n-ip">—</span></div>
-  <div class="row" data-f="net_mode"><span data-t="mode"></span><span class="v">CP ›</span></div>
+  <div class="row" data-f="net"><span data-t="host"></span><span class="v" id="n-host">—</span></div>
+  <div class="row" data-f="net_mode"><span data-t="mode"></span><span class="v" id="net-v">—</span></div>
  </div>
+ <p class="note" data-f="net_mode" id="net-note"></p>
  <h2 data-t="time_place" data-f="timezone"></h2>
  <div class="grp">
   <label class="row" data-f="timezone"><span data-t="tz"></span><span class="v"><select data-p id="tz-sel"></select></span></label>
@@ -234,7 +236,8 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <div class="row" data-f="fw"><span data-t="ver"></span><span class="v" id="fw-v">—</span></div>
   <div class="row" data-f="fw"><span data-t="sn"></span><span class="v" id="fw-sn">—</span></div>
-  <div class="row" data-f="ota"><span data-t="ota"></span><span class="v">›</span></div>
+  <button class="row" data-f="ota" data-p id="ota-chk"><span data-t="ota" class="act"></span></button>
+  <div class="row hide" data-f="ota" id="ota-row"><span id="ota-t" style="white-space:pre-line;font-size:15px"></span><button class="sw-btn hide" data-p id="ota-go" data-t="ota_go"></button></div>
  </div>
  <h2 data-f="homekit">HomeKit</h2>
  <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
@@ -291,14 +294,23 @@ test_time:'Време за тест на помпата',by_season:'По сез�
 col_min:'Мин. температура на колектора',d_on:'Разлика за включване',d_off:'Разлика за изключване',
 night_s:'Нощно охлаждане',season_note:'Маркираната колона е текущият сезон.',
 code:'Код за достъп',unlock:'Отключи промените',
-code_note:'Последните 6 знака от името на собствената мрежа на контролера (напр. 810841 от SOLAR-810841). Без кода стойностите само се виждат.',
+code_note:'Последните 6 знака от името на собствената мрежа на контролера (напр. 810840 от Solar-810840). Без кода стойностите само се виждат.',
 bad_code:'Грешен код',
 fluid:'Топлоносител',kind:'Вид',water:'Вода',glycol:'Пропилен-гликол',conc:'Концентрация',press:'Мин. налягане (студена система)',
 col_tank:'Колектор и бойлер',col_max:'Макс. температура на колектора',tank_vol:'Обем на бойлера',mount:'Монтаж на датчиците',
 calc:'Изчислено',boil:'Точка на кипене',cap:'Защита на колектора (таван)',prot:'Защита на колектора (използвана)',
 no_start:'Забрана за пускане над',vac_limit:'Праг във ваканция',frost_below:'Защита от замръзване под',
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
-net:'Мрежа',ip:'IP адрес',time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
+net:'Мрежа',ip:'IP адрес',host:'Име в мрежата',net_cp:'CP — рутер',net_ap:'AP — без рутер',
+net_ap_note:'Собствена точка за достъп „{ap}“ (без парола), адрес http://192.168.4.1.\nИзключва се 15 min след последното откачане и контролерът се връща към рутера (CP).\nРежимът се избира от менюто на контролера (nEt).',
+net_cp_note:'Режимът се избира от менюто на контролера (nEt). AP — собствена точка за достъп „{ap}“ — може да се избере само когато няма връзка с рутера.',
+net_pend:'AP е избран и ще се включи след края на обновяването на фърмуера.',
+ota_go:'Обнови',ota_check:'Проверка…',ota_ok:'Версията е актуална',ota_new:'Налична е по-нова версия {v}',
+ota_wait:'Версия {v}: обновяването изчаква — помпата работи или има активна защита.',
+ota_run:'Обновяване до версия {v}… {p}\nНе изключвайте захранването.',ota_done:'Версия {v} е записана — контролерът се рестартира…',
+ota_noconn:'Няма връзка със сървъра за обновяване',ota_fail:'Обновяването не успя — остава старата версия',
+ota_ap:'Няма интернет (собствена точка за достъп)',a_ota:'Обновяване на фърмуера',d_ota_new:'Инсталира се от „Система“ → „Фърмуер“ → „Обнови“.',
+time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
 fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
 confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
@@ -368,14 +380,23 @@ test_time:'Pump test time',by_season:'By season',param:'Parameter',summer:'Summe
 col_min:'Min. collector temperature',d_on:'Switch-on difference',d_off:'Switch-off difference',
 night_s:'Night cooling',season_note:'The highlighted column is the current season.',
 code:'Access code',unlock:'Unlock changes',
-code_note:'The last 6 characters of the controller\'s own network name (e.g. 810841 from SOLAR-810841). Without the code the values are read-only.',
+code_note:'The last 6 characters of the controller\'s own network name (e.g. 810840 from Solar-810840). Without the code the values are read-only.',
 bad_code:'Wrong code',
 fluid:'Heat transfer fluid',kind:'Kind',water:'Water',glycol:'Propylene glycol',conc:'Concentration',press:'Min. pressure (cold system)',
 col_tank:'Collector and tank',col_max:'Max. collector temperature',tank_vol:'Tank volume',mount:'Sensor mounting',
 calc:'Computed',boil:'Boiling point',cap:'Collector protection (ceiling)',prot:'Collector protection (in use)',
 no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost protection below',
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
-net:'Network',ip:'IP address',time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
+net:'Network',ip:'IP address',host:'Name in the network',net_cp:'CP — router',net_ap:'AP — no router',
+net_ap_note:'Own access point "{ap}" (no password), address http://192.168.4.1.\nIt switches off 15 min after the last device leaves and the controller returns to the router (CP).\nThe mode is chosen in the menu of the controller (nEt).',
+net_cp_note:'The mode is chosen in the menu of the controller (nEt). AP — the own access point "{ap}" — can be chosen only without a connection to the router.',
+net_pend:'AP is chosen and will start when the firmware update is over.',
+ota_go:'Update',ota_check:'Checking…',ota_ok:'Up to date',ota_new:'A newer version {v} is available',
+ota_wait:'Version {v}: the update is waiting — the pump runs or a protection is active.',
+ota_run:'Updating to version {v}… {p}\nDo not switch off the power.',ota_done:'Version {v} is written — the controller is restarting…',
+ota_noconn:'No connection to the update server',ota_fail:'The update failed — the old version stays',
+ota_ap:'No internet (own access point)',a_ota:'Firmware update',d_ota_new:'Install it from "System" → "Firmware" → "Update".',
+time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
 fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
 confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
@@ -417,7 +438,7 @@ r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped',
 r_pulse:'pulse (measuring)',r_pulse_wait:'waiting for the next pulse',pw_in:'in {m} min'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
-let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
+let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0,otaT=0;
 let BZ='';try{BZ=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
 const t=k=>T[lang][k]||k;
 const deg=v=>(v/10).toFixed(1).replace('-','−');
@@ -480,6 +501,9 @@ function render(){
   d.className='alarm'+cls;b.textContent=head;p.textContent=text;d.append(b,p);al.append(d)};
  S.alarms.forEach(c=>card(info.includes(c)?' info':'',c+' — '+t('a_'+c),fill('d_'+c,sub)));
  if(co.heater)card(' info',t('a_heat'),t('d_heat'));     /* information, after the alarms */
+ const o=S.ota,osub={v:o.ver,p:o.pct==null?'':o.pct+' %'};     /* firmware: a newer version, the update */
+ if(o.st=='new')card(' info',fill('ota_new',osub),t('d_ota_new'));
+ if(['wait','run','done'].includes(o.st))card(' info',t('a_ota'),fill('ota_'+o.st,osub));
  const h=S.heat,kw=S.inst.heater.v,k1=x=>(Math.abs(x)/10).toFixed(1);
  if(h.leak==2)card(' info',t('a_leak'),fill('d_leak',{d:h.last?k1(h.last.drop):'2.0'}));
  if(h.det&&!kw)card(' info',t('a_det'),t('d_det'));
@@ -534,8 +558,18 @@ function render(){
  $('#c-frost').textContent=deg(S.calc.frost)+' °C';
  const n=$('#n-prot'),lim=S.calc.prot<S.calc.prot_set;n.classList.toggle('hide',!lim);
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
- $('#n-wifi').textContent=S.net.ssid?S.net.ssid+' · '+String(S.net.rssi).replace('-','−')+' dBm':'—';
- $('#n-ip').textContent=S.net.ip||'—';$('#fw-v').textContent=S.fw;$('#fw-sn').textContent=S.sn||'—';
+ const nt=S.net,ap=nt.mode=='ap';
+ $('#n-wifi').textContent=ap?nt.ap+' (AP)':nt.ssid?nt.ssid+' · '+String(nt.rssi).replace('-','−')+' dBm':'—';
+ $('#n-ip').textContent=nt.ip||'—';$('#fw-v').textContent=S.fw;$('#fw-sn').textContent=S.sn||'—';
+ $('#n-host').textContent=ap||!nt.host?'—':nt.host+'.local';
+ $('#net-v').textContent=t(ap?'net_ap':'net_cp');     /* shown only: the mode is chosen in the menu (nEt) */
+ $('#net-note').textContent=fill(ap?'net_ap_note':nt.pend?'net_pend':'net_cp_note',{ap:nt.ap});
+ /* the update: one at a time; on the own access point there is no internet — grey, with the reason */
+ const oc=$('#ota-chk');oc.disabled=!unlocked||['check','wait','run','done'].includes(o.st);
+ if(o.st=='ap'){oc.classList.add('na');oc.inert=true}
+ $('#ota-row').classList.toggle('hide',o.st=='idle');$('#ota-t').textContent=o.st=='idle'?'':fill('ota_'+o.st,osub);
+ $('#ota-go').classList.toggle('hide',o.st!='new');
+ clearTimeout(otaT);if(['check','run','done'].includes(o.st))otaT=setTimeout(refresh,1000);    /* follow it closely */
  const c=S.clock;
  $('#hd-time').textContent=(c.min==null?'--:--':hm(c.min))+(c.st=='ok'?'':' ('+t('c_'+c.st)+')');
  $('#clock-v').textContent=t('c_'+c.st);
@@ -608,6 +642,8 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
  if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
+[['#ota-chk','check'],['#ota-go','update']].forEach(([s,c])=>
+ $(s).onclick=async()=>{await post('/api/ota',{cmd:c});setTimeout(refresh,300)});
 $('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};
 $('#tz-ok').onclick=async e=>{const i=+e.target.dataset.i;if(i>=0&&await post('/api/tz',{tz:i}))toast(t('done'));refresh();loadChart()};
 
