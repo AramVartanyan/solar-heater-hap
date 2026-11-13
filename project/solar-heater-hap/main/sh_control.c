@@ -486,6 +486,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     iin.wifi_portal = st.wifi_portal;
     iin.ap = st.net_ap;
     iin.ota = st.ota_running;
+    iin.pair_window = st.hap_pair_window;
     if (!s_ind_done || memcmp(&iin, &s_ind_in, sizeof(iin)) != 0) {
         const sh_ind_out_t out = sh_ind_update(&s_ind, &IND_PARAMS, &iin);
         sh_led_show(out.color, out.pattern);

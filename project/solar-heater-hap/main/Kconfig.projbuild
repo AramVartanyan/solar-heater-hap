@@ -256,6 +256,29 @@ menu "Device Settings"
 
     endmenu
 
+    menu "Apple HomeKit"
+
+        config SH_HAP_FIXED_SETUP_CODE
+            bool "Fixed setup code (development only)"
+            default n
+            help
+                The product reads the HomeKit setup info (unique for every device) from the
+                partition factory_nvs. With this option the setup code below is built into the
+                firmware instead, so that a development board works without writing the payload
+                after every erase of the flash. Never for a product.
+
+        config SH_HAP_SETUP_CODE
+            string "HomeKit setup code"
+            default "111-22-333"
+            depends on SH_HAP_FIXED_SETUP_CODE
+
+        config SH_HAP_SETUP_ID
+            string "HomeKit setup ID"
+            default "ES32"
+            depends on SH_HAP_FIXED_SETUP_CODE
+
+    endmenu
+
     config SH_INTERNAL_PULLUPS
         bool "Internal pull-ups on the 1-Wire and TM1637 lines (development prototype)"
         default y

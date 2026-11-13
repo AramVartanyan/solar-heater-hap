@@ -42,6 +42,7 @@ button.row{cursor:pointer}
 .sw{width:51px;height:31px;border-radius:16px;background:var(--green);position:relative;flex:none;border:0;padding:0;cursor:pointer}
 .sw:after{content:'';position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sw.off{background:var(--off)}.sw.off:after{right:auto;left:2px}
+.dim{opacity:.4;cursor:default}
 table{width:100%;border-collapse:collapse;font-size:16px}
 th,td{padding:11px 10px;text-align:left}th{color:var(--sub);font-weight:500;font-size:13px}
 td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
@@ -118,7 +119,7 @@ section{display:none}section.on{display:block}
  </div>
  <h2 data-t="last7" data-f="history"></h2>
  <div class="grp" style="padding:4px 6px" data-f="history">
-  <table class="days"><thead><tr><th data-t="date"></th><th><span data-t="col"></span><span class="u">°C</span></th><th><span data-t="tank"></span><span class="u">°C</span></th><th><span data-t="pump"></span><span class="u">h:min</span></th><th><span data-t="cool_h"></span><span class="u">min</span></th><th data-f="heater"><span data-t="heat_h"></span><span class="u">min</span></th></tr></thead><tbody id="days"></tbody></table>
+  <table class="days"><thead><tr><th data-t="date"></th><th><span data-t="col"></span><span class="u ut">°C</span></th><th><span data-t="tank"></span><span class="u ut">°C</span></th><th><span data-t="pump"></span><span class="u">h:min</span></th><th><span data-t="cool_h"></span><span class="u">min</span></th><th data-f="heater"><span data-t="heat_h"></span><span class="u">min</span></th></tr></thead><tbody id="days"></tbody></table>
  </div>
  <p class="note" data-f="history" data-t="days_note"></p>
 </section>
@@ -152,7 +153,7 @@ section{display:none}section.on{display:block}
  <div class="grp" data-f="season"><label class="row"><span data-t="season"></span><span class="v"><select data-k="ssn"><option value="2" data-t="s_auto"></option><option value="0" data-t="summer"></option><option value="1" data-t="winter"></option></select></span></label></div>
  <h2 data-t="common"></h2>
  <div class="grp">
-  <label class="row" data-f="settings"><span data-t="tmax"></span><span class="v"><input type="number" inputmode="numeric" data-k="tbo"> °C</span></label>
+  <label class="row" data-f="settings"><span data-t="tmax"></span><span class="v"><input type="number" inputmode="numeric" data-k="tbo" data-u="t"> <span class="ut">°C</span></span></label>
   <div class="row" data-f="night_cool"><span data-t="night"></span><button class="sw off" id="sw-nc" role="switch"></button></div>
   <div class="row" data-f="frost"><span data-t="frost"></span><button class="sw off" id="sw-fro" role="switch"></button></div>
   <label class="row" data-f="settings"><span data-t="test_time"></span><span class="v"><input type="number" inputmode="numeric" data-k="t_st"> s</span></label>
@@ -160,9 +161,9 @@ section{display:none}section.on{display:block}
  <h2 data-t="by_season"></h2>
  <div class="grp" style="padding:4px 6px">
   <table id="season-t"><tr><th data-t="param"></th><th data-t="summer"></th><th data-f="season" data-t="winter"></th></tr>
-  <tr data-f="settings"><td data-t="col_min"></td><td><input type="number" inputmode="numeric" data-k="c_lo"> °C</td><td data-f="season"><input type="number" inputmode="numeric" data-k="c_lo_w"> °C</td></tr>
-  <tr data-f="settings"><td data-t="d_on"></td><td><input type="number" inputmode="numeric" data-k="d_on"> K</td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_on_w"> K</td></tr>
-  <tr data-f="settings"><td data-t="d_off"></td><td><input type="number" inputmode="numeric" data-k="d_of"> K</td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_of_w"> K</td></tr>
+  <tr data-f="settings"><td data-t="col_min"></td><td><input type="number" inputmode="numeric" data-k="c_lo" data-u="t"> <span class="ut">°C</span></td><td data-f="season"><input type="number" inputmode="numeric" data-k="c_lo_w" data-u="t"> <span class="ut">°C</span></td></tr>
+  <tr data-f="settings"><td data-t="d_on"></td><td><input type="number" inputmode="numeric" data-k="d_on" data-u="d"> <span class="ud">K</span></td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_on_w" data-u="d"> <span class="ud">K</span></td></tr>
+  <tr data-f="settings"><td data-t="d_off"></td><td><input type="number" inputmode="numeric" data-k="d_of" data-u="d"> <span class="ud">K</span></td><td data-f="season"><input type="number" inputmode="numeric" data-k="d_of_w" data-u="d"> <span class="ud">K</span></td></tr>
   <tr data-f="night_cool"><td data-t="night_s"></td><td><button class="sw-btn" data-sw="nc"></button></td><td><button class="sw-btn" data-sw="nc_w"></button></td></tr></table>
  </div>
  <p class="note" data-f="season" data-t="season_note"></p>
@@ -184,7 +185,7 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <label class="row" data-f="col_type"><span data-t="col_kind"></span><span class="v"><select data-p data-k="col_type"><option value="0" data-t="flat"></option><option value="1" data-t="tubes"></option></select></span></label>
   <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
-  <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
+  <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max" data-u="t"> <span class="ut">°C</span></span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
   <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
   <label class="row" data-f="mount"><span data-t="mount"></span><span class="v"><select data-p data-k="mount"><option value="0" data-t="sleeves"></option><option value="1" data-t="pipes"></option></select></span></label>
@@ -240,13 +241,20 @@ section{display:none}section.on{display:block}
   <div class="row hide" data-f="ota" id="ota-row"><span id="ota-t" style="white-space:pre-line;font-size:15px"></span><button class="sw-btn hide" data-p id="ota-go" data-t="ota_go"></button></div>
  </div>
  <h2 data-f="homekit">HomeKit</h2>
- <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
+ <div class="grp" data-f="homekit">
+  <div class="row"><span>Apple HomeKit</span><button class="sw off" id="sw-hap" role="switch" data-p></button></div>
+  <div class="row"><span data-t="paired"></span><span class="v" id="hap-v">—</span></div>
+ </div>
+ <p class="note" data-f="homekit" id="hap-note"></p>
+ <h2 data-t="keys" data-f="keylock"></h2>
+ <div class="grp" data-f="keylock"><div class="row"><span id="lock-v">—</span><button class="sw off" id="sw-lock" role="switch" data-p></button></div></div>
+ <p class="note" data-f="keylock" data-t="keys_note"></p>
  <h2 data-t="hist" data-f="history"></h2>
  <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl" class="act"></span></a></div>
  <h2 data-t="reset"></h2>
  <div class="grp">
   <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi" class="act"></span></button>
-  <button class="row" data-f="homekit"><span data-t="rs_hk" class="act"></span></button>
+  <button class="row" data-f="homekit" data-p data-r="homekit" id="rs-hk"><span data-t="rs_hk" class="act"></span></button>
   <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn" class="act"></span></button>
   <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist" class="act"></span></button>
   <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def" class="act"></span></button>
@@ -311,7 +319,7 @@ ota_run:'Обновяване до версия {v}… {p}\nНе изключв�
 ota_noconn:'Няма връзка със сървъра за обновяване',ota_fail:'Обновяването не успя — остава старата версия',
 ota_ap:'Няма интернет (собствена точка за достъп)',a_ota:'Обновяване на фърмуера',d_ota_new:'Инсталира се от „Система“ → „Фърмуер“ → „Обнови“.',
 time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
-fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
+fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',p_yes:'да',p_no:'не',hist:'История',hist_dl:'Изтегли историята (CSV)',
 confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
@@ -320,6 +328,13 @@ q_defaults:'Връщане на всички параметри (потреби�
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
 q_history:'Изтриване на историята (всички дневни обобщения)?',
 q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона, засеченият нагревател, нормалното нощно охлаждане)?',
+q_homekit:'Изтриване на сдвояванията с HomeKit? Контролерът ще се рестартира; после устройството се добавя отново в Apple Home.',
+q_hap_on:'Включване на Apple HomeKit? Контролерът ще се рестартира.',q_hap_off:'Изключване на Apple HomeKit? Контролерът ще се рестартира.',
+keys:'Клавиатура',k_locked:'Клавиатура: заключена',k_open:'Клавиатура: отключена',
+keys_note:'Заключена: бутоните на контролера не правят нищо (на дисплея LoC).\nЗаключва се и се отключва и от място — „+“ и „−“ заедно за 3 s, и от Apple Home.',
+hap_paired:'Първо премахнете устройството от Apple Home.',hap_win:'Прозорецът за сдвояване е отворен (10 min) — добавете устройството в Apple Home.',
+hap_closed:'Прозорецът за сдвояване е затворен — отваря се отново за 10 min след рестарт на контролера.',
+hap_wait:'HomeKit работи само при връзка с рутера.',hap_off:'Apple HomeKit е изключен.',hap_sw:'Смяната на превключвателя рестартира контролера.',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
 a_E1:'Повреден датчик на колектора',d_E1:'Датчикът не отговаря. Помпата работи на проби. Проверете кабела и датчика.',
 a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът не отговаря. Помпата работи само по температурата на колектора. Проверете кабела и датчика.',
@@ -397,7 +412,7 @@ ota_run:'Updating to version {v}… {p}\nDo not switch off the power.',ota_done:
 ota_noconn:'No connection to the update server',ota_fail:'The update failed — the old version stays',
 ota_ap:'No internet (own access point)',a_ota:'Firmware update',d_ota_new:'Install it from "System" → "Firmware" → "Update".',
 time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
-fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
+fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',p_yes:'yes',p_no:'no',hist:'History',hist_dl:'Download the history (CSV)',
 confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
@@ -406,6 +421,13 @@ q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
 q_history:'Erase the history (all daily summaries)?',
 q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check, the detected heater, the normal night cooling)?',
+q_homekit:'Erase the HomeKit pairings? The controller will restart; then the device is added to Apple Home again.',
+q_hap_on:'Switch Apple HomeKit on? The controller will restart.',q_hap_off:'Switch Apple HomeKit off? The controller will restart.',
+keys:'Keyboard',k_locked:'Keyboard: locked',k_open:'Keyboard: unlocked',
+keys_note:'Locked: the buttons of the controller do nothing (the display shows LoC).\nIt is locked and unlocked on the spot too — "+" and "−" together for 3 s, and from Apple Home.',
+hap_paired:'First remove the device from Apple Home.',hap_win:'The pairing window is open (10 min) — add the device in Apple Home.',
+hap_closed:'The pairing window is closed — it opens again for 10 min after a restart of the controller.',
+hap_wait:'HomeKit works only with a connection to the router.',hap_off:'Apple HomeKit is switched off.',hap_sw:'Changing the switch restarts the controller.',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
 a_E1:'Collector sensor fault',d_E1:'The sensor does not answer. The pump runs on probes. Check the cable and the sensor.',
 a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the collector temperature only. Check the cable and the sensor.',
@@ -440,8 +462,17 @@ r_pulse:'pulse (measuring)',r_pulse_wait:'waiting for the next pulse',pw_in:'in 
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0,otaT=0;
 let BZ='';try{BZ=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
-const t=k=>T[lang][k]||k;
-const deg=v=>(v/10).toFixed(1).replace('-','−');
+/* The display units chosen in HomeKit (S.hap.f): the data and the requests stay in °C / K; a value is
+   converted only where it is shown or entered — tenths to 0.1 °F, whole values to a whole °F (a
+   difference without the + 32); the texts with temperatures too. The CSV stays in °C. */
+const F=()=>!!(S&&S.hap&&S.hap.f),tu=()=>F()?'°F':'°C',du=()=>F()?'°F':'K';
+const cw=(v,d)=>F()?Math.round(v*1.8+(d?0:32)):v;          /* whole °C / K -> shown */
+const wc=(v,d)=>F()?Math.round((v-(d?0:32))/1.8):v;        /* entered -> whole °C / K */
+const f10=v=>F()?v*1.8+320:v;                              /* tenths of °C -> shown tenths */
+const t=k=>{const s=T[lang][k]||k;return F()?s.replace(/(\d+) °C/g,(m,x)=>cw(+x)+' °F').replace(/(\d+) K(?![\w/])/g,(m,x)=>cw(+x,1)+' °F')
+ .replace(/°C/g,'°F').replace(/\} K(?![\w/])/g,'} °F'):s};
+const deg=v=>(f10(v)/10).toFixed(1).replace('-','−');
+const dk=v=>((F()?v*1.8:v)/10).toFixed(1);                 /* a difference in tenths of K, shown */
 const p2=n=>String(n).padStart(2,'0'),hm=m=>p2(Math.floor(m/60))+':'+p2(m%60);
 const c0min=()=>S.clock.min==null?null:S.clock.min;
 const dur=m=>m>=60?Math.floor(m/60)+' h '+m%60+' min':m+' min';
@@ -491,9 +522,12 @@ function testText(){
  const a=S.air;
  $('#air-v').textContent=a.on?fill(a.run?'air_run':'air_pause',{c:a.cycle,n:a.cycles})+' · '+t('left')+' '+Math.ceil(Math.max(0,a.left-gone)/60)+'\u00a0min':'';$('#air-v').classList.toggle('hide',!a.on);
 }
+let wasF=false;
 function render(){
  if(!S)return;
  gray(S.feat);
+ if(F()!=wasF){wasF=F();$$('[data-t]').forEach(e=>e.textContent=t(e.dataset.t))}     /* the texts in the new units */
+ $$('.ut').forEach(e=>e.textContent=tu());$$('.ud').forEach(e=>e.textContent=du());
  const vac=!!S.set.hol.v,co=S.cool,air=S.air;
  const info=['Hot','Fro'],sub={boil:deg(S.calc.boil),prot:deg(vac?S.calc.vac:S.calc.prot),frost:deg(S.calc.frost)};
  const al=$('#alarms');al.textContent='';
@@ -504,15 +538,15 @@ function render(){
  const o=S.ota,osub={v:o.ver,p:o.pct==null?'':o.pct+' %'};     /* firmware: a newer version, the update */
  if(o.st=='new')card(' info',fill('ota_new',osub),t('d_ota_new'));
  if(['wait','run','done'].includes(o.st))card(' info',t('a_ota'),fill('ota_'+o.st,osub));
- const h=S.heat,kw=S.inst.heater.v,k1=x=>(Math.abs(x)/10).toFixed(1);
- if(h.leak==2)card(' info',t('a_leak'),fill('d_leak',{d:h.last?k1(h.last.drop):'2.0'}));
+ const h=S.heat,kw=S.inst.heater.v,k1=x=>dk(Math.abs(x));
+ if(h.leak==2)card(' info',t('a_leak'),fill('d_leak',{d:h.last?k1(h.last.drop):dk(20)}));
  if(h.det&&!kw)card(' info',t('a_det'),t('d_det'));
  $('#heat-v').textContent=kw?(kw/10).toFixed(1)+' kW · '+t(h.on?'h_on':'h_off'):h.det?t('h_det')+' · '+t(h.on?'h_on':'h_off'):t('h_none');
  $('#leak-row').classList.toggle('hide',!h.leak&&!h.last);
  $('#leak-v').textContent=h.leak==1?fill('leak_chk',{s:Math.max(0,h.left-Math.round((Date.now()-leftAt)/1000))}):
   h.last?fill('leak_last',{dir:t(h.last.drop>=0?'fell':'rose'),d:k1(h.last.drop),res:t(h.last.stop?'res_stop':'res_go')}):'';
  $('#l-heater').textContent=t(h.det?'det':'not_det');
- $('#l-e8').textContent=h.e8n==null?'—':(h.e8n/10).toFixed(1)+' K/h';
+ $('#l-e8').textContent=h.e8n==null?'—':dk(h.e8n)+' '+du()+'/h';
  const ssn=t(S.winter?'winter':'summer');
  $('#hd-season').textContent=ssn;
  $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
@@ -534,11 +568,11 @@ function render(){
  $('#air-note').textContent=fill(S.inst.fluid.v?'air_pg':'air_water',{g:S.inst.glycol.v,tot:air.cycles*(air.work+air.pause)});
  $('#b-air').classList.toggle('hide',!!air.on);$('#b-air').disabled=!!S.test;$('#b-air-stop').classList.toggle('hide',!air.on);
  $('#b-start').disabled=!!air.on;
- $('#c-vac').textContent=deg(S.calc.vac)+' °C';
+ $('#c-vac').textContent=deg(S.calc.vac)+' '+tu();
  $('#l-rise').textContent=co.rise==null?'—':hm(co.rise);$('#l-set').textContent=co.set==null?'—':hm(co.set);
- $('#l-target').textContent=deg(co.learned)+' °C';
+ $('#l-target').textContent=deg(co.learned)+' '+tu();
  $('#t-tank').textContent=S.tank==null?'---':deg(S.tank)+'°';
- $('#s-tank').textContent=S.tank==null?t('no_sensor'):'Tmax '+S.set.tbo.v+' °C';
+ $('#s-tank').textContent=S.tank==null?t('no_sensor'):'Tmax '+cw(S.set.tbo.v)+' '+tu();
  $('#t-col').textContent=S.col==null?'---':deg(S.col)+'°';
  $('#s-col').textContent=S.col==null?t('no_sensor'):'';
  const prot=['protect','frost','tf_probe','cool'].includes(S.why);
@@ -549,13 +583,15 @@ function render(){
  $('#b-start').classList.toggle('hide',!!S.test);$('#test-ctl').classList.toggle('hide',!S.test);
  $('#sw-fro').classList.toggle('off',!S.fro);$('#sw-fro').setAttribute('aria-checked',!!S.fro);
  $$('[data-k]').forEach(e=>{const o=S.set[e.dataset.k]||S.inst[e.dataset.k],m=+e.dataset.m||1;
+  const u=e.dataset.u,d=u=='d';     /* a temperature / a difference: shown in the display units */
+  if(u&&F()){e.min=cw(o.min,d);e.max=cw(o.max,d);e.step='any';if(document.activeElement!=e)e.value=cw(o.v,d);return}
   e.min=o.min/m;e.max=o.max/m;e.step=(o.step||1)/m;if(document.activeElement!=e)e.value=o.v/m});
  const f=$('#i-fluid');if(document.activeElement!=f)f.value=S.inst.fluid.v;
  $$('[data-p]').forEach(e=>e.disabled=!unlocked);
  if(!S.inst.fluid.v)$('[data-k=glycol]').disabled=true;
- $('#c-boil').textContent=$('#c-ns').textContent=deg(S.calc.boil)+' °C';
- $('#c-cap').textContent=deg(S.calc.cap)+' °C';$('#c-prot').textContent=deg(S.calc.prot)+' °C';
- $('#c-frost').textContent=deg(S.calc.frost)+' °C';
+ $('#c-boil').textContent=$('#c-ns').textContent=deg(S.calc.boil)+' '+tu();
+ $('#c-cap').textContent=deg(S.calc.cap)+' '+tu();$('#c-prot').textContent=deg(S.calc.prot)+' '+tu();
+ $('#c-frost').textContent=deg(S.calc.frost)+' '+tu();
  const n=$('#n-prot'),lim=S.calc.prot<S.calc.prot_set;n.classList.toggle('hide',!lim);
  if(lim)n.textContent=t('prot_note').replace('{set}',deg(S.calc.prot_set));
  const nt=S.net,ap=nt.mode=='ap';
@@ -564,6 +600,14 @@ function render(){
  $('#n-host').textContent=ap||!nt.host?'—':nt.host+'.local';
  $('#net-v').textContent=t(ap?'net_ap':'net_cp');     /* shown only: the mode is chosen in the menu (nEt) */
  $('#net-note').textContent=fill(ap?'net_ap_note':nt.pend?'net_pend':'net_cp_note',{ap:nt.ap});
+ /* HomeKit: the switch cannot go off while paired (the note says why); the pairings can be erased while HAP runs */
+ const hk=S.hap,hsw=$('#sw-hap'),hfix=!!(hk.on&&hk.paired);
+ hsw.classList.toggle('off',!hk.on);hsw.setAttribute('aria-checked',!!hk.on);hsw.disabled=!unlocked||hfix;hsw.classList.toggle('dim',hfix);
+ $('#hap-v').textContent=hk.on?t(hk.paired?'p_yes':'p_no'):'—';
+ $('#hap-note').textContent=(!hk.on?[t('hap_off'),t('hap_sw')]:hk.paired?[t('hap_paired')]:[t(!hk.run?'hap_wait':hk.win?'hap_win':'hap_closed'),t('hap_sw')]).join('\n');
+ $('#lock-v').textContent=t(S.lock?'k_locked':'k_open');
+ $('#sw-lock').classList.toggle('off',!S.lock);$('#sw-lock').setAttribute('aria-checked',!!S.lock);
+ $('#rs-hk').disabled=!unlocked||!hk.run;$('#rs-hk').classList.toggle('dim',!hk.run);
  /* the update: one at a time; on the own access point there is no internet — grey, with the reason */
  const oc=$('#ota-chk');oc.disabled=!unlocked||['check','wait','run','done'].includes(o.st);
  if(o.st=='ap'){oc.classList.add('na');oc.inert=true}
@@ -590,13 +634,14 @@ function drawChart(){
  if(!C)return;
  const W=320,L=28,R=6,T=6,Y0=118,BY=137,day=C.day,x0=day?0:-1440,pw=(W-L-R)/1440;
  const X=x=>L+(x-x0)*pw;let lo=1e9,hi=-1e9;
- C.pts.forEach(p=>[p[1],p[2]].forEach(v=>{if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v)}}));
- if(lo>hi){lo=0;hi=600}lo=Math.floor(lo/100)*100;hi=Math.ceil(hi/100)*100;if(hi-lo<200)hi=lo+200;
+ const V=v=>v==null?null:f10(v);     /* the display units */
+ C.pts.forEach(p=>[p[1],p[2]].forEach(v=>{if(v!=null){lo=Math.min(lo,V(v));hi=Math.max(hi,V(v))}}));
+ if(lo>hi){lo=V(0);hi=V(600)}lo=Math.floor(lo/100)*100;hi=Math.ceil(hi/100)*100;if(hi-lo<200)hi=lo+200;
  const Y=v=>Y0-(v-lo)/(hi-lo)*(Y0-T),st=(hi-lo)/100>6?200:100;let h='';
  for(let v=lo;v<=hi;v+=st)h+=`<line class="ax" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-3}" y="${Y(v)+3}" text-anchor="end">${v/10}°</text>`;
  for(let i=0;i<=4;i++){const x=x0+i*360;h+=`<text x="${X(x)}" y="${Y0+11}" text-anchor="middle">${day?p2(i*6):(i<4?'−'+(24-i*6)+' h':'0')}</text>`}
  [[1,'var(--red)'],[2,'var(--blue)']].forEach(([k,col])=>{let d='',prev=null;
-  C.pts.forEach(p=>{const v=p[k];if(v==null){prev=null;return}d+=(prev?'L':'M')+X(p[0]).toFixed(1)+' '+Y(v).toFixed(1);prev=1});
+  C.pts.forEach(p=>{const v=V(p[k]);if(v==null){prev=null;return}d+=(prev?'L':'M')+X(p[0]).toFixed(1)+' '+Y(v).toFixed(1);prev=1});
   if(d)h+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/>`});
  h+=`<rect x="${L}" y="${BY}" width="${W-L-R}" height="12" rx="2" fill="var(--off)"/>`;
  C.pts.forEach(p=>{let x=X(p[0]-10);[[3,'var(--green)'],[4,'var(--orange)'],[6,'var(--orange)'],[5,'var(--sub)']].forEach(([k,col])=>{
@@ -624,7 +669,7 @@ $$('.tabs div').forEach(d=>d.onclick=()=>{
  $$('section').forEach(s=>s.classList.toggle('on',s.id==d.dataset.s));scrollTo(0,0)});
 $('#l-bg').onclick=()=>setLang('bg');$('#l-en').onclick=()=>setLang('en');
 $$('[data-k]').forEach(e=>e.onchange=async()=>{
- const v=Math.round(e.value*(+e.dataset.m||1));e.blur();
+ const u=e.dataset.u,v=u?wc(Math.round(e.value),u=='d'):Math.round(e.value*(+e.dataset.m||1));e.blur();     /* sent in °C / K */
  if(e.value!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
 $('#i-fluid').onchange=async e=>{const v=+e.target.value;e.target.blur();
  await post('/api/set',v?{fluid:1,glycol:S.inst.glycol.v}:{fluid:0});refresh()};
@@ -641,7 +686,10 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
  code=v;if(await post('/api/auth',{})){document.cookie='code='+v+';max-age=31536000;path=/';
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
- if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
+ if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory','homekit'].includes(w)?'restart':'done'));refresh();loadDays()}});
+$('#sw-lock').onclick=async()=>{if(S){await post('/api/lock',{on:S.lock?0:1});refresh()}};
+$('#sw-hap').onclick=async()=>{if(!S)return;const on=S.hap.on?0:1;
+ if(await ask(t(on?'q_hap_on':'q_hap_off'))&&await post('/api/hap',{on})){toast(t('restart'));refresh()}};
 [['#ota-chk','check'],['#ota-go','update']].forEach(([s,c])=>
  $(s).onclick=async()=>{await post('/api/ota',{cmd:c});setTimeout(refresh,300)});
 $('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};

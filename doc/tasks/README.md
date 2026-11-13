@@ -15,7 +15,7 @@
 | 12 (D) | [step12-heater-leak-e8.md](step12-heater-leak-e8.md) — нагревател, теч от нагревателя, обратен термосифон (`E8`) | след #48 / #49 |
 | 13 (D2) | [step13-pulse-mode.md](step13-pulse-mode.md) — импулсен режим (датчиците на тръбите) | след #52 / #53 |
 | 7 (E) | [step7-network-ota.md](step7-network-ota.md) — мрежата (`nEt`, режим `AP`, име), обновяване (OTA, `FUp`) | след #57 / #60 |
-| 14 (F) | [step14-homekit.md](step14-homekit.md) — Apple HomeKit | — |
+| 14 (F) | [step14-homekit.md](step14-homekit.md) — Apple HomeKit | след #63 / #62 |
 
 ## Групи на оставащите стъпки (прието)
 

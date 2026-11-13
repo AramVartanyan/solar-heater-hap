@@ -9,6 +9,7 @@
 #include "sh_tz.h"
 #include "sh_pump_ctl.h"        /* SH_AIR_* */
 #include "sh_cool.h"
+#include "sh_hap_rules.h"
 #include "sh_web_api.h"
 
 /* The functions this firmware has. A step that adds a function adds its name here and wires its
@@ -21,6 +22,7 @@ static const char *const FEATURES[] = {
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
     "heater", "mount",
     "net_mode", "ota",
+    "homekit", "keylock",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -191,7 +193,10 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ota_version ? s->ota_version : "");
     put(&o, ",\"pct\":");
     put_or_null(&o, s->ota == SH_OTA_RUNNING && s->ota_pct >= 0, s->ota_pct);
-    put(&o, "},");
+    /* Apple HomeKit: the setting, paired, running (the pairings can be reset), the pairing window;
+     * "f": the page shows °F (everything here stays in °C / K) */
+    put(&o, "},\"hap\":{\"on\":%d,\"paired\":%d,\"run\":%d,\"win\":%d,\"f\":%d},\"lock\":%d,", s->hap_on, s->hap_paired,
+        s->hap_running, s->hap_window, s->fahrenheit, s->key_lock);
 
     static const char *const trust[] = {
         [SH_CLOCK_UNSET] = "unset", [SH_CLOCK_TZ_UNCONFIRMED] = "tz",
@@ -509,6 +514,8 @@ sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *wh
         *what = SH_WEB_RESET_HISTORY;
     } else if (strcmp(v, "learned") == 0) {
         *what = SH_WEB_RESET_LEARNED;
+    } else if (strcmp(v, "homekit") == 0) {
+        *what = SH_WEB_RESET_HOMEKIT;
     } else {
         return SH_WEB_BAD;
     }
@@ -560,6 +567,32 @@ sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd)
         return SH_WEB_BAD;
     }
     return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
+}
+
+sh_web_res_t sh_web_hap(const char *body, const char *code, bool on_now, bool paired, bool *on)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "on", v) || (strcmp(v, "0") != 0 && strcmp(v, "1") != 0)) {
+        return SH_WEB_BAD;
+    }
+    if (!sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
+    *on = v[0] == '1';
+    return sh_hap_set(on_now, *on, paired) == SH_HAP_SET_REFUSED ? SH_WEB_BAD : SH_WEB_OK;
+}
+
+sh_web_res_t sh_web_lock(const char *body, const char *code, bool *on)
+{
+    char v[VALUE_MAX];
+    if (!form_get(body, "on", v) || (strcmp(v, "0") != 0 && strcmp(v, "1") != 0)) {
+        return SH_WEB_BAD;
+    }
+    if (!sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
+    *on = v[0] == '1';
+    return SH_WEB_OK;
 }
 
 const char *sh_web_ota_key(sh_ota_phase_t phase, bool ap)

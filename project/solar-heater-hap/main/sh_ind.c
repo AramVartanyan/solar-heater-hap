@@ -54,8 +54,10 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
     }
     if (in->ap) {
         out.pattern = SH_IND_WINK;
+    } else if (!in->wifi_connected || in->wifi_portal) {
+        out.pattern = SH_IND_HEARTBEAT;
     } else {
-        out.pattern = in->wifi_connected && !in->wifi_portal ? SH_IND_STEADY : SH_IND_HEARTBEAT;
+        out.pattern = in->pair_window ? SH_IND_BREATHE : SH_IND_STEADY;
     }
     return out;
 }
@@ -63,6 +65,16 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
 bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms)
 {
     switch (pattern) {
+    case SH_IND_BREATHE:
+        return sh_ind_level(pattern, ms) > 0;
+    case SH_IND_IDENTIFY: {
+        if (ms >= SH_IND_IDENT_MS) {
+            return true;                /* over: what was shown before */
+        }
+        const uint32_t t = ms % SH_IND_IDENT_GROUP_MS;
+        /* each flash: dark, then lit; the gap between the groups is lit */
+        return t >= SH_IND_IDENT_FLASHES * 2u * SH_IND_IDENT_FLASH_MS || (t / SH_IND_IDENT_FLASH_MS) % 2u == 1u;
+    }
     case SH_IND_BLINK:
         return ms % (2 * SH_IND_BLINK_MS) < SH_IND_BLINK_MS;
     case SH_IND_WINK:
@@ -81,4 +93,22 @@ bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms)
     default:
         return true;
     }
+}
+
+uint8_t sh_ind_level(sh_ind_pattern_t pattern, uint32_t ms)
+{
+    if (pattern != SH_IND_BREATHE) {
+        return sh_ind_lit(pattern, ms) ? 100 : 0;
+    }
+    const uint32_t t = ms % (2 * SH_IND_BREATHE_HALF_MS + SH_IND_BREATHE_DARK_MS);
+    if (t >= 2 * SH_IND_BREATHE_HALF_MS) {
+        return 0;                       /* the dark bottom of a breath */
+    }
+    const uint32_t pos = t < SH_IND_BREATHE_HALF_MS ? t : 2 * SH_IND_BREATHE_HALF_MS - t;
+    return (uint8_t)(100u * pos * pos / (SH_IND_BREATHE_HALF_MS * SH_IND_BREATHE_HALF_MS));     /* squared: smooth to the eye */
+}
+
+bool sh_ind_identify_ok(sh_ind_pattern_t pattern)
+{
+    return pattern != SH_IND_BLINK;
 }

@@ -37,12 +37,16 @@ idf_component_register(
         "sh_net_rules.c"
         "sh_ota.c"
         "sh_net.c"
+        "sh_hap_rules.c"
+        "sh_hap.c"
     INCLUDE_DIRS "."
     # the page of the web interface (sh_web), served as it is
     EMBED_FILES "web/index.html" "web/favicon.svg"
     REQUIRES
         # ESP-IDF
         driver esp_timer nvs_flash esp_wifi esp_event esp_netif esp_app_format esp_http_server esp_partition
+        # esp-homekit-sdk (components/homekit, git submodule)
+        esp_hap_core esp_hap_apple_profiles esp_hap_platform
         # project/common (git submodules)
         button outputwrite captive-wifi container_nvs general-ota esp_tm1637 ds18b20
         # managed components (idf_component.yml)
