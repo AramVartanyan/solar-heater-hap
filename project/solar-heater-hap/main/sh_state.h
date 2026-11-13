@@ -72,6 +72,7 @@ void sh_state_set_pump(bool on, sh_pump_reason_t reason);
 void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s);
 void sh_state_set_wifi(bool connected, bool portal);
 void sh_state_set_net(bool ap, bool ota_running, bool fup_offer, bool fup);
+void sh_state_set_pair_window(bool open);          /* HomeKit (sh_hap) */
 void sh_state_set_alarms(uint8_t alarms);
 void sh_state_set_vacation(bool on);
 void sh_state_set_modes(const sh_modes_t *modes);

@@ -30,7 +30,7 @@ CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
 CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3072
 
 # LWIP (HomeKit needs several concurrent controller sockets)
-CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_LWIP_MAX_SOCKETS=20
 CONFIG_LWIP_SO_REUSE=y
 CONFIG_LWIP_MAX_ACTIVE_TCP=12
 CONFIG_LWIP_MAX_LISTENING_TCP=12
@@ -56,12 +56,14 @@ CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="Solar"
 CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN=15
 CONFIG_CAPTIVE_WIFI_AP_ONLY=y
 
-# HomeKit SDK (enabled together with HomeKit in a later phase):
-# room for application web page handlers next to the 8 HAP URIs
-# CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
+# HomeKit SDK (sh_hap): the pages of the web interface (17 handlers, sh_web) are registered on
+# the server of HAP next to its 8 URIs; browsers and the controllers (iPhone, home hubs) share its
+# sockets (CONFIG_LWIP_MAX_SOCKETS above)
+CONFIG_HAP_HTTP_MAX_URI_HANDLERS=28
+CONFIG_HAP_HTTP_MAX_OPEN_SOCKETS=12
 
-# mDNS (sh_net: Solar-xxxxxx.local; later also esp-homekit-sdk): on the station only (not on the
-# own access point), no console CLI — the console component is not built
+# mDNS (Solar-xxxxxx.local: sh_net without HomeKit, esp-homekit-sdk with it): on the station only
+# (not on the own access point), no console CLI — the console component is not built
 CONFIG_MDNS_ENABLE_CONSOLE_CLI=n
 CONFIG_MDNS_PREDEF_NETIF_AP=n
 CONFIG_MDNS_PREDEF_NETIF_ETH=n

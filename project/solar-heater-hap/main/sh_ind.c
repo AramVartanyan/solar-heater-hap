@@ -54,6 +54,8 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
     }
     if (in->ap) {
         out.pattern = SH_IND_WINK;
+    } else if (in->pair_window && in->wifi_connected && !in->wifi_portal) {
+        out.pattern = SH_IND_BREATHE;
     } else {
         out.pattern = in->wifi_connected && !in->wifi_portal ? SH_IND_STEADY : SH_IND_HEARTBEAT;
     }
@@ -77,8 +79,37 @@ bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms)
     }
     case SH_IND_HEARTBEAT:
         return ms % SH_IND_BEAT_PERIOD_MS < SH_IND_BEAT_ON_MS;
+    case SH_IND_BREATHE:
+        return sh_ind_level(pattern, ms) > 0;
     case SH_IND_STEADY:
     default:
         return true;
     }
+}
+
+uint8_t sh_ind_level(sh_ind_pattern_t pattern, uint32_t ms)
+{
+    if (pattern != SH_IND_BREATHE) {
+        return sh_ind_lit(pattern, ms) ? SH_IND_LEVEL_MAX : 0;
+    }
+    const uint32_t t = ms % (SH_IND_BREATHE_HOLD_MS + SH_IND_BREATHE_MS);
+    if (t < SH_IND_BREATHE_HOLD_MS) {
+        return 0;
+    }
+    const uint32_t half = SH_IND_BREATHE_MS / 2, x = t - SH_IND_BREATHE_HOLD_MS;
+    const uint32_t pos = x < half ? x : SH_IND_BREATHE_MS - x;      /* 0 ... half */
+    return (uint8_t)(SH_IND_LEVEL_MAX * pos / half * pos / half);
+}
+
+bool sh_ind_identify(uint32_t ms, bool *lit)
+{
+    if (ms >= SH_IND_IDENT_MS) {
+        *lit = true;
+        return false;
+    }
+    const uint32_t group = SH_IND_IDENT_BLINKS * 2u * SH_IND_IDENT_HALF_MS;
+    const uint32_t t = ms % (group + SH_IND_IDENT_GAP_MS);
+    /* each blink: the opposite of the lit base first (dark), then lit; lit in the gap */
+    *lit = t >= group || (t / SH_IND_IDENT_HALF_MS) % 2u == 1u;
+    return true;
 }

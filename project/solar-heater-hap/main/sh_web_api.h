@@ -15,8 +15,10 @@
  *                     code)
  *              test   cmd=start | plus | minus | stop
  *              air    cmd=start | stop: the air venting
- *              reset  what=wifi | defaults | factory | history | learned (only with the access
- *                     code)
+ *              reset  what=wifi | defaults | factory | history | learned | pairings (only with the
+ *                     access code)
+ *              hk     hap=0 / 1 the setting "Apple HomeKit" (stored, then a restart; 0 while paired
+ *                     is refused), lock=0 / 1 the keypad lock (group F; with the access code)
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
@@ -24,6 +26,8 @@
  *            the access code ("code") is the last 6 characters of the setup network name
  *   chart    the day in RAM (sh_day): the 10-min intervals of today / of the last 24 h
  *   days     the last daily summaries (sh_hist), newest first
+ *   units    with °F chosen in Apple Home ("hk":{"f":1}) the page shows and takes the temperatures in
+ *            °F; the API stays in °C (group F)
  *   features the functions the firmware has; the page greys out every element whose function is
  *            not in the list (doc/web-interface.md 7); "history" only with the history partition */
 #pragma once
@@ -116,6 +120,12 @@ typedef struct {
     bool pulse_next;            /* a next pulse is planned ... */
     uint32_t pulse_left_s;      /* ... in */
     bool pulse_hot;             /* no pulses after an overheated collector */
+    /* HomeKit (group F) */
+    bool hk_on;                 /* the setting "Apple HomeKit" */
+    bool hk_run;                /* HAP runs */
+    bool hk_paired;             /* paired with a controller */
+    bool locked;                /* the keypad lock */
+    bool fahrenheit;            /* the display units (set in Apple Home) */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */
@@ -181,10 +191,15 @@ typedef enum {
     SH_WEB_RESET_FACTORY,       /* everything */
     SH_WEB_RESET_HISTORY,       /* the daily summaries */
     SH_WEB_RESET_LEARNED,       /* the learned values: sunrise / sunset, the cooling target, the zone check */
+    SH_WEB_RESET_PAIRINGS,      /* the HomeKit pairings (group F) */
 } sh_web_reset_t;
 
 /* "reset": needs the access code. */
 sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *what);
+
+/* "hk" (group F): `hap` -1 not given / 0 / 1 — the setting "Apple HomeKit"; `lock` -1 / 0 / 1 — the
+ * keypad lock. Needs the access code; hap=0 while `paired` is refused (SH_WEB_BAD). */
+sh_web_res_t sh_web_hk(const char *body, const char *code, bool paired, int *hap, int *lock);
 
 /* "time": the time of the browser, s since 1970 (UTC). */
 sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s);

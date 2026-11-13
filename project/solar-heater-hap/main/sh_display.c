@@ -12,6 +12,8 @@
 #include "sh_pump_ctl.h"
 #include "sh_buttons.h"
 #include "sh_net.h"
+#include "sh_settings_store.h"
+#include "sh_units.h"
 #include "sh_display.h"
 
 static const char *TAG = "sh_display";
@@ -35,6 +37,9 @@ static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
 static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
 static const uint8_t s_fup[DIGITS]  = { 0x71 /* F */, 0x3E /* U */, 0x73 /* P */ };
+/* The keypad lock (group F): "LoC" locked / a locked key, "UnL" unlocked */
+static const uint8_t s_loc[DIGITS]  = { 0x38 /* L */, 0x5C /* o */, 0x39 /* C */ };
+static const uint8_t s_unl[DIGITS]  = { 0x3E /* U */, 0x54 /* n */, 0x38 /* L */ };
 /* Values of nEt (CP, AP); " AP" is also the label of the own access point */
 static const uint8_t s_net[2][DIGITS] = {
     { 0, 0x39 /* C */, 0x73 /* P */ },
@@ -79,6 +84,8 @@ static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
     [SH_MENU_DOF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
     [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
     [SH_MENU_NET] = { 0x54 /* n */, 0x79 /* E */, 0x78 /* t */ },
+    [SH_MENU_HAP] = { 0x76 /* H */, 0x77 /* A */, 0x73 /* P */ },
+    [SH_MENU_LOC] = { 0x38 /* L */, 0x5C /* o */, 0x39 /* C */ },
     [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
@@ -117,14 +124,15 @@ static void set_number(screen_t *s, int value)
     }
 }
 
-static void set_temp(screen_t *s, int16_t t_tenths, bool fault)
+/* `t_tenths` in 0.1 °C; shown in the units chosen in Apple Home (°C without a choice) */
+static void set_temp(screen_t *s, int16_t t_tenths, bool fault, bool fahrenheit)
 {
     if (fault || t_tenths == SH_TEMP_INVALID) {
         const uint8_t dashes[DIGITS] = { SEG_MINUS, SEG_MINUS, SEG_MINUS };
         set_seg(s, dashes);
     } else {
         s->is_temp = true;
-        s->temp = t_tenths;
+        s->temp = sh_units_temp10(t_tenths, fahrenheit ? SH_UNITS_F : SH_UNITS_C);
     }
 }
 
@@ -157,7 +165,7 @@ static void code_screen(screen_t *s, uint8_t part)
     set_seg(s, seg);
 }
 
-static void menu_screen(screen_t *s, const sh_menu_view_t *v)
+static void menu_screen(screen_t *s, const sh_menu_view_t *v, bool fahrenheit)
 {
     if (v->mode == SH_MENU_LIST) {
         set_seg(s, s_items[v->pos < SH_MENU_ITEMS ? v->pos : SH_MENU_END]);
@@ -170,10 +178,10 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
         set_seg(s, s_net[v->value != 0]);
     } else if (v->pos == SH_MENU_SSN) {
         set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
-    } else if (v->pos == SH_MENU_HOL) {
+    } else if (v->pos == SH_MENU_HOL || v->pos == SH_MENU_HAP || v->pos == SH_MENU_LOC) {
         set_seg(s, s_on_off[v->value != 0]);
     } else {
-        set_number(s, v->value);
+        set_number(s, sh_menu_value_shown(v->pos, v->value, fahrenheit));
     }
 }
 
@@ -210,7 +218,7 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
 /* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
  * codes and the labels "HoL" (vacation), " AP" (own access point), "FUp" (update waiting or running),
  * 1 s each. Returns false when the cycle is over (the caller starts it again). */
-static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
+static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms, bool fahrenheit)
 {
     if (ms >= CYCLE_MS) {
         const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
@@ -237,11 +245,11 @@ static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
     } else if (ms < LABEL_MS) {
         set_seg(s, s_boil);
     } else if (ms < LABEL_MS + VALUE_MS) {
-        set_temp(s, st->t_tank, st->tank_fault);
+        set_temp(s, st->t_tank, st->tank_fault, fahrenheit);
     } else if (ms < 2 * LABEL_MS + VALUE_MS) {
         set_seg(s, s_col);
     } else {
-        set_temp(s, st->t_col, st->col_fault);
+        set_temp(s, st->t_col, st->col_fault, fahrenheit);
     }
     return true;
 }
@@ -265,11 +273,12 @@ static void display_task(void *arg)
         sh_buttons_menu_view(&view);
         sh_state_t st;
         sh_state_get_shown(&st);     /* pulse mode: the last reliable values */
+        const bool fahrenheit = sh_settings_fahrenheit();
 
         screen_t scr = { 0 };
         const bool normal = view.mode == SH_MENU_NORMAL;
         if (!normal) {
-            menu_screen(&scr, &view);   /* no alarms or test in the menu */
+            menu_screen(&scr, &view, fahrenheit);   /* no alarms or test in the menu */
         } else {
             /* the offered update, the test or the air venting instead of the cycle */
             const bool special = st.fup_offer || st.test_on || st.modes.air_on;
@@ -282,13 +291,17 @@ static void display_task(void *arg)
                 test_screen(&scr, &st, now_s);
             } else if (st.modes.air_on) {
                 air_screen(&scr, &st, now_s);
-            } else if (!normal_screen(&scr, &st, now_ms - cycle_ms)) {
+            } else if (!normal_screen(&scr, &st, now_ms - cycle_ms, fahrenheit)) {
                 cycle_ms = now_ms;      /* the codes are over: from "Boil" again */
-                normal_screen(&scr, &st, 0);
+                normal_screen(&scr, &st, 0, fahrenheit);
             }
             was_test = special;
         }
         was_normal = normal;
+        if (view.notice != SH_MENU_NOTICE_NONE) {
+            /* the keypad lock: 1 s over whatever runs underneath (the test goes on) */
+            set_seg(&scr, view.notice == SH_MENU_NOTICE_LOC ? s_loc : s_unl);
+        }
 
         if (!written || !same(&scr, &shown)) {
             show(&scr);

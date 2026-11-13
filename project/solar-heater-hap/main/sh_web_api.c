@@ -21,6 +21,7 @@ static const char *const FEATURES[] = {
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
     "heater", "mount",
     "net_mode", "ota",
+    "homekit", "keylock",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -204,7 +205,9 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, c->tz);
     put(&o, ",\"tzok\":%d,\"peak\":", c->tz_confirmed);
     put_or_null(&o, c->peak >= 0, c->peak);
-    put(&o, "},\"run\":[%lu,%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
+    put(&o, "},\"hk\":{\"on\":%d,\"run\":%d,\"paired\":%d,\"lock\":%d,\"f\":%d}", s->hk_on, s->hk_run,
+        s->hk_paired, s->locked, s->fahrenheit);
+    put(&o, ",\"run\":[%lu,%lu,%lu,%lu]}", (unsigned long)((s->run_s[0] + 30) / 60),
         (unsigned long)((s->run_s[1] + 30) / 60), (unsigned long)((s->run_s[2] + 30) / 60),
         (unsigned long)((s->run_s[SH_RUN_COOL] + 30) / 60));
 
@@ -509,10 +512,47 @@ sh_web_res_t sh_web_reset(const char *body, const char *code, sh_web_reset_t *wh
         *what = SH_WEB_RESET_HISTORY;
     } else if (strcmp(v, "learned") == 0) {
         *what = SH_WEB_RESET_LEARNED;
+    } else if (strcmp(v, "pairings") == 0) {
+        *what = SH_WEB_RESET_PAIRINGS;
     } else {
         return SH_WEB_BAD;
     }
     return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
+}
+
+sh_web_res_t sh_web_hk(const char *body, const char *code, bool paired, int *hap, int *lock)
+{
+    int h = -1, l = -1;
+    const char *p = body;
+    char key[VALUE_MAX], value[VALUE_MAX];
+    while (next_pair(&p, key, value)) {
+        if (strcmp(key, "code") == 0) {
+            continue;
+        }
+        int16_t v;
+        if (!parse_int(value, &v) || (v != 0 && v != 1)) {
+            return SH_WEB_BAD;
+        }
+        if (strcmp(key, "hap") == 0) {
+            h = v;
+        } else if (strcmp(key, "lock") == 0) {
+            l = v;
+        } else {
+            return SH_WEB_BAD;
+        }
+    }
+    if (p == NULL || (h < 0 && l < 0)) {
+        return SH_WEB_BAD;
+    }
+    if (!sh_web_code_ok(body, code)) {
+        return SH_WEB_DENIED;
+    }
+    if (h == 0 && paired) {
+        return SH_WEB_BAD;              /* first remove the device from Apple Home */
+    }
+    *hap = h;
+    *lock = l;
+    return SH_WEB_OK;
 }
 
 sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s)

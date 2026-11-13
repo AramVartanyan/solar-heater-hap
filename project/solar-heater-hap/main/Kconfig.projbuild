@@ -256,6 +256,29 @@ menu "Device Settings"
 
     endmenu
 
+    menu "HomeKit"
+
+        config SH_HAP_FIXED_SETUP_CODE
+            bool "Fixed setup code (development only)"
+            default n
+            help
+                A product reads its own setup info (salt / verifier of a unique setup code, setup
+                ID) from the factory_nvs partition, prepared by the owner with the label (as in
+                mppt-1k). For the development only, a fixed code from here, so that no setup
+                payload must be written after each erase of the flash. Never in a product.
+
+        config SH_HAP_SETUP_CODE
+            string "Setup code (xxx-xx-xxx)"
+            default "111-22-333"
+            depends on SH_HAP_FIXED_SETUP_CODE
+
+        config SH_HAP_SETUP_ID
+            string "Setup ID (4 characters)"
+            default "SH14"
+            depends on SH_HAP_FIXED_SETUP_CODE
+
+    endmenu
+
     config SH_INTERNAL_PULLUPS
         bool "Internal pull-ups on the 1-Wire and TM1637 lines (development prototype)"
         default y

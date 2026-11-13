@@ -49,6 +49,13 @@
  *                                        comes 1 min after the start; the console says when)
  * A check answers after 2 s, an update takes 30 s and "restarts" into the new version; with the pump
  * running (/sim?col=900&tank=400) a confirmed update waits.
+ * HomeKit (group F, doc/tasks/step14-homekit.md 3.3): HAP runs, not paired; "Apple HomeKit" and the
+ * keypad lock in "System" ("hap" "restarts": the setting changes at once, HAP runs with it on),
+ * "Reset -> HomeKit pairings" (unpairs, "restarts"):
+ *   http://localhost:8080/sim?paired=1   paired with Apple Home (HAP cannot be switched off); paired=0
+ *   http://localhost:8080/sim?hkrun=0    HAP has not started (no router yet): the reset is grey
+ *   http://localhost:8080/sim?f=1        °F chosen in Apple Home: the page in °F; f=0: °C
+ *   http://localhost:8080/sim?lock=1     the keypad locked on the device / in Apple Home; lock=0
  * POSIX sockets, one request at a time. */
 
 #define _POSIX_C_SOURCE 200809L
@@ -519,6 +526,9 @@ static void reply_res(int fd, sh_web_res_t res)
     reply(fd, status[res], "application/json", body[res], strlen(body[res]));
 }
 
+/* HomeKit (group F) */
+static bool s_hk_on = true, s_hk_run = true, s_hk_paired, s_locked, s_fahrenheit;
+
 static void reply_state(int fd)
 {
     control();
@@ -552,6 +562,8 @@ static void reply_state(int fd)
         .meas_pulse = s_pump.rel.by_pulse, .meas_now = pulse && s_pump.rel.fresh,
         .pulse_next = pulse && !s_pump.on && s_pulse.next_s != SH_PULSE_NONE,
         .pulse_left_s = s_pulse.next_s > now ? s_pulse.next_s - now : 0, .pulse_hot = pulse && s_pulse.hot,
+        .hk_on = s_hk_on, .hk_run = s_hk_on && s_hk_run, .hk_paired = s_hk_on && s_hk_paired,
+        .locked = s_locked, .fahrenheit = s_fahrenheit,
     };
     sh_air_view_t air;
     sh_pump_ctl_air(&s_pump, now, &air);
@@ -644,6 +656,18 @@ static void sim_set(const char *query)
     if ((p = strstr(query, "ap=")) && sscanf(p + 3, "%d", &v) == 1) {
         /* the choice of the menu; AP is possible because "the router does not answer" */
         net_do(sh_net_choose(&s_net, v ? SH_NET_AP : SH_NET_CP, false, sh_ota_updating(&s_ota), now_s()));
+    }
+    if ((p = strstr(query, "paired=")) && sscanf(p + 7, "%d", &v) == 1) {
+        s_hk_paired = v != 0;
+    }
+    if ((p = strstr(query, "hkrun=")) && sscanf(p + 6, "%d", &v) == 1) {
+        s_hk_run = v != 0;
+    }
+    if ((p = strstr(query, "f=")) && (p == query + 5 || p[-1] == '&') && sscanf(p + 2, "%d", &v) == 1) {
+        s_fahrenheit = v != 0;
+    }
+    if ((p = strstr(query, "lock=")) && sscanf(p + 5, "%d", &v) == 1) {
+        s_locked = v != 0;
     }
     if ((p = strstr(query, "apidle=")) && sscanf(p + 7, "%d", &v) == 1 && v && s_net.mode == SH_NET_AP) {
         s_net.clients = 0;                              /* the last client left 15 min ago */
@@ -801,7 +825,14 @@ static void handle(int fd, const char *page, size_t page_len)
     } else if (post && strcmp(path, "/api/reset") == 0) {
         sh_web_reset_t what;
         const sh_web_res_t res = sh_web_reset(body, CODE, &what);
-        if (res == SH_WEB_OK && what == SH_WEB_RESET_HISTORY) {
+        if (res == SH_WEB_OK && what == SH_WEB_RESET_PAIRINGS) {
+            if (!s_hk_on || !s_hk_run) {
+                reply_res(fd, SH_WEB_BAD);      /* HAP does not run */
+                return;
+            }
+            s_hk_paired = false;                /* the SDK erases them and restarts */
+            printf("HomeKit pairings erased: \"restart\", the pairing window opens\n");
+        } else if (res == SH_WEB_OK && what == SH_WEB_RESET_HISTORY) {
             sh_hist_clear(&s_hist);
         } else if (res == SH_WEB_OK && what == SH_WEB_RESET_LEARNED) {
             sh_peak_reset(&s_peak, s_tz_ok);
@@ -813,6 +844,11 @@ static void handle(int fd, const char *page, size_t page_len)
                 s_e8.l.rate[i] = SH_E8_NO_RATE;
             }
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
+            s_locked = s_fahrenheit = false;    /* the keypad unlocked, °C (notified to HomeKit) */
+            if (what == SH_WEB_RESET_FACTORY) {
+                s_hk_on = true;
+                s_hk_paired = false;
+            }
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
         }
@@ -824,6 +860,18 @@ static void handle(int fd, const char *page, size_t page_len)
             const sh_ota_in_t in = { .online = s_net.mode == SH_NET_CP, .pump_on = s_pump.on,
                                      .alarms = s_alarm.active, .air = s_pump.air };
             ota_do(sh_ota_cmd(&s_ota, cmd, &in, sim_ms()));
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/hk") == 0) {
+        int hap, lock;
+        const sh_web_res_t res = sh_web_hk(body, CODE, s_hk_on && s_hk_paired, &hap, &lock);
+        if (res == SH_WEB_OK && lock >= 0) {
+            s_locked = lock != 0;
+            printf("keypad %s (LoC / UnL on the display for 1 s)\n", lock ? "locked" : "unlocked");
+        }
+        if (res == SH_WEB_OK && hap >= 0 && hap != s_hk_on) {
+            s_hk_on = hap != 0;
+            printf("Apple HomeKit %s: stored, \"restart\"\n", hap ? "on" : "off");
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {

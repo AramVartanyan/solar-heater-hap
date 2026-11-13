@@ -12,6 +12,7 @@
 #include "sh_control.h"
 #include "sh_reset.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_buttons.h"
 
 static const char *TAG = "sh_buttons";
@@ -22,6 +23,7 @@ static const char *TAG = "sh_buttons";
 
 #define REPEAT_AFTER_S      1       /* "+" / "-" held longer: repeated ... */
 #define REPEAT_MS           200     /* ... every 200 ms */
+#define POLL_MS             100     /* the hold of "+" and "-" (3 s) is checked this often */
 
 /* The button callbacks run in the FreeRTOS timer task (small stack, must not block): they only
  * queue an event. Everything else (log, menu, reset) runs in the buttons task. */
@@ -31,6 +33,8 @@ typedef enum {
     EVT_TAP_PLUS,
     EVT_PUSH_MINUS,         /* a new press (clears the "repeated" mark) */
     EVT_PUSH_PLUS,
+    EVT_RELEASE_MINUS,      /* released (the hold of both: keypad lock) */
+    EVT_RELEASE_PLUS,
     EVT_REPEAT_MINUS,       /* held > 1 s, every 200 ms */
     EVT_REPEAT_PLUS,
     EVT_MENU_NET_REACHED,   /* held NET s: releasing now resets the Wi-Fi network */
@@ -68,23 +72,19 @@ static uint32_t now_ms(void)
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
-static void menu_key(sh_key_t key)
+static void get_ctx(sh_menu_ctx_t *ctx)
 {
-    sh_settings_t settings;
-    sh_settings_get(&settings);
     sh_state_t st;
     sh_state_get(&st);
-
-    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
-    const sh_menu_ctx_t ctx = {
+    *ctx = (sh_menu_ctx_t){
         .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
         .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fup_offer = st.fup_offer,
+        .hap_on = sh_hap_enabled(), .hap_paired = sh_hap_paired(), .locked = sh_settings_locked(),
     };
-    const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
-    const sh_setting_t id = (sh_setting_t)s_menu.id;
-    const int16_t value = s_menu.value;
-    xSemaphoreGive(s_menu_lock);
+}
 
+static void do_act(sh_menu_act_t act, sh_setting_t id, int16_t value)
+{
     switch (act) {
     case SH_MENU_ACT_PLUS:
         sh_control_cmd(SH_CONTROL_TEST_PLUS);
@@ -109,9 +109,69 @@ static void menu_key(sh_key_t key)
         ESP_LOGI(TAG, "menu: firmware update confirmed");
         sh_net_update(SH_OTA_CMD_CONFIRM);
         break;
+    case SH_MENU_ACT_HAP:
+        ESP_LOGI(TAG, "menu: HAP -> %s", value ? "on" : "oFF");
+        if (sh_hap_store_enabled(value != 0) == ESP_OK) {
+            vTaskDelay(pdMS_TO_TICKS(SH_MENU_SAVED_MS));    /* the value stays on the display */
+            sh_reset_now(SH_RESET_RESTART);                 /* does not return */
+        }
+        break;
+    case SH_MENU_ACT_LOCK:
+    case SH_MENU_ACT_UNLOCK:
+        ESP_LOGI(TAG, "keypad %s on the device", act == SH_MENU_ACT_LOCK ? "locked" : "unlocked");
+        sh_settings_set_locked(act == SH_MENU_ACT_LOCK);
+        break;
     case SH_MENU_ACT_NONE:
         break;
     }
+}
+
+static void menu_key(sh_key_t key)
+{
+    sh_settings_t settings;
+    sh_settings_get(&settings);
+    sh_menu_ctx_t ctx;
+    get_ctx(&ctx);
+
+    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
+    const sh_setting_t id = (sh_setting_t)s_menu.id;
+    const int16_t value = s_menu.value;
+    xSemaphoreGive(s_menu_lock);
+    do_act(act, id, value);
+}
+
+/* "+" / "-" pressed or released; the 3 s hold of both. */
+static void menu_button(bool plus, bool down)
+{
+    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    sh_menu_button(&s_menu, plus, down, now_ms());
+    xSemaphoreGive(s_menu_lock);
+}
+
+static void menu_poll(void)
+{
+    sh_menu_ctx_t ctx;
+    get_ctx(&ctx);
+    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    sh_menu_sync_lock(&s_menu, ctx.locked, now_ms());
+    const sh_menu_act_t act = sh_menu_poll(&s_menu, now_ms(), &ctx);
+    xSemaphoreGive(s_menu_lock);
+    do_act(act, SH_SET_COUNT, 0);
+}
+
+/* "menu" held for a reset: refused while the keypad is locked ("LoC"). */
+static bool menu_hold(void)
+{
+    sh_menu_ctx_t ctx;
+    get_ctx(&ctx);
+    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    const bool ok = sh_menu_hold(&s_menu, now_ms(), &ctx);
+    xSemaphoreGive(s_menu_lock);
+    if (!ok) {
+        ESP_LOGI(TAG, "menu held: the keypad is locked");
+    }
+    return ok;
 }
 
 void sh_buttons_menu_view(sh_menu_view_t *out)
@@ -121,7 +181,9 @@ void sh_buttons_menu_view(sh_menu_view_t *out)
         return;
     }
     const uint32_t now = now_ms();
+    const bool locked = sh_settings_locked();
     xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    sh_menu_sync_lock(&s_menu, locked, now);       /* a change from HomeKit / the web at once */
     sh_menu_update(&s_menu, now);
     sh_menu_view(&s_menu, now, out);
     xSemaphoreGive(s_menu_lock);
@@ -132,7 +194,8 @@ static void buttons_task(void *arg)
     (void)arg;
     btn_evt_t evt;
     for (;;) {
-        if (xQueueReceive(s_queue, &evt, portMAX_DELAY) != pdTRUE) {
+        if (xQueueReceive(s_queue, &evt, pdMS_TO_TICKS(POLL_MS)) != pdTRUE) {
+            menu_poll();
             continue;
         }
         switch (evt) {
@@ -154,9 +217,17 @@ static void buttons_task(void *arg)
             break;
         case EVT_PUSH_MINUS:
             s_repeated_minus = false;
+            menu_button(false, true);
             break;
         case EVT_PUSH_PLUS:
             s_repeated_plus = false;
+            menu_button(true, true);
+            break;
+        case EVT_RELEASE_MINUS:
+            menu_button(false, false);
+            break;
+        case EVT_RELEASE_PLUS:
+            menu_button(true, false);
             break;
         case EVT_REPEAT_MINUS:
             s_repeated_minus = true;
@@ -167,17 +238,25 @@ static void buttons_task(void *arg)
             menu_key(SH_KEY_PLUS_REPEAT);
             break;
         case EVT_MENU_NET_REACHED:
+            if (!menu_hold()) {
+                break;
+            }
             ESP_LOGI(TAG, "menu held %d s: release now to reset the Wi-Fi network, "
                      "keep holding until %d s for a factory reset", CONFIG_SH_NET_RESET_HOLD_S,
                      CONFIG_SH_FACTORY_RESET_HOLD_S);
             break;
         case EVT_MENU_NET_RELEASE:
-            reset_and_restart(false);       /* does not return */
+            if (menu_hold()) {
+                reset_and_restart(false);   /* does not return */
+            }
             break;
         case EVT_MENU_FACTORY:
-            reset_and_restart(true);        /* does not return */
+            if (menu_hold()) {
+                reset_and_restart(true);    /* does not return */
+            }
             break;
         }
+        menu_poll();
     }
 }
 
@@ -190,10 +269,14 @@ static button_handle_t add(gpio_num_t gpio, btn_evt_t tap)
     return b;
 }
 
-/* "+" / "-": a press, and the repetition while held (only the value in the menu uses it). */
-static esp_err_t add_repeat(button_handle_t b, btn_evt_t push, btn_evt_t repeat)
+/* "+" / "-": a press, the release (the hold of both), and the repetition while held (only the
+ * value in the menu uses it). */
+static esp_err_t add_repeat(button_handle_t b, btn_evt_t push, btn_evt_t release, btn_evt_t repeat)
 {
     esp_err_t err = iot_button_set_evt_cb(b, BUTTON_CB_PUSH, post, (void *)(intptr_t)push);
+    if (err == ESP_OK) {
+        err = iot_button_set_evt_cb(b, BUTTON_CB_RELEASE, post, (void *)(intptr_t)release);
+    }
     if (err == ESP_OK) {
         err = iot_button_set_serial_cb(b, REPEAT_AFTER_S, pdMS_TO_TICKS(REPEAT_MS), post,
                                        (void *)(intptr_t)repeat);
@@ -215,9 +298,9 @@ esp_err_t sh_buttons_init(void)
     if (!menu || !minus || !plus) {
         return ESP_FAIL;
     }
-    esp_err_t err = add_repeat(minus, EVT_PUSH_MINUS, EVT_REPEAT_MINUS);
+    esp_err_t err = add_repeat(minus, EVT_PUSH_MINUS, EVT_RELEASE_MINUS, EVT_REPEAT_MINUS);
     if (err == ESP_OK) {
-        err = add_repeat(plus, EVT_PUSH_PLUS, EVT_REPEAT_PLUS);
+        err = add_repeat(plus, EVT_PUSH_PLUS, EVT_RELEASE_PLUS, EVT_REPEAT_PLUS);
     }
     if (err == ESP_OK) {
         err = iot_button_add_on_release_cb(menu, CONFIG_SH_NET_RESET_HOLD_S, post,

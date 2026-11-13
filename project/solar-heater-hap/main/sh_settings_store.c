@@ -10,6 +10,8 @@ static const char *TAG = "sh_settings";
 #define NVS_NAMESPACE   "sh_settings"
 #define KEY_FROST       "fro"
 #define KEY_WINTER      "ssn_now"
+#define KEY_LOCK        "lock"
+#define KEY_UNITS       "unit"
 
 #ifdef CONFIG_SH_FROST_PROTECT
 #define FROST_DEFAULT   true
@@ -40,6 +42,8 @@ static const sh_settings_t s_defaults = { .v = {
 static sh_settings_t s_settings;
 static bool s_frost;
 static bool s_winter;           /* the current season; in the automatic mode it starts as summer */
+static bool s_locked;           /* the keypad lock */
+static bool s_fahrenheit;       /* the display units */
 static SemaphoreHandle_t s_lock;
 
 esp_err_t sh_settings_init(void)
@@ -69,6 +73,13 @@ esp_err_t sh_settings_init(void)
         if (nvs_get_u8(h, KEY_WINTER, &winter) == ESP_OK && winter <= 1) {
             s_winter = winter;
         }
+        uint8_t flag;
+        if (nvs_get_u8(h, KEY_LOCK, &flag) == ESP_OK && flag <= 1) {
+            s_locked = flag;
+        }
+        if (nvs_get_u8(h, KEY_UNITS, &flag) == ESP_OK && flag <= 1) {
+            s_fahrenheit = flag;
+        }
         nvs_close(h);
     } else if (err != ESP_ERR_NVS_NOT_FOUND) {      /* not found: nothing stored yet */
         ESP_LOGE(TAG, "NVS open: %s, defaults used", esp_err_to_name(err));
@@ -88,8 +99,9 @@ esp_err_t sh_settings_init(void)
              s_settings.v[SH_SET_COL_MIN_W], s_settings.v[SH_SET_DIFF_ON_W], s_settings.v[SH_SET_DIFF_OFF_W],
              s_settings.v[SH_SET_NCOOL_W] ? "on" : "off");
     static const char *const modes[SH_SEASON_MODES] = { "summer", "winter", "automatic" };
-    ESP_LOGI(TAG, "season: %s (now %s), vacation %s", modes[s_settings.v[SH_SET_SEASON]],
-             s_winter ? "winter" : "summer", s_settings.v[SH_SET_VACATION] ? "on" : "off");
+    ESP_LOGI(TAG, "season: %s (now %s), vacation %s; keypad %s, display in %s", modes[s_settings.v[SH_SET_SEASON]],
+             s_winter ? "winter" : "summer", s_settings.v[SH_SET_VACATION] ? "on" : "off",
+             s_locked ? "locked" : "unlocked", s_fahrenheit ? "degF" : "degC");
     return ESP_OK;
 }
 
@@ -234,6 +246,58 @@ esp_err_t sh_settings_set_winter(bool winter)
     return err;
 }
 
+/* A flag of the namespace: kept in `*var`, written only when it changes. */
+static esp_err_t set_flag(const char *key, bool *var, bool on)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    if (on != *var) {
+        nvs_handle_t h;
+        err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h);
+        if (err == ESP_OK) {
+            err = nvs_set_u8(h, key, on);
+            if (err == ESP_OK) {
+                err = nvs_commit(h);
+            }
+            nvs_close(h);
+        }
+        *var = on;                      /* used at once, also if the write failed */
+    }
+    xSemaphoreGive(s_lock);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "%s = %d: %s", key, on, esp_err_to_name(err));
+    }
+    return err;
+}
+
+static bool get_flag(const bool *var)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const bool on = *var;
+    xSemaphoreGive(s_lock);
+    return on;
+}
+
+bool sh_settings_locked(void)
+{
+    return get_flag(&s_locked);
+}
+
+esp_err_t sh_settings_set_locked(bool on)
+{
+    return set_flag(KEY_LOCK, &s_locked, on);
+}
+
+bool sh_settings_fahrenheit(void)
+{
+    return get_flag(&s_fahrenheit);
+}
+
+esp_err_t sh_settings_set_fahrenheit(bool on)
+{
+    return set_flag(KEY_UNITS, &s_fahrenheit, on);
+}
+
 esp_err_t sh_settings_reset(void)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -249,6 +313,8 @@ esp_err_t sh_settings_reset(void)
     s_settings = s_defaults;
     s_frost = FROST_DEFAULT;
     s_winter = false;
+    s_locked = false;
+    s_fahrenheit = false;
     xSemaphoreGive(s_lock);
 
     if (err == ESP_OK) {

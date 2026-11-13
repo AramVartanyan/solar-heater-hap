@@ -14,7 +14,10 @@
  * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
  * other colours -> while the own access point is on (nEt -> AP) steady with a short dark wink (the
  * mirror of the heartbeat), otherwise steady with Wi-Fi, heartbeat without it (or while the setup
- * portal is open).
+ * portal is open); breathing (group F) while the HomeKit pairing window is open and the device is
+ * connected — only then.
+ * Identify (HomeKit, group F): the pattern of ledIdentify() of outputwrite over whatever is shown —
+ * 3 groups of 2 blinks (200 ms dark, 200 ms lit), 300 ms between the groups.
  * Temperatures are tenths of °C, times ms. */
 #pragma once
 
@@ -34,6 +37,15 @@
 #define SH_IND_BLINK_MS         500u    /* OTA: 500 on / 500 off */
 #define SH_IND_WINK_OFF_MS      80u     /* own access point: 80 ms dark every 2 s */
 #define SH_IND_WINK_PERIOD_MS   2000u
+#define SH_IND_BREATHE_HOLD_MS  400u    /* breathing (as ledBreathe() of outputwrite): dark ... */
+#define SH_IND_BREATHE_MS       5000u   /* ... then in and out, squared ramp */
+#define SH_IND_IDENT_HALF_MS    200u    /* Identify: 3 x (2 blinks), 300 ms gap */
+#define SH_IND_IDENT_BLINKS     2u
+#define SH_IND_IDENT_GROUPS     3u
+#define SH_IND_IDENT_GAP_MS     300u
+#define SH_IND_IDENT_MS         (SH_IND_IDENT_GROUPS * SH_IND_IDENT_BLINKS * 2u * SH_IND_IDENT_HALF_MS + \
+                                 (SH_IND_IDENT_GROUPS - 1u) * SH_IND_IDENT_GAP_MS)
+#define SH_IND_LEVEL_MAX        255u
 
 typedef enum {
     SH_COLOR_OFF = 0,
@@ -54,6 +66,7 @@ typedef enum {
     SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
     SH_IND_BLINK,       /* firmware update */
     SH_IND_WINK,        /* own access point on */
+    SH_IND_BREATHE,     /* HomeKit pairing window open */
 } sh_ind_pattern_t;
 
 typedef struct {
@@ -72,6 +85,7 @@ typedef struct {
     bool wifi_portal;
     bool ap;            /* the own access point is on (nEt -> AP) */
     bool ota;           /* a firmware update is being written */
+    bool pair_window;   /* the HomeKit pairing window is open */
 } sh_ind_in_t;
 
 /* The memory of the white / yellow return zones; all zeros at boot. */
@@ -88,5 +102,12 @@ typedef struct {
 /* The indication for `in`; updates the return zones in `st`. Called when the inputs change. */
 sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const sh_ind_in_t *in);
 
-/* The LED is lit `ms` after the start of `pattern`. */
+/* The LED is lit `ms` after the start of `pattern` (breathing: not dark). */
 bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms);
+
+/* The brightness `ms` after the start of `pattern`, 0 ... SH_IND_LEVEL_MAX (only breathing has the
+ * levels between). */
+uint8_t sh_ind_level(sh_ind_pattern_t pattern, uint32_t ms);
+
+/* Identify, `ms` after it started: true while it runs (`*lit`: the LED is lit now). */
+bool sh_ind_identify(uint32_t ms, bool *lit);

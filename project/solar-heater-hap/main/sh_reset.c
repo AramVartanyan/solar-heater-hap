@@ -5,13 +5,24 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "captive_wifi.h"
+#include "sh_hap.h"
 #include "sh_reset.h"
 
 static const char *TAG = "sh_reset";
 
 void sh_reset_now(sh_reset_t what)
 {
-    if (what == SH_RESET_FACTORY) {
+    if (what == SH_RESET_FACTORY && sh_hap_reset_to_factory()) {
+        /* HAP runs: hap_reset_to_factory() closes the sessions, ends the mDNS announcement, erases
+         * the "nvs" partition and restarts */
+        ESP_LOGW(TAG, "factory reset through HomeKit (all settings, pairings and the Wi-Fi network)");
+        for (;;) {
+            vTaskDelay(portMAX_DELAY);
+        }
+    }
+    if (what == SH_RESET_RESTART) {
+        ESP_LOGW(TAG, "restarting");
+    } else if (what == SH_RESET_FACTORY) {
         /* Everything in the "nvs" partition: settings, Wi-Fi network (kept there by the driver)
          * and, with HomeKit, the pairings — what hap_reset_to_factory() erases too; the read-only
          * factory_nvs (setup code) stays. Wi-Fi is stopped first, so the driver does not write

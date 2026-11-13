@@ -24,13 +24,18 @@
 #                     labels of the display, the indication of AP and of the update, the firmware
 #                     update rules, the web interface (sh_net_rules, sh_ota, sh_menu, sh_ind,
 #                     sh_web_api)
+#   test_hap          group F: HomeKit — the characteristics and their limits, the notifications,
+#                     the writes, when HAP starts and which web server serves, switching HAP off while
+#                     paired, the pairing window; the keypad lock (menu LoC, "+" and "-" held, locked
+#                     keys, LoC / UnL), the menu HAP; the display units °C / °F; breathing and
+#                     Identify; the web interface (sh_hap_rules, sh_units, sh_menu, sh_ind, sh_web_api)
 
 CC      := gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O1
 MAIN    := ../main
 BUILD   := build
 TESTS   := test_pump_logic test_pump_ctl test_meas test_settings test_menu test_alarm test_ind \
-           test_installer test_web test_clock_history test_group_c test_group_d test_pulse test_net
+           test_installer test_web test_clock_history test_group_c test_group_d test_pulse test_net test_hap
 HIST_SRC := $(MAIN)/sh_clock_rules.c $(MAIN)/sh_tz.c $(MAIN)/sh_day.c $(MAIN)/sh_hist.c $(MAIN)/sh_alarm.c
 WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
            $(HIST_SRC)
@@ -47,7 +52,8 @@ $(BUILD)/test_pump_logic: test_pump_logic.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_pump_ctl:   test_pump_ctl.c $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_meas:       test_meas.c $(MAIN)/sh_meas.c $(HDRS)
 $(BUILD)/test_settings:   test_settings.c $(MAIN)/sh_settings.c $(HDRS)
-$(BUILD)/test_menu:       test_menu.c $(MAIN)/sh_menu.c $(MAIN)/sh_settings.c $(HDRS)
+MENU_SRC := $(MAIN)/sh_menu.c $(MAIN)/sh_settings.c $(MAIN)/sh_units.c $(MAIN)/sh_hap_rules.c $(MAIN)/sh_alarm.c
+$(BUILD)/test_menu:       test_menu.c $(MENU_SRC) $(HDRS)
 $(BUILD)/test_alarm:      test_alarm.c $(MAIN)/sh_alarm.c $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c $(HDRS)
 $(BUILD)/test_ind:        test_ind.c $(MAIN)/sh_ind.c $(HDRS)
 $(BUILD)/test_installer:  test_installer.c $(MAIN)/sh_installer.c $(HDRS)
@@ -60,6 +66,8 @@ $(BUILD)/test_group_d:    test_group_d.c $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c $(
 $(BUILD)/test_pulse:      test_pulse.c $(MAIN)/sh_pulse.c $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c \
                           $(MAIN)/sh_pump_logic.c $(MAIN)/sh_installer.c $(HIST_SRC) $(HDRS)
 $(BUILD)/test_net:        test_net.c $(MAIN)/sh_net_rules.c $(MAIN)/sh_ota.c $(MAIN)/sh_menu.c $(MAIN)/sh_ind.c \
+                          $(MAIN)/sh_units.c $(MAIN)/sh_hap_rules.c $(WEB_SRC) $(HDRS)
+$(BUILD)/test_hap:        test_hap.c $(MAIN)/sh_hap_rules.c $(MAIN)/sh_units.c $(MAIN)/sh_menu.c $(MAIN)/sh_ind.c \
                           $(WEB_SRC) $(HDRS)
 $(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pulse.c $(MAIN)/sh_pump_ctl.c \
                           $(MAIN)/sh_net_rules.c $(MAIN)/sh_ota.c $(HDRS)

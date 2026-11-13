@@ -26,6 +26,21 @@
   поредни неуспешни заявки (след първата опитва пак след 1 s).
 
 ### Added
+- **Apple HomeKit** (стъпка 14, група F, [doc/tasks/step14-homekit.md](doc/tasks/step14-homekit.md)); esp-homekit-sdk —
+  подмодулът `components/homekit`. Аксесоарът `Solar-xxxxxx` (категория Heater, Armo Ltd., Solar Heater, сериен
+  номер — основният MAC): **Heater Cooler** (основна услуга) — Active (изкл. = ваканция), Current State (Idle /
+  Heating / Cooling), Target само Heat, Current Temperature (бойлерът), Heating Threshold (Tmax 30 – 85 °C),
+  Temperature Display Units, Lock Physical Controls; **`Collector`** (−40 … 200 °C) и **`Tank`** с Status Fault (`E1`,
+  `E5` / `E2`, `E4`). Температурите — само при четене; `notify` при промяна на Active, Current State, Tmax, единиците,
+  заключването и Status Fault. Identify — шаблонът на `ledIdentify()`. Код за сдвояване — `factory_nvs`; фиксиран
+  код в Kconfig само за разработката (`CONFIG_SH_HAP_FIXED_SETUP_CODE`). Настройка **„Apple HomeKit“** (по
+  подразбиране вкл.): менюто `HAP` след `nEt` и уеб интерфейсът („Система“); смяната рестартира, изключване при
+  сдвояване се отказва. HAP тръгва само при връзка с рутера (при всяко свързване несдвоен — прозорец 10 min,
+  светодиодът диша) и не се спира; страниците и `Solar-xxxxxx.local` — на сървъра и в mDNS на HAP. **Заключване на
+  клавиатурата** — „+“ и „−“ 3 s, менюто `LoC` (преди `End`), Apple Home, уеб; заключена — бутоните само показват
+  `LoC` (и нулиранията със задържане не действат); смяната — `LoC` / `UnL` 1 s. **°F** (от Apple Home) — на
+  дисплея и в уеб интерфейса; вътре всичко остава в °C. „Нулиране → Сдвояванията с HomeKit“ в уеб интерфейса.
+  Фърмуерът — 1 292 096 B (~1262 KB от 1600 KB).
 - **Мрежа (`nEt`, режим `AP`, име), обновяване на фърмуера (OTA, `FUp`)** (стъпка 7, група E,
   [doc/tasks/step7-network-ota.md](doc/tasks/step7-network-ota.md)); `captive-wifi` 0.4.0. Менюто — позиция `nEt`
   преди `End` (` CP` / ` AP`, показва текущия режим); след избор на `AP` — кодът за достъп на две части по 2 s

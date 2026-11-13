@@ -22,6 +22,7 @@
 #include "sh_cool.h"
 #include "sh_heater.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_web_api.h"
 #include "sh_web.h"
 
@@ -35,7 +36,8 @@ extern const char page_end[] asm("_binary_index_html_end");
 extern const char icon_start[] asm("_binary_favicon_svg_start");
 extern const char icon_end[] asm("_binary_favicon_svg_end");
 
-static httpd_handle_t s_httpd;      /* only the web task starts and stops it */
+static httpd_handle_t s_httpd;      /* the own server: only the web task starts and stops it */
+static volatile bool s_on_hap;      /* the pages are on the server of HAP (never on the own one again) */
 static TaskHandle_t s_task;
 static volatile bool s_enabled;
 static volatile bool s_running;     /* the server is up (for sh_web_stop_wait()) */
@@ -125,6 +127,8 @@ static esp_err_t state_get(httpd_req_t *req)
         .pulse_next = st.modes.pulse_next_s != 0,
         .pulse_left_s = st.modes.pulse_next_s > now_s ? st.modes.pulse_next_s - now_s : 0,
         .pulse_hot = st.modes.pulse_hot,
+        .hk_on = sh_hap_enabled(), .hk_run = sh_hap_started(), .hk_paired = sh_hap_paired(),
+        .locked = sh_settings_locked(), .fahrenheit = sh_settings_fahrenheit(),
     };
     if (st.modes.leak == SH_LEAK_CHECK) {
         const sh_leak_t l = { .phase = SH_LEAK_CHECK, .check_s = st.modes.leak_start_s };
@@ -408,6 +412,12 @@ static esp_err_t reset_post(httpd_req_t *req)
             sh_clock_reset_learned();
             sh_control_cmd(SH_CONTROL_RESET_LEARNED);   /* sunrise / sunset, the cooling target */
             break;
+        case SH_WEB_RESET_PAIRINGS:     /* the SDK restarts after the answer */
+            ESP_LOGW(TAG, "web: HomeKit pairings reset");
+            if (sh_hap_reset_pairings() != ESP_OK) {
+                res = SH_WEB_BAD;       /* HAP does not run */
+            }
+            break;
         }
     }
     return answer(req, res);
@@ -458,6 +468,27 @@ static esp_err_t ota_post(httpd_req_t *req)
     return answer(req, res);
 }
 
+/* HomeKit (group F): the setting "Apple HomeKit" (stored, then a restart) and the keypad lock. */
+static esp_err_t hk_post(httpd_req_t *req)
+{
+    char body[BODY_MAX];
+    if (!read_body(req, body)) {
+        return ESP_FAIL;
+    }
+    int hap, lock;
+    const sh_web_res_t res = sh_web_hk(body, s_code, sh_hap_paired(), &hap, &lock);
+    if (res == SH_WEB_OK) {
+        if (lock >= 0) {
+            ESP_LOGI(TAG, "web: keypad %s", lock ? "locked" : "unlocked");
+            sh_settings_set_locked(lock);
+        }
+        if (hap >= 0 && hap != sh_hap_enabled() && sh_hap_store_enabled(hap) == ESP_OK) {
+            sh_reset_later(SH_RESET_RESTART);   /* after the answer */
+        }
+    }
+    return answer(req, res);
+}
+
 static esp_err_t auth_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -467,21 +498,9 @@ static esp_err_t auth_post(httpd_req_t *req)
     return answer(req, sh_web_code_ok(body, s_code) ? SH_WEB_OK : SH_WEB_DENIED);
 }
 
-static void server_start(void)
+/* The pages and the API on `server` (the own one, or the one of HAP). */
+static void register_all(httpd_handle_t server)
 {
-    httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    cfg.stack_size = 6144;
-    /* browsers keep several connections to one address open (Safari up to 6); with fewer places
-     * the oldest one is purged while the browser still uses it and its request fails */
-    cfg.max_open_sockets = 7;
-    cfg.lru_purge_enable = true;
-    cfg.max_uri_handlers = 20;
-    esp_err_t err = httpd_start(&s_httpd, &cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "httpd_start: %s", esp_err_to_name(err));
-        s_httpd = NULL;
-        return;
-    }
     const httpd_uri_t uris[] = {
         { .uri = "/",          .method = HTTP_GET,  .handler = page_get },
         { .uri = "/favicon.svg", .method = HTTP_GET, .handler = icon_get },
@@ -499,10 +518,32 @@ static void server_start(void)
         { .uri = "/api/time",  .method = HTTP_POST, .handler = time_post },
         { .uri = "/api/tz",    .method = HTTP_POST, .handler = tz_post },
         { .uri = "/api/ota",   .method = HTTP_POST, .handler = ota_post },
+        { .uri = "/api/hk",    .method = HTTP_POST, .handler = hk_post },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
-        httpd_register_uri_handler(s_httpd, &uris[i]);
+        const esp_err_t err = httpd_register_uri_handler(server, &uris[i]);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "%s: %s", uris[i].uri, esp_err_to_name(err));
+        }
     }
+}
+
+static void server_start(void)
+{
+    httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
+    cfg.stack_size = 6144;
+    /* browsers keep several connections to one address open (Safari up to 6); with fewer places
+     * the oldest one is purged while the browser still uses it and its request fails */
+    cfg.max_open_sockets = 7;
+    cfg.lru_purge_enable = true;
+    cfg.max_uri_handlers = 20;
+    esp_err_t err = httpd_start(&s_httpd, &cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_start: %s", esp_err_to_name(err));
+        s_httpd = NULL;
+        return;
+    }
+    register_all(s_httpd);
     char ip[16] = "";
     if (captive_wifi_get_ip(ip, sizeof(ip)) != ESP_OK) {
         strlcpy(ip, captive_wifi_portal_ip(), sizeof(ip));     /* on the own access point */
@@ -525,7 +566,7 @@ static void web_task(void *arg)
     (void)arg;
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        const bool on = s_enabled;
+        const bool on = s_enabled && !s_on_hap;
         if (on && !s_httpd) {
             server_start();
         } else if (!on && s_httpd) {
@@ -548,6 +589,14 @@ void sh_web_stop_wait(void)
     for (int i = 0; s_running && i < 300; i++) {       /* httpd_stop() ends within a second or two */
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
+
+void sh_web_attach(httpd_handle_t server)
+{
+    sh_web_stop_wait();                 /* already down: HAP holds port 80 */
+    s_on_hap = true;
+    register_all(server);
+    ESP_LOGI(TAG, "web interface on the server of HomeKit (access code %s)", s_code);
 }
 
 esp_err_t sh_web_init(void)

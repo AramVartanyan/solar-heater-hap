@@ -6,8 +6,9 @@
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task, history task
  *   5. the network (sh_net: captive-wifi in the mode CP, the name Solar-xxxxxx, mDNS, firmware
- *      update), SNTP (at every connection to the router) and the web interface (on the router or on
- *      the own access point); HomeKit follows in a later phase
+ *      update), HomeKit (sh_hap: with the setting on the accessory now, HAP on the first connection
+ *      to the router), SNTP (at every connection to the router) and the web interface (on the router
+ *      or on the own access point; with HomeKit on the server of HAP)
  */
 
 #include "freertos/FreeRTOS.h"
@@ -27,6 +28,7 @@
 #include "sh_control.h"
 #include "sh_web.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_clock.h"
 #include "sh_history.h"
 
@@ -59,7 +61,10 @@ void app_main(void)
     sh_control_start();
     sh_history_start();
 
-    ESP_ERROR_CHECK(sh_net_init());                 /* 5. network, clock, web */
+    ESP_ERROR_CHECK(sh_net_init());                 /* 5. network, HomeKit, clock, web */
+    if (sh_hap_init() != ESP_OK) {
+        ESP_LOGE(TAG, "HomeKit does not run; the controller works without it");
+    }
     sh_clock_start();
     ESP_ERROR_CHECK(sh_web_init());
     ESP_ERROR_CHECK(sh_net_start());

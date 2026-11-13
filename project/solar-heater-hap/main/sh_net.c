@@ -14,6 +14,8 @@
 #include "sh_state.h"
 #include "sh_clock.h"
 #include "sh_web.h"
+#include "sh_hap.h"
+#include "sh_hap_rules.h"
 #include "sh_net.h"
 
 static const char *TAG = "sh_net";
@@ -137,7 +139,12 @@ static void on_wifi(captive_wifi_event_t evt, uint32_t now_s)
     case CAPTIVE_WIFI_EVT_STA_CONNECTED:
         sh_state_set_wifi(true, false);
         sh_clock_connected();
-        sh_web_enable(true);
+        /* with HomeKit the pages are on the server of HAP: the own one must be down before it */
+        sh_web_enable(sh_hap_own_web(sh_hap_enabled(), sh_hap_started(), true, false));
+        if (sh_hap_should_start(sh_hap_enabled(), sh_hap_started(), true)) {
+            sh_web_stop_wait();
+            sh_hap_connected();
+        }
         ESP_LOGI(TAG, "connected: http://%s.local/", sh_net_name());
         break;
     case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
@@ -162,7 +169,8 @@ static void on_wifi(captive_wifi_event_t evt, uint32_t now_s)
         ESP_LOGI(TAG, "access point: join %s, open http://%s", captive_wifi_ap_ssid(), captive_wifi_portal_ip());
         sh_state_set_wifi(false, false);
         act = sh_net_event(&s_net, SH_NET_EVT_AP_STARTED, has_network, now_s);
-        sh_web_enable(true);    /* the web interface on the access point */
+        /* the web interface on the access point: the own server, or the one of HAP if it runs */
+        sh_web_enable(sh_hap_own_web(sh_hap_enabled(), sh_hap_started(), false, true));
         break;
     case CAPTIVE_WIFI_EVT_AP_STOPPED:
         sh_web_enable(false);
@@ -325,16 +333,19 @@ esp_err_t sh_net_init(void)
         esp_netif_set_hostname(sta, name);      /* the name at the router (DHCP) */
     }
 
-    /* mDNS answers on the station only (CONFIG_MDNS_PREDEF_NETIF_AP=n): on the router */
-    err = mdns_init();
-    if (err == ESP_OK) {
-        err = mdns_hostname_set(name);
-    }
-    if (err == ESP_OK) {
-        err = mdns_service_add("Solar controller", "_http", "_tcp", 80, NULL, 0);
-    }
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "mDNS: %s", esp_err_to_name(err));    /* the IP address still works */
+    /* mDNS answers on the station only (CONFIG_MDNS_PREDEF_NETIF_AP=n): on the router. With HomeKit
+     * HAP starts it (hap_mdns_init() fails if it runs already), sh_hap sets the name after it. */
+    if (!sh_hap_enabled()) {
+        err = mdns_init();
+        if (err == ESP_OK) {
+            err = mdns_hostname_set(name);
+        }
+        if (err == ESP_OK) {
+            err = mdns_service_add("Solar controller", "_http", "_tcp", 80, NULL, 0);
+        }
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "mDNS: %s", esp_err_to_name(err));    /* the IP address still works */
+        }
     }
 
     const general_ota_config_t ota = { .cb = ota_event, .auto_reboot = true };
