@@ -72,6 +72,9 @@ void app_main(void)
     sh_state_init();
     ESP_ERROR_CHECK(sh_settings_init());
     ESP_ERROR_CHECK(sh_installer_init());
+    sh_installer_t inst;
+    sh_installer_get(&inst, NULL);                  /* sensors on the pipes: the pipes are never shown */
+    sh_state_set_pulse(inst.v[SH_INST_MOUNT] == SH_MOUNT_PIPES);
     ESP_ERROR_CHECK(sh_clock_init());
     ESP_ERROR_CHECK(sh_history_init());
 

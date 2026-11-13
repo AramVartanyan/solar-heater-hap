@@ -94,6 +94,7 @@ section{display:none}section.on{display:block}
   <div class="tile"><div class="l" data-t="tank"></div><div class="t" id="t-tank">---</div><div class="s" id="s-tank"></div></div>
   <div class="tile"><div class="l" data-t="col"></div><div class="t" id="t-col">---</div><div class="s" id="s-col"></div></div>
  </div>
+ <p class="note hide" data-f="mount" id="pulse-note"></p>
  <h2 data-t="pump"></h2>
  <div class="grp">
   <div class="row" data-f="pump"><span><span class="dot" id="p-dot"></span><span id="p-txt">—</span></span></div>
@@ -184,8 +185,9 @@ section{display:none}section.on{display:block}
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
   <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
-  <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
+  <label class="row" data-f="mount"><span data-t="mount"></span><span class="v"><select data-p data-k="mount"><option value="0" data-t="mt_sleeves"></option><option value="1" data-t="mt_pipes"></option></select></span></label>
  </div>
+ <p class="note" data-f="mount" data-t="mount_note"></p>
  <h2 data-t="calc"></h2>
  <div class="grp">
   <div class="row" data-f="calc"><span data-t="boil"></span><span class="v calc" id="c-boil">—</span></div>
@@ -327,7 +329,15 @@ r_tf_hot:'колекторът е горещ (повреден датчик на
 r_cf_probe:'проба (повреден датчик на колектора)',r_cf_run:'бойлерът се топли (повреден датчик на колектора)',
 r_cf_wait:'изчакване до следващата проба (повреден датчик на колектора)',r_cf_heater:'работи нагревателят, пробата е отложена',
 r_cool:'нощно охлаждане',r_vacation:'ваканция, без зареждане',r_air_run:'обезвъздушаване — работа',r_air_pause:'обезвъздушаване — престой',
-r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян'
+r_leak_check:'проверка за теч от нагревателя',r_leak_stop:'течът от нагревателя е спрян',
+r_pulse:'импулс',r_pulse_wait:'изчакване до следващия импулс',pw_in:' (след {m} min)',pw_now:' (след малко)',pw_block:' (спрени след прегряване)',
+m_pulse:'импулсен',mt_sleeves:'В гилзи',mt_pipes:'На тръбите',
+mount_note:'„На тръбите“ включва импулсния режим: помпата работи на импулси от 30 s и всичко се решава по стойностите от импулсите.\nПозицията на датчиците: „колектор“ — на тръбата на изхода на колектора, възможно най-близо до него; „бойлер“ — на тръбата на изхода от бойлера към колектора, до самия бойлер.\nСамо при метални тръби (мед, бронз) — върху пластмасови тръби датчиците не мерят.',
+p_at:'Импулсен режим: измерено при импулса в {h}.',p_ago:'Импулсен режим: измерено при импулса преди {m} min.',p_live:'Импулсен режим: помпата работи — стойностите са текущите.',
+p_none:'Импулсен режим: още няма измерване — стойностите идват с първия импулс.',
+a_pblock:'Импулсите са спрени',d_pb1:'При последния импулс колекторът беше {t} °C — на по-малко от 10 K от точката на кипене. Нови импулси няма поне 5 h след него.',
+d_pb2:'При последния импулс колекторът беше {t} °C — на по-малко от 10 K от точката на кипене. Нови импулси няма до залеза.',
+d_pb3:'При последния импулс колекторът беше {t} °C — на по-малко от 10 K от точката на кипене. Нови импулси няма до 18:00 и поне 5 h след него.'
 },en:{
 title:'Solar controller',offline:'No connection to the controller.',
 tab1:'Status',tab2:'Control',tab3:'Settings',tab4:'Service',tab5:'System',
@@ -398,7 +408,15 @@ r_tf_hot:'collector hot (tank sensor fault)',r_tf_probe:'probe at a hot collecto
 r_cf_probe:'probe (collector sensor fault)',r_cf_run:'tank warming up (collector sensor fault)',
 r_cf_wait:'waiting for the next probe (collector sensor fault)',r_cf_heater:'heater running, probe postponed',
 r_cool:'night cooling',r_vacation:'vacation, no charging',r_air_run:'air venting — run',r_air_pause:'air venting — pause',
-r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped'
+r_leak_check:'heater leak check',r_leak_stop:'heater leak stopped',
+r_pulse:'pulse',r_pulse_wait:'waiting for the next pulse',pw_in:' (in {m} min)',pw_now:' (shortly)',pw_block:' (stopped after overheating)',
+m_pulse:'pulse mode',mt_sleeves:'In sleeves',mt_pipes:'On the pipes',
+mount_note:'"On the pipes" turns on the pulse mode: the pump works in pulses of 30 s and everything is decided by the values of the pulses.\nWhere the sensors go: "collector" — on the pipe at the outlet of the collector, as close to it as possible; "tank" — on the pipe at the outlet of the tank towards the collector, right next to the tank.\nOnly on metal pipes (copper, bronze) — on plastic pipes the sensors do not measure.',
+p_at:'Pulse mode: measured at the pulse at {h}.',p_ago:'Pulse mode: measured at the pulse {m} min ago.',p_live:'Pulse mode: the pump is running — the values are current.',
+p_none:'Pulse mode: no measurement yet — the values come with the first pulse.',
+a_pblock:'Pulses stopped',d_pb1:'At the last pulse the collector was {t} °C — within 10 K of the boiling point. No new pulses for at least 5 h after it.',
+d_pb2:'At the last pulse the collector was {t} °C — within 10 K of the boiling point. No new pulses until the sunset.',
+d_pb3:'At the last pulse the collector was {t} °C — within 10 K of the boiling point. No new pulses until 18:00 and for at least 5 h after it.'
 }};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
@@ -466,6 +484,10 @@ function render(){
  const h=S.heat,kw=S.inst.heater.v,k1=x=>(Math.abs(x)/10).toFixed(1);
  if(h.leak==2)card(' info',t('a_leak'),fill('d_leak',{d:h.last?k1(h.last.drop):'2.0'}));
  if(h.det&&!kw)card(' info',t('a_det'),t('d_det'));
+ const pu=S.pulse,gone=Math.round((Date.now()-leftAt)/1000);
+ if(pu.block)card(' info',t('a_pblock'),fill('d_pb'+pu.block,{t:S.col==null?'—':deg(S.col)}));
+ const pn=$('#pulse-note');pn.classList.toggle('hide',!pu.on);
+ if(pu.on)pn.textContent=pu.age==null?t('p_none'):S.pump&&pu.age<3?t('p_live'):pu.at==null?fill('p_ago',{m:Math.round((pu.age+gone)/60)}):fill('p_at',{h:hm(pu.at)});
  $('#heat-v').textContent=kw?(kw/10).toFixed(1)+' kW · '+t(h.on?'h_on':'h_off'):h.det?t('h_det')+' · '+t(h.on?'h_on':'h_off'):t('h_none');
  $('#leak-row').classList.toggle('hide',!h.leak&&!h.last);
  $('#leak-v').textContent=h.leak==1?fill('leak_chk',{s:Math.max(0,h.left-Math.round((Date.now()-leftAt)/1000))}):
@@ -475,7 +497,7 @@ function render(){
  const ssn=t(S.winter?'winter':'summer');
  $('#hd-season').textContent=ssn;
  $('#season-v').textContent=ssn+' ('+t(S.set.ssn.v==2?'s_is_auto':'s_hand')+')';
- $('#mode-v').textContent=t(vac?'m_vac':'m_normal');
+ $('#mode-v').textContent=t(vac?'m_vac':'m_normal')+(pu.on?' · '+t('m_pulse'):'');
  $('#cool-row').classList.toggle('hide',!co.on);
  if(co.on)$('#cool-v').textContent=[t('cool_'+co.on),co.target==null?t('cool_eq'):fill('cool_to',{t:deg(co.target)}),
   co.until==null?t('cool_rise'):fill('cool_until',{h:hm(co.until)})].join(' · ');
@@ -497,7 +519,8 @@ function render(){
  $('#s-col').textContent=S.col==null?t('no_sensor'):'';
  const prot=['protect','frost','tf_probe','cool'].includes(S.why);
  $('#p-dot').style.background=S.pump?(prot?'var(--orange)':'var(--green)'):'';
- $('#p-txt').textContent=t(S.pump?'runs':'idle')+' — '+t('r_'+S.why+(S.why=='diff'?(S.pump?'_on':'_off'):''));
+ $('#p-txt').textContent=t(S.pump?'runs':'idle')+' — '+t('r_'+S.why+(S.why=='diff'?(S.pump?'_on':'_off'):''))+
+  (S.why!='pulse_wait'?'':pu.block?t('pw_block'):pu.next==null?'':pu.next-gone<60?t('pw_now'):fill('pw_in',{m:Math.round((pu.next-gone)/60)}));
  testText();
  $('#b-start').classList.toggle('hide',!!S.test);$('#test-ctl').classList.toggle('hide',!S.test);
  $('#sw-fro').classList.toggle('off',!S.fro);$('#sw-fro').setAttribute('aria-checked',!!S.fro);

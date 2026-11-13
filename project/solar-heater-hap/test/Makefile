@@ -17,18 +17,22 @@
 #   test_group_d      heater sign and detection, guaranteed daylight, heater leak checks, E8
 #                     (sh_heater, sh_e8, sh_pump_logic, sh_pump_ctl, sh_installer, sh_alarm, sh_ind,
 #                     sh_day, sh_hist)
+#   test_group_d2     the pulse mode of sensors on the pipes: window, intervals, overheat, night,
+#                     cooling, frost watch, reliable values (sh_pulse, sh_pump_ctl, sh_pump_logic,
+#                     sh_sun, sh_cool, sh_heater, sh_e8, sh_alarm, sh_installer)
 
 CC      := gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O1
 MAIN    := ../main
 BUILD   := build
 TESTS   := test_pump_logic test_pump_ctl test_meas test_settings test_menu test_alarm test_ind \
-           test_installer test_web test_clock_history test_group_c test_group_d
+           test_installer test_web test_clock_history test_group_c test_group_d test_group_d2
 HIST_SRC := $(MAIN)/sh_clock_rules.c $(MAIN)/sh_tz.c $(MAIN)/sh_day.c $(MAIN)/sh_hist.c $(MAIN)/sh_alarm.c
 WEB_SRC := $(MAIN)/sh_web_api.c $(MAIN)/sh_installer.c $(MAIN)/sh_settings.c $(MAIN)/sh_pump_logic.c \
            $(HIST_SRC)
 GROUP_C_SRC := $(MAIN)/sh_cool.c $(MAIN)/sh_sun.c $(MAIN)/sh_season.c
 GROUP_D_SRC := $(MAIN)/sh_heater.c $(MAIN)/sh_e8.c
+GROUP_D2_SRC := $(MAIN)/sh_pulse.c
 HDRS    := $(wildcard $(MAIN)/sh_*.h) test_util.h
 
 .PHONY: test sim clean
@@ -50,7 +54,9 @@ $(BUILD)/test_group_c:    test_group_c.c $(GROUP_C_SRC) $(MAIN)/sh_pump_ctl.c $(
                           $(MAIN)/sh_installer.c $(MAIN)/sh_ind.c $(HIST_SRC) $(HDRS)
 $(BUILD)/test_group_d:    test_group_d.c $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c $(MAIN)/sh_pump_logic.c \
                           $(MAIN)/sh_installer.c $(MAIN)/sh_ind.c $(HIST_SRC) $(HDRS)
-$(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c $(HDRS)
+$(BUILD)/test_group_d2:   test_group_d2.c $(GROUP_D2_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(MAIN)/sh_pump_ctl.c \
+                          $(MAIN)/sh_pump_logic.c $(MAIN)/sh_installer.c $(HIST_SRC) $(HDRS)
+$(BUILD)/web_sim:         web_sim.c $(WEB_SRC) $(GROUP_C_SRC) $(GROUP_D_SRC) $(GROUP_D2_SRC) $(MAIN)/sh_pump_ctl.c $(HDRS)
 
 $(BUILD)/%:
 	@mkdir -p $(BUILD)

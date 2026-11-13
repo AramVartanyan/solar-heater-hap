@@ -21,6 +21,7 @@
 #include "sh_cool.h"
 #include "sh_heater.h"
 #include "sh_e8.h"
+#include "sh_pulse.h"
 #include "sh_relay.h"
 #include "sh_led.h"
 #include "sh_control.h"
@@ -70,6 +71,9 @@ static sh_heater_t s_heater;
 static sh_leak_t s_leak;
 static sh_e8_t s_e8;
 
+/* The pulse mode: sensors on the pipes (only the control task uses it) */
+static sh_pulse_t s_pulse;
+
 static QueueHandle_t s_cmds;
 
 /* The menu settings (whole K / °C; the seasonal ones of the current season), Kconfig "Control"
@@ -94,6 +98,10 @@ static void get_params(sh_pump_params_t *p, const sh_settings_t *s, bool winter,
     p->frost = lim->frost;
     p->charge_off = vacation;
     p->heater_rise = sh_heater_rise(inst->v[SH_INST_HEATER], inst->v[SH_INST_TANK_VOL]);
+    if (inst->v[SH_INST_MOUNT] == SH_MOUNT_PIPES) {
+        p->pulse = true;
+        p->min_run_s = SH_PULSE_S;      /* in the pulse mode the pulse is the minimum run time */
+    }
 }
 
 static void save_learned(void)
@@ -136,19 +144,47 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     sh_clock_get(&ci);
     const bool reliable = ci.trust == SH_CLOCK_RELIABLE;
     /* a faulty sensor's last valid value is not used */
-    const int16_t t_col = st.col_fault ? SH_TEMP_INVALID : st.t_col;
-    const int16_t t_tank = st.tank_fault ? SH_TEMP_INVALID : st.t_tank;
+    const int16_t raw_col = st.col_fault ? SH_TEMP_INVALID : st.t_col;
+    const int16_t raw_tank = st.tank_fault ? SH_TEMP_INVALID : st.t_tank;
     bool learned = false;
 
-    /* sunrise and sunset, seen by the collector with the pump as the last step left it */
-    const uint8_t sun = sh_sun_step(&s_sun, t_col, t_tank, pump->on, &ci.lt, reliable, now);
+    /* The pulse mode (sensors on the pipes): the reliable values are taken while the pump has run
+     * for 30 s. They are what decides and what is shown; the pipes themselves (raw_*) only serve
+     * the sunrise / sunset, the heater sign, E8 and the frost gate. In sleeves both are the same. */
+    sh_pulse_in_t pin = {
+        .pipes = inst.v[SH_INST_MOUNT] == SH_MOUNT_PIPES, .t_col = raw_col, .t_tank = raw_tank,
+        .pump_on = pump->on, .run_s = pump->on ? now - pump->switched_s : 0, .boiling = lim.boiling,
+    };
+    sh_pulse_measure(&s_pulse, &pin, now);
+    const bool pipes = s_pulse.pipes;
+    /* what is shown and logged (a faulty sensor keeps its last value there), and what decides */
+    const int16_t show_col = pipes ? s_pulse.col : st.t_col;
+    const int16_t show_tank = pipes ? s_pulse.tank : st.t_tank;
+    const int16_t t_col = st.col_fault ? SH_TEMP_INVALID : show_col;
+    const int16_t t_tank = st.tank_fault ? SH_TEMP_INVALID : show_tank;
+    if (s_pulse.events & SH_PULSE_EVT_MODE) {
+        ESP_LOGI(TAG, "sensors %s", pipes ? "on the pipes: pulse mode" : "in sleeves");
+    }
+    if (s_pulse.events & SH_PULSE_EVT_MEASURED) {
+        char tank[12];
+        ESP_LOGI(TAG, "pulse values: collector %s °C, tank %s °C", temp_str(tbuf, sizeof(tbuf), t_col, false),
+                 temp_str(tank, sizeof(tank), t_tank, false));
+    }
+    if (s_pulse.events & SH_PULSE_EVT_BLOCK) {
+        ESP_LOGW(TAG, "collector %s °C, within 10 K of the boiling point: no pulses",
+                 temp_str(tbuf, sizeof(tbuf), t_col, false));
+    }
+
+    /* sunrise and sunset, seen by the collector (in the pulse mode by the pipes) with the pump as the
+     * last step left it */
+    const uint8_t sun = sh_sun_step_flow(&s_sun, raw_col, raw_tank, pump->on, s_pulse.fresh, &ci.lt, reliable, now);
     if (sun & SH_SUN_EVT_RISE) {
         s_modes.sunrises++;
-        ESP_LOGI(TAG, "sunrise detected: collector %s °C", temp_str(tbuf, sizeof(tbuf), t_col, false));
+        ESP_LOGI(TAG, "sunrise detected: collector %s °C", temp_str(tbuf, sizeof(tbuf), raw_col, false));
     }
     if (sun & SH_SUN_EVT_SET) {
         s_modes.sunsets++;
-        ESP_LOGI(TAG, "sunset detected: collector %s °C", temp_str(tbuf, sizeof(tbuf), t_col, false));
+        ESP_LOGI(TAG, "sunset detected: collector %s °C", temp_str(tbuf, sizeof(tbuf), raw_col, false));
     }
     learned = (sun & SH_SUN_EVT_LEARNED) != 0;
 
@@ -216,10 +252,12 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
         learned = true;
     }
 
-    /* the leak of the heater: checks with the pump stopped outside the guaranteed daylight */
+    /* the leak of the heater: checks with the pump stopped outside the guaranteed daylight; not in
+     * the pulse mode — there the two sensors measure the liquid itself, and without the sun the
+     * difference turns negative and stops the pump by the usual rule */
     const int sun_rise = sh_sun_avg(s_sun.days.rise), sun_set = sh_sun_avg(s_sun.days.set);
     const sh_leak_in_t lin = {
-        .heater = sh_heater_present(&s_heater, power), .reliable = reliable, .min = ci.lt.min,
+        .heater = !pipes && sh_heater_present(&s_heater, power), .reliable = reliable, .min = ci.lt.min,
         .rise = sun_rise, .set = sun_set, .t_col = t_col, .pump_on = pump->on,
         .charging = pump->on && pump->mode == SH_PUMP_MODE_NORMAL &&
                     (pump->reason == SH_PUMP_REASON_DIFF || pump->reason == SH_PUMP_REASON_MIN_RUN),
@@ -245,9 +283,9 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     params.leak_stop = s_leak.phase == SH_LEAK_STOP;
     params.leak_resume = s_leak.resume;
 
-    /* E8: reverse thermosiphon at night */
+    /* E8: reverse thermosiphon at night (in the pulse mode by the pipes with the pump stopped) */
     const sh_e8_in_t ein = {
-        .night = sh_sun_night(&s_sun, &ci.lt, reliable), .t_col = t_col, .t_tank = t_tank, .pump_on = pump->on,
+        .night = sh_sun_night(&s_sun, &ci.lt, reliable), .t_col = raw_col, .t_tank = raw_tank, .pump_on = pump->on,
         .heater = heater_on,
         .threshold = sh_e8_threshold(inst.v[SH_INST_COL_TYPE] == SH_COL_TUBES, inst.v[SH_INST_COL_AREA],
                                      inst.v[SH_INST_TANK_VOL]),
@@ -266,6 +304,22 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     }
     if (learned || (s_cool.events & SH_COOL_EVT_LEARNED)) {
         save_learned();
+    }
+
+    /* the pulse mode: is a pulse due? */
+    pin.reliable = reliable;
+    pin.min = ci.lt.min;
+    pin.rise = sun_rise;
+    pin.set = sun_set;
+    pin.sunrise = (sun & SH_SUN_EVT_RISE) != 0;
+    pin.sunset = (sun & SH_SUN_EVT_SET) != 0;
+    pin.cooling = params.cool;
+    pin.frost_on = params.frost_on;
+    pin.frost = params.frost;
+    params.pulse_due = sh_pulse_plan(&s_pulse, &pin, now);
+    params.pulse_fresh = s_pulse.fresh;
+    if (s_pulse.events & SH_PULSE_EVT_UNBLOCK) {
+        ESP_LOGI(TAG, "pulses allowed again");
     }
 
     /* the computed limits: at boot and whenever the installer data change them */
@@ -326,7 +380,8 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     }
 
     const sh_pump_temps_t temps = {
-        .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .t_col = show_col, .t_tank = show_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .pipe_tank = st.t_tank,
     };
     sh_pump_ctl_step(pump, &params, &temps, now);
     sh_relay_set(pump->on);
@@ -361,8 +416,8 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
         /* every switch, and every change of the reason (why the pump does not start or stop) */
         char col[12], tank[12];
         ESP_LOGI(TAG, "pump %s (%s): collector %s °C, tank %s °C", pump->on ? "ON" : "OFF",
-                 sh_pump_reason_name(pump->reason), temp_str(col, sizeof(col), st.t_col, st.col_fault),
-                 temp_str(tank, sizeof(tank), st.t_tank, st.tank_fault));
+                 sh_pump_reason_name(pump->reason), temp_str(col, sizeof(col), show_col, st.col_fault),
+                 temp_str(tank, sizeof(tank), show_tank, st.tank_fault));
     }
 
     /* season, night cooling, learned values, air venting: published when they change */
@@ -385,6 +440,15 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     s_modes.leak_last_stop = s_leak.last_stop;
     s_modes.leak_last_drop = s_leak.last_drop;
     s_modes.e8_normal = sh_e8_normal(&s_e8.l);
+    s_modes.pulse = pipes;
+    s_modes.rel_col = pipes ? s_pulse.col : SH_TEMP_INVALID;
+    s_modes.rel_tank = pipes ? s_pulse.tank : SH_TEMP_INVALID;
+    s_modes.rel_have = pipes && s_pulse.have;
+    s_modes.rel_s = pipes && s_pulse.have ? s_pulse.meas_s : 0;
+    s_modes.pulse_next = pipes && s_pulse.next_known;
+    s_modes.pulse_next_s = s_modes.pulse_next ? s_pulse.next_s : 0;
+    s_modes.pulse_block = pipes && s_pulse.block;
+    s_modes.pulse_until = s_modes.pulse_block ? (uint8_t)s_pulse.block_until : 0;
     static sh_modes_t s_published;
     if (!s_modes_done || memcmp(&s_modes, &s_published, sizeof(s_modes)) != 0) {
         sh_state_set_modes(&s_modes);
@@ -394,7 +458,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
 
     /* alarm and information codes: every appearance and clearing in the log */
     const sh_alarm_in_t ain = {
-        .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .t_col = show_col, .t_tank = show_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = pump->on, .reason = pump->reason,
         .col_boiling = pump->norm.col_boiling, .tank_ceiling = pump->norm.tank_ceiling,
         .e8 = s_e8.l.active,
@@ -404,8 +468,8 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     if (alarms != was_alarms) {
         sh_state_set_alarms(alarms);
         char col[12], tank[12];
-        temp_str(col, sizeof(col), st.t_col, st.col_fault);
-        temp_str(tank, sizeof(tank), st.t_tank, st.tank_fault);
+        temp_str(col, sizeof(col), show_col, st.col_fault);
+        temp_str(tank, sizeof(tank), show_tank, st.tank_fault);
         for (int a = 0; a < SH_ALARM_COUNT; a++) {
             const uint8_t bit = SH_ALARM_BIT(a);
             if ((alarms ^ was_alarms) & bit) {
@@ -420,7 +484,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     memset(&iin, 0, sizeof(iin));   /* padding too: compared with memcmp() */
     iin.alarms = alarms;
     iin.pump_on = pump->on;
-    iin.t_col = st.t_col;
+    iin.t_col = show_col;
     iin.col_fault = st.col_fault;
     iin.vacation = vacation;
     iin.cooling = pump->on && pump->reason == SH_PUMP_REASON_COOL;

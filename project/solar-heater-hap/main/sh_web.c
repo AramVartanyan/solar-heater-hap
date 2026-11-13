@@ -98,7 +98,8 @@ static esp_err_t state_get(httpd_req_t *req)
                  mac[5]);
     }
     sh_web_status_t s = {
-        .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+        .t_col = sh_state_col(&st), .t_tank = sh_state_tank(&st),   /* pulse mode: the reliable values */
+        .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
         .test_on = st.test_on,
         .test_left_s = st.test_on && st.test_end_s > now_s ? st.test_end_s - now_s : 0,
@@ -117,6 +118,11 @@ static esp_err_t state_get(httpd_req_t *req)
         .heater_on = st.modes.heater_on, .heater_det = st.modes.heater_det, .leak = st.modes.leak,
         .leak_last = st.modes.leak_last, .leak_last_stop = st.modes.leak_last_stop,
         .leak_last_drop = st.modes.leak_last_drop, .e8_normal = st.modes.e8_normal,
+        .pulse = st.modes.pulse, .pulse_have = st.modes.rel_have,
+        .pulse_age_s = st.modes.rel_have && now_s > st.modes.rel_s ? now_s - st.modes.rel_s : 0,
+        .pulse_next = st.modes.pulse_next,
+        .pulse_next_in_s = st.modes.pulse_next_s > now_s ? st.modes.pulse_next_s - now_s : 0,
+        .pulse_block = st.modes.pulse_block ? (uint8_t)(st.modes.pulse_until + 1) : 0,
     };
     if (st.modes.leak == SH_LEAK_CHECK) {
         const sh_leak_t l = { .phase = SH_LEAK_CHECK, .check_s = st.modes.leak_start_s };

@@ -36,6 +36,12 @@ static void days_add(uint16_t v[SH_SUN_DAYS], uint16_t min)
 uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, const sh_local_t *lt,
                     bool reliable, uint32_t now_s)
 {
+    return sh_sun_step_flow(s, t_col, t_tank, pump_on, false, lt, reliable, now_s);
+}
+
+uint8_t sh_sun_step_flow(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, bool flow,
+                         const sh_local_t *lt, bool reliable, uint32_t now_s)
+{
     uint8_t evt = 0;
 
     /* the last sunset of a finished day becomes a learned one */
@@ -82,7 +88,7 @@ uint8_t sh_sun_step(sh_sun_t *s, int16_t t_col, int16_t t_tank, bool pump_on, co
         if (t_col > t_tank) {
             s->above = true;
             s->dark = false;            /* day */
-        } else if (s->above && !pump_on && t_col < t_tank) {
+        } else if (s->above && (!pump_on || flow) && t_col < t_tank) {
             s->above = false;
             s->dark = true;
             s->sunset_s = now_s;

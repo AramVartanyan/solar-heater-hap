@@ -60,12 +60,13 @@ static void test_status(void)
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\",\"heater\"],"
+        "\"vac_limit\",\"heater\",\"mount\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
         "\"air\":{\"on\":0,\"run\":0,\"cycle\":0,\"left\":0,\"cycles\":3,\"work\":5,\"pause\":10},"
         "\"heat\":{\"on\":0,\"det\":0,\"leak\":0,\"left\":0,\"last\":null,\"e8n\":null},"
+        "\"pulse\":{\"on\":0,\"at\":null,\"age\":null,\"next\":null,\"block\":0},"
         "\"set\":{\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1},"
         "\"c_lo\":{\"v\":25,\"min\":10,\"max\":80,\"step\":1},"
         "\"d_on\":{\"v\":6,\"min\":5,\"max\":20,\"step\":1},"
@@ -81,7 +82,7 @@ static void test_status(void)
         "\"press\":{\"v\":15,\"min\":5,\"max\":60},\"col_max\":{\"v\":120,\"min\":100,\"max\":250},"
         "\"col_type\":{\"v\":0,\"min\":0,\"max\":1},\"col_area\":{\"v\":20,\"min\":5,\"max\":200},"
         "\"tank_vol\":{\"v\":150,\"min\":50,\"max\":1000,\"step\":10},"
-        "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5}},"
+        "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5},\"mount\":{\"v\":0,\"min\":0,\"max\":1}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
@@ -175,7 +176,7 @@ static void test_status_values(void)
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"vac_limit\",\"heater\",\"history\"],");
+    HAS(&s, "\"vac_limit\",\"heater\",\"mount\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();
@@ -233,6 +234,9 @@ static void test_status_buffer(void)
     s.leak_last = s.leak_last_stop = true;
     s.leak_last_drop = -1234;
     s.e8_normal = -1234;
+    s.pulse = s.pulse_have = s.pulse_next = true;
+    s.pulse_age_s = s.pulse_next_in_s = 4000000000u;
+    s.pulse_block = 3;
     s.alarms = 0xFF;
     const int len = sh_web_status_json(s_json, sizeof(s_json), &s);
     CHECK(len > 0 && len < SH_WEB_STATUS_MAX * 3 / 4);
@@ -440,6 +444,82 @@ static void test_status_group_d(void)
     /* E8: after E6, before the information */
     s.alarms = SH_ALARM_BIT(SH_ALARM_HOT) | SH_ALARM_BIT(SH_ALARM_E8) | SH_ALARM_BIT(SH_ALARM_E6);
     HAS(&s, "\"alarms\":[\"E6\",\"E8\",\"Hot\"]");
+}
+
+/* The pulse mode (group D2): the mounting of the sensors, when the shown values were measured, the
+ * next pulse, no pulses after an overheat, the reasons. */
+static void test_pulse(void)
+{
+    sh_web_config_t c;
+    unsigned ch;
+    /* installer data: 0 in sleeves / 1 on the pipes, with the code */
+    CHECK_EQ(set("mount=1", &c, &ch), SH_WEB_DENIED);
+    CHECK_EQ(set("mount=1&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_MOUNT], SH_MOUNT_PIPES);
+    CHECK_EQ(ch, SH_WEB_CH_INSTALLER);
+    CHECK_EQ(set("mount=0&code=" CODE, &c, &ch), SH_WEB_OK);
+    CHECK_EQ(c.inst.v[SH_INST_MOUNT], SH_MOUNT_SLEEVES);
+    CHECK_EQ(set("mount=2&code=" CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(set("mount=-1&code=" CODE, &c, &ch), SH_WEB_BAD);
+
+    sh_web_status_t s = status();
+    HAS(&s, "\"mount\"");                                       /* the function is there: not grey */
+    HAS(&s, "\"pulse\":{\"on\":0,\"at\":null,\"age\":null,\"next\":null,\"block\":0},");
+    /* in sleeves nothing of it is shown, whatever the fields hold */
+    s.pulse_have = s.pulse_next = true;
+    s.pulse_block = 2;
+    HAS(&s, "\"pulse\":{\"on\":0,\"at\":null,\"age\":null,\"next\":null,\"block\":0},");
+
+    /* on the pipes, no pulse yet: the next one in 25 min */
+    s = status();
+    s.cfg.inst.v[SH_INST_MOUNT] = SH_MOUNT_PIPES;
+    s.pulse = true;
+    s.t_col = s.t_tank = SH_TEMP_INVALID;
+    s.pump_on = false;
+    s.reason = SH_PUMP_REASON_PULSE_WAIT;
+    s.pulse_next = true;
+    s.pulse_next_in_s = 1500;
+    HAS(&s, "\"mount\":{\"v\":1,\"min\":0,\"max\":1}");
+    HAS(&s, "\"tank\":null,\"col\":null,\"pump\":0,\"why\":\"pulse_wait\"");
+    HAS(&s, "\"pulse\":{\"on\":1,\"at\":null,\"age\":null,\"next\":1500,\"block\":0},");
+
+    /* measured 10 min 30 s ago: without a clock only the age, with one the local minute — 14:20 */
+    s.t_col = 523;
+    s.t_tank = 418;
+    s.pulse_have = true;
+    s.pulse_age_s = 630;
+    HAS(&s, "\"tank\":418,\"col\":523,");
+    HAS(&s, "\"pulse\":{\"on\":1,\"at\":null,\"age\":630,\"next\":1500,\"block\":0},");
+    s.clock.trust = SH_CLOCK_RELIABLE;
+    s.clock.min = 14 * 60 + 30;
+    HAS(&s, "\"pulse\":{\"on\":1,\"at\":860,\"age\":630,\"next\":1500,\"block\":0},");
+    s.clock.min = 5;                                            /* measured before midnight: 23:55 */
+    HAS(&s, "\"at\":1435,\"age\":630,");
+    s.clock.trust = SH_CLOCK_TZ_UNCONFIRMED;                    /* a set clock is enough for the time shown */
+    HAS(&s, "\"at\":1435,");
+    /* the pump runs: the values are of now */
+    s.clock.min = 860;
+    s.pump_on = true;
+    s.reason = SH_PUMP_REASON_PULSE;
+    s.pulse_age_s = 0;
+    s.pulse_next = false;
+    HAS(&s, "\"pump\":1,\"why\":\"pulse\"");
+    HAS(&s, "\"pulse\":{\"on\":1,\"at\":860,\"age\":0,\"next\":null,\"block\":0},");
+    /* no pulses after an overheat: for 5 h / until the learned sunset / until 18:00 and 5 h */
+    s.pump_on = false;
+    s.reason = SH_PUMP_REASON_PULSE_WAIT;
+    s.pulse_block = 1;
+    HAS(&s, "\"next\":null,\"block\":1},");
+    s.pulse_block = 2;
+    HAS(&s, "\"block\":2},");
+    s.pulse_block = 3;
+    HAS(&s, "\"block\":3},");
+    /* a faulty sensor shows nothing in this mode too */
+    s.col_fault = true;
+    HAS(&s, "\"col\":null,");
+    /* a pulse is "other" in the chart and in the run time, not charging */
+    CHECK_EQ(sh_run_kind(true, SH_PUMP_REASON_PULSE), SH_RUN_OTHER);
+    CHECK_EQ(sh_run_kind(false, SH_PUMP_REASON_PULSE_WAIT), -1);
 }
 
 /* The status of the season, the night cooling and the air venting. */
@@ -724,6 +804,7 @@ int main(void)
     test_set_group_c();
     test_status_group_c();
     test_status_group_d();
+    test_pulse();
     test_air();
     test_code();
     test_pump_test();

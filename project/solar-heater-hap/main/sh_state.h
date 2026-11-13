@@ -29,6 +29,15 @@ typedef struct {
     bool    leak_last_stop;     /* ... its result: stopped */
     int16_t leak_last_drop;     /* ... the collector fell by, 0.1 K */
     int16_t e8_normal;          /* learned normal night cooling of the tank, 0.1 K/h, INT16_MIN: none */
+    /* group D2: the pulse mode (sensors on the pipes) */
+    bool    pulse;              /* the mode is on: t_col / t_tank below are the pipes, not to be shown */
+    int16_t rel_col, rel_tank;  /* the last reliable values, 0.1 °C (SH_TEMP_INVALID: none yet) */
+    bool    rel_have;           /* there are reliable values ... */
+    uint32_t rel_s;             /* ... measured at, monotonic s */
+    bool    pulse_next;         /* the next pulse is expected ... */
+    uint32_t pulse_next_s;      /* ... at, monotonic s */
+    bool    pulse_block;        /* no pulses after an overheat */
+    uint8_t pulse_until;        /* ... until: sh_pulse_until_t */
 } sh_modes_t;
 
 typedef struct {
@@ -50,7 +59,20 @@ typedef struct {
     sh_modes_t modes;           /* season, night cooling, air venting */
 } sh_state_t;
 
+/* The temperatures to show and to record: in the pulse mode the last reliable values (the pipes with
+ * the pump stopped are never shown), otherwise the last valid measurement. */
+static inline int16_t sh_state_col(const sh_state_t *st)
+{
+    return st->modes.pulse ? st->modes.rel_col : st->t_col;
+}
+
+static inline int16_t sh_state_tank(const sh_state_t *st)
+{
+    return st->modes.pulse ? st->modes.rel_tank : st->t_tank;
+}
+
 void sh_state_init(void);
+void sh_state_set_pulse(bool on);                   /* at boot, before the control task publishes */
 void sh_state_get(sh_state_t *out);                 /* consistent copy */
 void sh_state_set_temps(int16_t t_col, int16_t t_tank, bool col_fault, bool tank_fault);
 void sh_state_set_pump(bool on, sh_pump_reason_t reason);

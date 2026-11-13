@@ -9,7 +9,8 @@
  *                     set c_lo_w, d_on_w, d_of_w — the checks of the button menu; ssn 0 / 1 / 2
  *                     season, hol 0 / 1 vacation, nc / nc_w 0 / 1 night cooling above Tmax in
  *                     summer / winter), fro (0 / 1), installer data (fluid, glycol, press,
- *                     col_max, col_type, col_area, tank_vol, heater — only with the access code)
+ *                     col_max, col_type, col_area, tank_vol, heater, mount — only with the access
+ *                     code)
  *              test   cmd=start | plus | minus | stop
  *              air    cmd=start | stop: the air venting
  *              reset  what=wifi | defaults | factory | history | learned (only with the access
@@ -92,6 +93,13 @@ typedef struct {
     bool leak_last, leak_last_stop;
     int16_t leak_last_drop;     /* 0.1 K */
     int16_t e8_normal;          /* learned normal night cooling, 0.1 K/h, INT16_MIN: none */
+    /* the pulse mode (group D2): t_col / t_tank above are then the last reliable values */
+    bool pulse;                 /* the mode is on */
+    bool pulse_have;            /* there are reliable values ... */
+    uint32_t pulse_age_s;       /* ... measured this long ago */
+    bool pulse_next;            /* the next pulse is expected ... */
+    uint32_t pulse_next_in_s;   /* ... in this many s */
+    uint8_t pulse_block;        /* no pulses after an overheat: 0 no, otherwise sh_pulse_until_t + 1 */
 } sh_web_status_t;
 
 /* Writes the status as JSON; returns its length, or -1 if `size` is too small. */

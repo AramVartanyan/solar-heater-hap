@@ -19,7 +19,7 @@ static const char *const FEATURES[] = {
     "fluid", "pressure", "col_max", "calc", "net", "fw", "reset",
     "clock", "timezone", "run_today", "chart", "learned",
     "vacation", "season", "night_cool", "deaerate", "col_type", "tank_vol", "vac_limit",
-    "heater",
+    "heater", "mount",
 };
 
 /* ---- JSON ------------------------------------------------------------------------------- */
@@ -144,6 +144,20 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put(&o, ",\"e8n\":");
     put_or_null(&o, s->e8_normal != INT16_MIN, s->e8_normal);
     put(&o, "},");
+
+    /* the pulse mode: when the shown values were measured (the local minute with a set clock, and
+     * how long ago), the next pulse (in s), no pulses after an overheat (1 for 5 h, 2 until the
+     * learned sunset, 3 until 18:00 and at least 5 h) */
+    const bool clock_set = s->clock.trust != SH_CLOCK_UNSET && s->clock.min >= 0;
+    const int32_t ago_min = (int32_t)(s->pulse_age_s / 60u % SH_DAY_MIN);
+    put(&o, "\"pulse\":{\"on\":%d,\"at\":", s->pulse);
+    put_or_null(&o, s->pulse && s->pulse_have && clock_set,
+                (int)((s->clock.min - ago_min + SH_DAY_MIN) % SH_DAY_MIN));
+    put(&o, ",\"age\":");
+    put_or_null(&o, s->pulse && s->pulse_have, (int)s->pulse_age_s);
+    put(&o, ",\"next\":");
+    put_or_null(&o, s->pulse && s->pulse_next, (int)s->pulse_next_in_s);
+    put(&o, ",\"block\":%d},", s->pulse ? s->pulse_block : 0);
 
     /* the menu values with the range the others leave them */
     put(&o, "\"set\":{");
@@ -560,6 +574,8 @@ const char *sh_web_reason_key(sh_pump_reason_t reason)
         [SH_PUMP_REASON_AIR_PAUSE]    = "air_pause",
         [SH_PUMP_REASON_LEAK_CHECK]   = "leak_check",
         [SH_PUMP_REASON_LEAK_STOP]    = "leak_stop",
+        [SH_PUMP_REASON_PULSE]        = "pulse",
+        [SH_PUMP_REASON_PULSE_WAIT]   = "pulse_wait",
     };
     if ((unsigned)reason < SH_PUMP_REASON_COUNT && keys[reason] != NULL) {
         return keys[reason];

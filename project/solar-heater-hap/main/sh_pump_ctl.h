@@ -21,6 +21,12 @@
  *                             heater sign is active — the threshold of sh_heater)
  *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
+ * Pulse mode (sensors on the pipes, sh_pulse; doc/tasks/step13-pulse-mode.md): the temperatures are
+ * the last reliable ones. With no sensor or the tank sensor faulty a stopped pump starts only by a
+ * pulse (30 s); when the pump has run for 30 s the mode of step 3 decides as for a stopped pump
+ * whose minimum off time is over, and then as for a running pump (the minimum run time is the
+ * pulse). The rest — the test, the air venting, the anti-seize run, the probes with a faulty
+ * collector sensor — is unchanged; the heater sign follows the tank pipe with the pump stopped.
  * The end of the test and of the anti-seize run is handled like a stopped pump whose minimum off
  * time is over: the pump keeps running if the mode would start it (its minimum run time counts from
  * then), otherwise it stops and the minimum off time counts from then. */
@@ -64,6 +70,8 @@ typedef struct {
     int16_t t_tank;
     bool col_fault;             /* 5 failed measurements in a row */
     bool tank_fault;
+    int16_t pipe_tank;          /* pulse mode only (p->pulse): the tank pipe as measured now — the heater
+                                 * sign with the pump stopped; t_col / t_tank are the last reliable values */
 } sh_pump_temps_t;
 
 typedef enum {
@@ -99,6 +107,9 @@ typedef struct {
     bool air;
     uint32_t air_start_s;
     uint32_t air_pause_s;       /* pause phase of a cycle */
+
+    /* pulse mode */
+    bool pulsing;               /* the pump runs a pulse: at its end the mode decides as for a stopped pump */
 
     /* anti-seize */
     bool seize;

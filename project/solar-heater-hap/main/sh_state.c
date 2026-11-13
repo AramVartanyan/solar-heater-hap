@@ -13,6 +13,14 @@ void sh_state_init(void)
     s_state.t_col = SH_TEMP_INVALID;
     s_state.t_tank = SH_TEMP_INVALID;
     s_state.modes.sunrise = s_state.modes.sunset = -1;
+    s_state.modes.rel_col = s_state.modes.rel_tank = SH_TEMP_INVALID;
+}
+
+void sh_state_set_pulse(bool on)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.modes.pulse = on;
+    xSemaphoreGive(s_lock);
 }
 
 void sh_state_get(sh_state_t *out)

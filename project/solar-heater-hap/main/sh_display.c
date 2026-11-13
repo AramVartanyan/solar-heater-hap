@@ -197,11 +197,11 @@ static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
     } else if (ms < LABEL_MS) {
         set_seg(s, s_boil);
     } else if (ms < LABEL_MS + VALUE_MS) {
-        set_temp(s, st->t_tank, st->tank_fault);
+        set_temp(s, sh_state_tank(st), st->tank_fault);
     } else if (ms < 2 * LABEL_MS + VALUE_MS) {
         set_seg(s, s_col);
     } else {
-        set_temp(s, st->t_col, st->col_fault);
+        set_temp(s, sh_state_col(st), st->col_fault);
     }
     return true;
 }

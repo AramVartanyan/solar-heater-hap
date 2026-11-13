@@ -10,7 +10,10 @@
  * Group C (doc/tasks/step10-cooling-vacation-seasons.md): before the pump decision — sunrise and
  * sunset (sh_sun), the season (sh_season; the seasonal values of sh_settings), the night cooling
  * sessions (sh_cool) and the vacation (collector protection at the vacation limit, no charging);
- * the air venting is a command like the pump test. The learned values are kept by sh_learn_store. */
+ * the air venting is a command like the pump test. The learned values are kept by sh_learn_store.
+ * Group D2 (doc/tasks/step13-pulse-mode.md): with the sensors on the pipes sh_pulse takes the reliable
+ * values first — they decide and are shown; the pipes themselves serve sh_sun, the heater sign and
+ * E8 — and says before the pump decision whether a pulse is due. */
 #pragma once
 
 #include "esp_err.h"

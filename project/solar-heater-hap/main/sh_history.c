@@ -133,7 +133,8 @@ static void history_task(void *arg)
         sh_clock_info_t ci;
         sh_clock_get(&ci);
         const sh_day_in_t in = {
-            .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
+            .t_col = sh_state_col(&st), .t_tank = sh_state_tank(&st),     /* pulse mode: the reliable values */
+            .col_fault = st.col_fault, .tank_fault = st.tank_fault,
             .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
             .sunrises = st.modes.sunrises, .sunsets = st.modes.sunsets, .heater = st.modes.heater_on,
         };

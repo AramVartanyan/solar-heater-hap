@@ -72,6 +72,9 @@ typedef enum {
     /* group D: the heater */
     SH_PUMP_REASON_LEAK_CHECK,      /* off: leak check of the heater (5 min) */
     SH_PUMP_REASON_LEAK_STOP,       /* off: the leak of the heater stopped, no start by the difference */
+    /* group D2: the pulse mode (sensors on the pipes) */
+    SH_PUMP_REASON_PULSE,           /* on:  a pulse of 30 s, the values are not reliable yet */
+    SH_PUMP_REASON_PULSE_WAIT,      /* off: waiting for the next pulse */
     SH_PUMP_REASON_COUNT
 } sh_pump_reason_t;
 
@@ -94,6 +97,10 @@ typedef struct {
     bool     leak_check;            /* a leak check runs: normal charging off at once */
     bool     leak_stop;             /* the leak is stopped: no charging by the difference */
     bool     leak_resume;           /* the check passed: the pump goes on at once (this step) */
+    /* group D2: the pulse mode (sh_pulse; used by sh_pump_ctl) — the sensors are on the pipes */
+    bool     pulse;                 /* the temperatures are the last reliable ones; a stopped pump starts only by a pulse */
+    bool     pulse_due;             /* a pulse is due now */
+    bool     pulse_fresh;           /* the pump has run for 30 s: the temperatures are those of the liquid now */
 } sh_pump_params_t;
 
 /* Pump state kept by the caller between the calls; all zeros at start (pump off, nothing latched).

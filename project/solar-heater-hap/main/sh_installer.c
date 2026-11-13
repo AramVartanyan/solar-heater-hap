@@ -12,6 +12,7 @@ const sh_inst_info_t sh_inst_info[SH_INST_COUNT] = {
     [SH_INST_COL_AREA] = { "col_area",   5,  200,  1 },
     [SH_INST_TANK_VOL] = { "tank_vol",  50, 1000, 10 },
     [SH_INST_HEATER]   = { "heater",     0,  120,  5 },
+    [SH_INST_MOUNT]    = { "mount",      0, SH_MOUNT_COUNT - 1, 1 },
 };
 
 /* Antoine equation for water, 99 - 374 °C: log10(P / mmHg) = A - B / (C + T / °C) */

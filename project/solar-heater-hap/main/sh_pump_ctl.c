@@ -276,14 +276,20 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
 {
     /* A faulty sensor's last valid value is not used for any decision. */
     const int16_t col = t->col_fault ? SH_TEMP_INVALID : t->t_col;
-    const int16_t tank = t->tank_fault ? SH_TEMP_INVALID : t->t_tank;
+    int16_t tank = t->tank_fault ? SH_TEMP_INVALID : t->t_tank;
+    if (p->pulse && t->col_fault && !t->tank_fault && tank == SH_TEMP_INVALID) {
+        /* pulse mode, collector sensor faulty, no reliable tank value yet: there are no pulses to
+         * give one, so the probes start from the tank pipe as it is */
+        tank = t->pipe_tank;
+    }
 
     sh_pump_track_limits(p, &c->norm, col, tank);
     c->heater_rise = p->heater_rise;
     if (col != SH_TEMP_INVALID) {
         c->tf_hot = sh_pump_latch(c->tf_hot, col, SH_TF_HOT);
     }
-    track_history(c, tank, now_s);
+    /* the heater sign: in the pulse mode the tank pipe with the pump stopped, not the reliable value */
+    track_history(c, p->pulse && !t->tank_fault ? t->pipe_tank : tank, now_s);
 
     const sh_pump_mode_t mode = mode_of(t);
     if (mode != c->mode) {
@@ -327,23 +333,50 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
     }
 
     /* After the test / anti-seize run: like a stopped pump whose minimum off time is over. */
-    const bool was_on = restart ? false : c->on;
-    const uint32_t elapsed_s = restart ? LONG_AGO_S : now_s - c->switched_s;
-    bool on;
-    switch (c->mode) {
-    case SH_PUMP_MODE_NORMAL:
-        on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
-        break;
-    case SH_PUMP_MODE_TANK_FAULT:
-        on = tank_fault_mode(c, p, col, was_on, elapsed_s, now_s, &reason);
-        break;
-    case SH_PUMP_MODE_COL_FAULT:
-        on = col_fault_mode(c, p, tank, was_on, elapsed_s, now_s, &reason);
-        break;
-    default:
-        on = false;
-        reason = SH_PUMP_REASON_BOTH_FAULT;
-        break;
+    bool was_on = restart ? false : c->on;
+    uint32_t elapsed_s = restart ? LONG_AGO_S : now_s - c->switched_s;
+    bool on, decide = true;
+
+    /* Pulse mode: a stopped pump starts only by a pulse; until the pump has run for 30 s nothing can
+     * be judged; at the end of the pulse (also of a test ...) the mode decides as for a stopped pump. */
+    const bool pulse = p->pulse && (c->mode == SH_PUMP_MODE_NORMAL || c->mode == SH_PUMP_MODE_TANK_FAULT);
+    if (!pulse) {
+        c->pulsing = false;
+    } else if (!c->on) {
+        c->pulsing = p->pulse_due;
+        c->norm.col_protect = false;
+        c->norm.frost = false;
+        c->norm.cool = false;
+        on = p->pulse_due;
+        reason = on ? SH_PUMP_REASON_PULSE : SH_PUMP_REASON_PULSE_WAIT;
+        decide = false;
+    } else if (!p->pulse_fresh) {
+        c->pulsing = true;
+        on = true;
+        reason = SH_PUMP_REASON_PULSE;
+        decide = false;
+    } else if (c->pulsing) {
+        c->pulsing = false;
+        was_on = false;
+        elapsed_s = LONG_AGO_S;
+    }
+
+    if (decide) {
+        switch (c->mode) {
+        case SH_PUMP_MODE_NORMAL:
+            on = normal_mode(c, p, col, tank, was_on, elapsed_s, &reason);
+            break;
+        case SH_PUMP_MODE_TANK_FAULT:
+            on = tank_fault_mode(c, p, col, was_on, elapsed_s, now_s, &reason);
+            break;
+        case SH_PUMP_MODE_COL_FAULT:
+            on = col_fault_mode(c, p, tank, was_on, elapsed_s, now_s, &reason);
+            break;
+        default:
+            on = false;
+            reason = SH_PUMP_REASON_BOTH_FAULT;
+            break;
+        }
     }
 
     if (!on && seize_due(c, col, tank, now_s)) {
@@ -354,7 +387,7 @@ void sh_pump_ctl_step(sh_pump_ctl_t *c, const sh_pump_params_t *p, const sh_pump
         reason = SH_PUMP_REASON_ANTI_SEIZE;
     }
     set(c, on, reason, now_s);
-    if (restart && on) {
+    if (restart && on && !pulse) {
         c->switched_s = now_s;          /* a pump that goes on runs from now: its minimum run time too */
     }
 }

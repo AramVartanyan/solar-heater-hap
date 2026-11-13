@@ -35,6 +35,12 @@ typedef enum {
 } sh_col_type_t;
 
 typedef enum {
+    SH_MOUNT_SLEEVES = 0,       /* the sensors are in sleeves, inside the collector and the tank */
+    SH_MOUNT_PIPES,             /* on the pipes: the pulse mode (sh_pulse) */
+    SH_MOUNT_COUNT
+} sh_mount_t;
+
+typedef enum {
     SH_INST_FLUID = 0,          /* sh_fluid_t */
     SH_INST_GLYCOL,             /* propylene glycol, 0 - 60 % by volume; 0 with water */
     SH_INST_PRESSURE,           /* minimum pressure on the gauge (cold system), 5 - 60 = 0.5 - 6.0 bar */
@@ -43,6 +49,7 @@ typedef enum {
     SH_INST_COL_AREA,           /* collector area, 5 - 200 = 0.5 - 20.0 m² */
     SH_INST_TANK_VOL,           /* tank volume, 50 - 1000 l, step 10 */
     SH_INST_HEATER,             /* heater in the tank, 0 = none, 5 - 120 = 0.5 - 12.0 kW, step 0.5 */
+    SH_INST_MOUNT,              /* sh_mount_t: where the sensors are mounted */
     SH_INST_COUNT
 } sh_inst_t;
 

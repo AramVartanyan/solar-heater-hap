@@ -246,6 +246,16 @@ menu "Device Settings"
                 in steps of 0.5 kW (a multiple of 5, checked at compile time). The rise that
                 counts as a working heater and the leak checks of the heater depend on it.
 
+        config SH_INST_ON_PIPES
+            bool "Sensors on the pipes: pulse mode (off: in sleeves)"
+            default n
+            help
+                On the pipes the sensors measure the liquid only while the pump runs: the pump
+                works in pulses of 30 s and everything is judged by the values of the pulses.
+                Only on metal pipes: "collector" on the outlet of the collector, as close to it
+                as possible; "tank" on the outlet of the tank towards the collector, next to
+                the tank.
+
     endmenu
 
     config SH_INTERNAL_PULLUPS
