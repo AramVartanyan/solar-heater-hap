@@ -56,11 +56,15 @@ CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="Solar"
 CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN=15
 CONFIG_CAPTIVE_WIFI_AP_ONLY=y
 
-# HomeKit SDK (enabled together with HomeKit in a later phase):
-# room for application web page handlers next to the 8 HAP URIs
-# CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
+# HomeKit SDK (sh_hap): with Apple HomeKit on, the web interface is served by the HTTP server of
+# HAP — room for its 17 handlers next to the 8 HAP URIs, and for the connections of a browser
+# (Safari opens up to 6) next to those of the HomeKit controllers (the server needs 3 more sockets
+# of CONFIG_LWIP_MAX_SOCKETS, and one TCP connection of CONFIG_LWIP_MAX_ACTIVE_TCP stays for the
+# firmware update)
+CONFIG_HAP_HTTP_MAX_URI_HANDLERS=28
+CONFIG_HAP_HTTP_MAX_OPEN_SOCKETS=11
 
-# mDNS (sh_net: Solar-xxxxxx.local; later also esp-homekit-sdk): on the station only (not on the
+# mDNS (sh_net: Solar-xxxxxx.local; with Apple HomeKit on it is started by esp-homekit-sdk): on the station only (not on the
 # own access point), no console CLI — the console component is not built
 CONFIG_MDNS_ENABLE_CONSOLE_CLI=n
 CONFIG_MDNS_PREDEF_NETIF_AP=n

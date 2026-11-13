@@ -5,7 +5,7 @@
  *   normal screen   "+" pump test (during the test +60 s), "-" during the test -60 s,
  *                   "menu" -> the list at SSn (during the test: stops the test; during the air
  *                   venting: stops it, and "+" does not start a test)
- *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, End; "+" / "-" next / previous item,
+ *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, End; "+" / "-" next / previous item,
  *                   round (after End -> SSn); C.Lo, d.on and d.oF are those of the current season;
  *                   "menu" on a setting -> its value blinks; on End -> normal screen
  *   value (blinks)  "+" / "-" one step within the range (no wrap), held > 1 s: repeated;
@@ -16,9 +16,16 @@
  *                   again); after AP the access code is shown in two parts, 2 s each ("810", "840"),
  *                   instead of the steady value; AP while the device is connected to the router is
  *                   refused: "CP" steady for 1 s, nothing is passed on; the mode is not stored
+ *   HAP             the setting "Apple HomeKit" (group F): "on" / "oFF" ("+" on, "-" oFF); "menu"
+ *                   confirms: a different value is passed on (it is stored and the controller
+ *                   restarts); oFF while a controller is paired is refused: "on" steady for 1 s,
+ *                   nothing is passed on
  *   10 s without a key in the list or on a value -> normal screen, an unconfirmed value is lost.
  * While "FUp" is offered on the normal screen (a newer firmware, 5 s) a short "menu" confirms the
  * update instead of anything else.
+ * Child lock (Lock Physical Controls of HomeKit): on the normal screen every short press — the
+ * way into the menu, the pump test and whatever else the keys do there — only shows "LoC" for 1 s.
+ * The resets by holding "menu" are not keys of the menu and stay.
  * Times in ms of a monotonic clock. */
 #pragma once
 
@@ -36,16 +43,19 @@ typedef enum {
     SH_MENU_DOF,
     SH_MENU_TST,
     SH_MENU_NET,                /* network mode: CP / AP (not a setting of sh_settings) */
+    SH_MENU_HAP,                /* Apple HomeKit: on / oFF (kept by sh_hap; a change restarts) */
     SH_MENU_END,                /* the item after the settings */
     SH_MENU_ITEMS
 } sh_menu_item_t;
 
-/* The setting behind an item (not for SH_MENU_NET and SH_MENU_END); `winter`: the current season. */
+/* The setting behind an item (not for SH_MENU_NET, SH_MENU_HAP and SH_MENU_END); `winter`: the
+ * current season. */
 sh_setting_t sh_menu_setting(uint8_t pos, bool winter);
 #define SH_MENU_TIMEOUT_MS      10000u
 #define SH_MENU_SAVED_MS        1000u
 #define SH_MENU_BLINK_MS        500u                /* on 0.5 s, off 0.5 s */
 #define SH_MENU_CODE_MS         2000u               /* nEt -> AP: each half of the access code */
+#define SH_MENU_LOCKED_MS       1000u               /* "LoC" after a key with the child lock on */
 
 /* Pump test screen: "tSt" for 3 s, then the seconds left, "tSt" again for 1 s every 7 s. */
 #define SH_MENU_TEST_LABEL_S    3u
@@ -84,6 +94,7 @@ typedef enum {
     SH_MENU_ACT_AIR_STOP,       /* air venting: stop */
     SH_MENU_ACT_NET,            /* network mode chosen: `value` 0 CP / 1 AP */
     SH_MENU_ACT_FUP,            /* the offered firmware update is confirmed */
+    SH_MENU_ACT_HAP,            /* Apple HomeKit switched: `value` 0 off / 1 on (store, restart) */
 } sh_menu_act_t;
 
 typedef struct {
@@ -93,6 +104,8 @@ typedef struct {
     int16_t value;              /* value being edited / just saved */
     uint32_t key_ms;            /* last key (the 10 s timeout) */
     uint32_t mark_ms;           /* start of the blinking / of the 1 s steady value */
+    bool locked;                /* "LoC" is shown (a key met the child lock) ... */
+    uint32_t locked_ms;         /* ... since */
 } sh_menu_t;
 
 typedef struct {
@@ -101,9 +114,11 @@ typedef struct {
     int16_t value;
     bool value_visible;         /* false in the "off" half of the blinking */
     uint8_t code_part;          /* nEt -> AP confirmed: 1 / 2 the half of the access code, 0 none */
+    bool locked;                /* normal screen: "LoC" instead of everything else */
 } sh_menu_view_t;
 
-/* The timeouts up to `now_ms` (1 s steady value -> list, 10 s without a key -> normal screen). */
+/* The timeouts up to `now_ms` (1 s steady value -> list, 10 s without a key -> normal screen, 1 s
+ * of "LoC"). */
 void sh_menu_update(sh_menu_t *m, uint32_t now_ms);
 
 /* What runs on the normal screen and which season it is. */
@@ -114,6 +129,9 @@ typedef struct {
     bool net_ap;                /* the network mode is AP */
     bool net_connected;         /* connected to the router: AP cannot be chosen */
     bool fup_offer;             /* "FUp" is offered on the display */
+    bool hap_on;                /* the setting "Apple HomeKit" */
+    bool hap_paired;            /* a HomeKit controller is paired: HAP cannot be switched off */
+    bool locked;                /* the child lock is on */
 } sh_menu_ctx_t;
 
 /* One key. `s`: the current settings. */

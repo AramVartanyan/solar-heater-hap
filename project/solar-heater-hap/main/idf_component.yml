@@ -2,7 +2,7 @@
 dependencies:
   # Onboard WS2812 status LED (RMT backend only, see doc/firmware.md)
   espressif/led_strip: "^3.0.0"
-  # mDNS: solar-xxxxxx.local and the web service (sh_net); HomeKit will need it too
+  # mDNS: Solar-xxxxxx.local and the web service (sh_net); esp-homekit-sdk uses the same component
   espressif/mdns: "^1.2"
   # Planned: DS18B20 over 1-Wire (RMT)
   # espressif/onewire_bus: "^1.0.0"

@@ -48,16 +48,17 @@ static ui_t at_net(bool ap)
     ui_t u = { .now = 1000, .ctx = { .net_ap = ap } };
     key(&u, SH_KEY_MENU, 0);
     key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
-    key(&u, SH_KEY_MINUS, 100);                                 /* End -> nEt */
+    key(&u, SH_KEY_MINUS, 100);                                 /* End -> HAP (group F) */
+    key(&u, SH_KEY_MINUS, 100);                                 /* HAP -> nEt */
     return u;
 }
 
 static void test_menu_net(void)
 {
-    /* nEt is before End: SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, End */
+    /* nEt is after tSt: SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP (group F), End */
     CHECK_EQ(SH_MENU_NET, SH_MENU_TST + 1);
-    CHECK_EQ(SH_MENU_END, SH_MENU_NET + 1);
-    CHECK_EQ(SH_MENU_ITEMS, 9);
+    CHECK_EQ(SH_MENU_END, SH_MENU_NET + 2);
+    CHECK_EQ(SH_MENU_ITEMS, 10);
     ui_t u = at_net(false);
     CHECK_EQ(u.m.pos, SH_MENU_NET);
     CHECK_EQ(u.m.mode, SH_MENU_LIST);
@@ -859,7 +860,7 @@ static void test_web_status(void)
     };
     /* the functions of this step are there: nothing of theirs is grey */
     HAS(&s, "\"net_mode\"");
-    HAS(&s, "\"ota\"]");
+    HAS(&s, "\"ota\",");
 
     /* CP on the router: the mode, the name, nothing checked yet */
     HAS(&s, "\"name\":\"Solar-810840\",");

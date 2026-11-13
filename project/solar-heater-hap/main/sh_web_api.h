@@ -15,8 +15,10 @@
  *                     code)
  *              test   cmd=start | plus | minus | stop
  *              air    cmd=start | stop: the air venting
- *              reset  what=wifi | defaults | factory | history | learned (only with the access
- *                     code)
+ *              reset  what=wifi | homekit | defaults | factory | history | learned (only with the
+ *                     access code)
+ *              hap    on=0 | 1: the setting "Apple HomeKit" (with the code; off is refused while a
+ *                     controller is paired)
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
@@ -85,6 +87,11 @@ typedef struct {
     sh_ota_phase_t ota;
     int8_t ota_pct;
     const char *ota_version;    /* the newer version, "" / NULL: none */
+    /* Apple HomeKit (group F) */
+    bool hap_on;                /* the setting */
+    bool hap_paired;            /* a controller is paired */
+    bool hap_running;           /* HAP is running (connected to the router since boot) */
+    bool hap_window;            /* the pairing window is open */
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
     bool history;               /* the history partition is there */
@@ -181,6 +188,7 @@ typedef enum {
     SH_WEB_RESET_FACTORY,       /* everything */
     SH_WEB_RESET_HISTORY,       /* the daily summaries */
     SH_WEB_RESET_LEARNED,       /* the learned values: sunrise / sunset, the cooling target, the zone check */
+    SH_WEB_RESET_HOMEKIT,       /* the HomeKit pairings */
 } sh_web_reset_t;
 
 /* "reset": needs the access code. */
@@ -194,6 +202,10 @@ sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz);
 
 /* "ota": check for a newer firmware, or install the found one; needs the access code. */
 sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd);
+
+/* "hap": the setting "Apple HomeKit"; needs the access code. `on_now`, `paired`: the setting and
+ * the pairing now — switching off while paired is refused (SH_WEB_BAD), as in the menu. */
+sh_web_res_t sh_web_hap(const char *body, const char *code, bool on_now, bool paired, bool *on);
 
 /* Key of the firmware update state for the page (it holds the texts): "ap" (no internet: own
  * access point) instead of everything that needs the server, "noconn" for a failed check. */

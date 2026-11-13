@@ -26,6 +26,29 @@
   поредни неуспешни заявки (след първата опитва пак след 1 s).
 
 ### Added
+- **Apple HomeKit** (стъпка 14, група F, [doc/tasks/step14-homekit.md](doc/tasks/step14-homekit.md));
+  esp-homekit-sdk — подмодулът `components/homekit`. Аксесоар `Solar-xxxxxx` (категория Heater, Armo Ltd., Solar
+  Heater, сериен номер — основният MAC, версията на фърмуера) с три услуги: **Heater Cooler** (основна; Active —
+  изкл. = ваканция, Current State — Idle / Heating / Cooling (нощно охлаждане), Target State — само Heat, Current
+  Temperature — бойлерът, Heating Threshold — Tmax 30 – 85 °C, Name, Temperature Display Units — °C / °F на нашия
+  дисплей (към HomeKit винаги °C), Lock Physical Controls — детска защита) и датчиците **`Collector`**
+  (−40 … 200 °C; Status Fault при `E1`, `E5`) и **`Tank`** (Status Fault при `E2`, `E4`). Температурите се подават
+  само при четене; известия при промяна — Active, Current State, Heating Threshold, Lock Physical Controls, Status
+  Fault. **Identify** — светодиодът по шаблона на `ledIdentify()` (3 × 2 мигания). Кодът за сдвояване — от
+  `factory_nvs`; фиксиран код в Kconfig (`SH_HAP_FIXED_SETUP_CODE`) — само за разработка. Настройка **„Apple
+  HomeKit“** (по подразбиране вкл., NVS): в менюто — **`HAP`** (`on` / `oFF`) точно след `nEt`, в уеб интерфейса —
+  превключвател в „Система“; смяната се записва и контролерът се рестартира; **изключване при сдвоен контролер се
+  отказва** („Първо премахнете устройството от Apple Home“). HAP тръгва само при връзка с рутера и включена
+  настройка (веднъж след старта; `hap_stop()` не се ползва); тогава **уеб интерфейсът е на сървъра на HAP**, а
+  `Solar-xxxxxx.local` — в неговия mDNS (mDNS се пуска от HAP, после приложението задава името и `_http._tcp`); при
+  изключен HomeKit — собственият сървър и mDNS, както досега. Светодиодът **диша само при отворен прозорец за
+  сдвояване** (10 min след свързването, докато няма сдвоен контролер). **Детска защита:** при заключване кратките
+  натискания на нормалния екран показват `LoC` за 1 s (без меню и тест на помпата); нулиранията със задържане и уеб
+  интерфейсът не се заключват. Уеб интерфейс, „Система“: „HomeKit“ — превключвателят, „Сдвоен“ (да / не), бележка
+  за състоянието; „Нулиране → Сдвояванията с HomeKit“ (Да / Не, с кода). Нови модули: `sh_hap_rules` (чист C, тест
+  `test_hap`), `sh_hap` (задача). ⚠️ Съществуващ `sdkconfig` се изтрива преди компилацията (новите стойности в
+  `sdkconfig.defaults`: `HAP_HTTP_MAX_URI_HANDLERS`, `HAP_HTTP_MAX_OPEN_SOCKETS`); подмодулите —
+  `git submodule update --init`.
 - **Мрежа (`nEt`, режим `AP`, име), обновяване на фърмуера (OTA, `FUp`)** (стъпка 7, група E,
   [doc/tasks/step7-network-ota.md](doc/tasks/step7-network-ota.md)); `captive-wifi` 0.4.0. Менюто — позиция `nEt`
   преди `End` (` CP` / ` AP`, показва текущия режим); след избор на `AP` — кодът за достъп на две части по 2 s

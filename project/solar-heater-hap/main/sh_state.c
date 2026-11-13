@@ -76,6 +76,15 @@ void sh_state_set_net(bool ap, bool ota_running, bool fup_offer, bool fup)
     xSemaphoreGive(s_lock);
 }
 
+void sh_state_set_hap(bool pair_window, bool lock, bool fahrenheit)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.hap_pair_window = pair_window;
+    s_state.hap_lock = lock;
+    s_state.hap_fahrenheit = fahrenheit;
+    xSemaphoreGive(s_lock);
+}
+
 void sh_state_set_alarms(uint8_t alarms)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);

@@ -12,6 +12,7 @@
 #include "sh_control.h"
 #include "sh_reset.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_buttons.h"
 
 static const char *TAG = "sh_buttons";
@@ -79,6 +80,7 @@ static void menu_key(sh_key_t key)
     const sh_menu_ctx_t ctx = {
         .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
         .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fup_offer = st.fup_offer,
+        .hap_on = sh_hap_enabled(), .hap_paired = sh_hap_paired(), .locked = st.hap_lock,
     };
     const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
     const sh_setting_t id = (sh_setting_t)s_menu.id;
@@ -108,6 +110,10 @@ static void menu_key(sh_key_t key)
     case SH_MENU_ACT_FUP:
         ESP_LOGI(TAG, "menu: firmware update confirmed");
         sh_net_update(SH_OTA_CMD_CONFIRM);
+        break;
+    case SH_MENU_ACT_HAP:
+        ESP_LOGI(TAG, "menu: HAP -> %s", value ? "on" : "oFF");
+        sh_hap_set_enabled(value != 0);     /* stores it and restarts */
         break;
     case SH_MENU_ACT_NONE:
         break;

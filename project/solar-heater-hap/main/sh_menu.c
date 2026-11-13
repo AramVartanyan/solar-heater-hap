@@ -12,6 +12,9 @@ void sh_menu_update(sh_menu_t *m, uint32_t now_ms)
     if (m->mode != SH_MENU_NORMAL && now_ms - m->key_ms >= SH_MENU_TIMEOUT_MS) {
         m->mode = SH_MENU_NORMAL;       /* an unconfirmed value is dropped */
     }
+    if (m->locked && now_ms - m->locked_ms >= SH_MENU_LOCKED_MS) {
+        m->locked = false;
+    }
 }
 
 sh_setting_t sh_menu_setting(uint8_t pos, bool winter)
@@ -33,6 +36,13 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
 
     switch (m->mode) {
     case SH_MENU_NORMAL:
+        if (ctx->locked) {              /* the child lock: no menu, no pump test */
+            if (!repeat) {
+                m->locked = true;
+                m->locked_ms = now_ms;
+            }
+            return SH_MENU_ACT_NONE;
+        }
         if (key == SH_KEY_MENU) {
             if (ctx->fup_offer) {
                 return SH_MENU_ACT_FUP;
@@ -65,6 +75,10 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
                 m->mode = SH_MENU_EDIT;
                 m->value = ctx->net_ap;         /* the current mode */
                 m->mark_ms = now_ms;
+            } else if (m->pos == SH_MENU_HAP) {
+                m->mode = SH_MENU_EDIT;
+                m->value = ctx->hap_on;         /* the current setting */
+                m->mark_ms = now_ms;
             } else {
                 m->mode = SH_MENU_EDIT;
                 m->id = (uint8_t)sh_menu_setting(m->pos, ctx->winter);
@@ -88,10 +102,20 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
                 }
                 return SH_MENU_ACT_NET;
             }
+            if (m->pos == SH_MENU_HAP) {
+                if ((m->value != 0) == ctx->hap_on) {
+                    return SH_MENU_ACT_NONE;
+                }
+                if (m->value == 0 && ctx->hap_paired) {
+                    m->value = 1;               /* refused: "on" steady for 1 s */
+                    return SH_MENU_ACT_NONE;
+                }
+                return SH_MENU_ACT_HAP;
+            }
             return m->value != s->v[m->id] ? SH_MENU_ACT_SAVE : SH_MENU_ACT_NONE;
         }
-        if (m->pos == SH_MENU_NET) {
-            m->value = dir > 0;                 /* "+" AP, "-" CP, no wrap */
+        if (m->pos == SH_MENU_NET || m->pos == SH_MENU_HAP) {
+            m->value = dir > 0;                 /* "+" AP / on, "-" CP / oFF, no wrap */
         } else {
             m->value = sh_settings_step(s, (sh_setting_t)m->id, m->value, dir);
         }
@@ -112,6 +136,7 @@ void sh_menu_view(const sh_menu_t *m, uint32_t now_ms, sh_menu_view_t *out)
     out->value_visible = m->mode != SH_MENU_EDIT ||
                          (now_ms - m->mark_ms) % (2 * SH_MENU_BLINK_MS) < SH_MENU_BLINK_MS;
     out->code_part = 0;
+    out->locked = m->mode == SH_MENU_NORMAL && m->locked && now_ms - m->locked_ms < SH_MENU_LOCKED_MS;
     if (m->mode == SH_MENU_SAVED && m->pos == SH_MENU_NET && m->value != 0) {
         out->code_part = now_ms - m->mark_ms < SH_MENU_CODE_MS ? 1 : 2;
     }

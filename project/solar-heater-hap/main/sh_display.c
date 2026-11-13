@@ -12,6 +12,7 @@
 #include "sh_pump_ctl.h"
 #include "sh_buttons.h"
 #include "sh_net.h"
+#include "sh_hap_rules.h"
 #include "sh_display.h"
 
 static const char *TAG = "sh_display";
@@ -35,6 +36,8 @@ static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
 static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
 static const uint8_t s_fup[DIGITS]  = { 0x71 /* F */, 0x3E /* U */, 0x73 /* P */ };
+/* A key with the child lock on (HomeKit Lock Physical Controls) */
+static const uint8_t s_loc[DIGITS]  = { 0x38 /* L */, 0x5C /* o */, 0x39 /* C */ };
 /* Values of nEt (CP, AP); " AP" is also the label of the own access point */
 static const uint8_t s_net[2][DIGITS] = {
     { 0, 0x39 /* C */, 0x73 /* P */ },
@@ -46,7 +49,7 @@ static const uint8_t s_hex[6] = { 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71 };
 static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
 static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
 static const uint8_t s_pau[DIGITS]  = { 0x73 /* P */, 0x77 /* A */, 0x1C /* u */ };
-/* Values of SSn (in the order of sh_season_mode_t) and of HoL (off, on) */
+/* Values of SSn (in the order of sh_season_mode_t) and of HoL and HAP (off, on) */
 static const uint8_t s_seasons[SH_SEASON_MODES][DIGITS] = {
     [SH_SEASON_SUMMER] = { 0x6D /* S */, 0x1C /* u */, 0x54 /* n */ },
     [SH_SEASON_WINTER] = { 0x39 /* C */, 0x38 /* L */, 0x5E /* d */ },
@@ -79,6 +82,7 @@ static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
     [SH_MENU_DOF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
     [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
     [SH_MENU_NET] = { 0x54 /* n */, 0x79 /* E */, 0x78 /* t */ },
+    [SH_MENU_HAP] = { 0x76 /* H */, 0x77 /* A */, 0x73 /* P */ },
     [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
@@ -117,14 +121,15 @@ static void set_number(screen_t *s, int value)
     }
 }
 
-static void set_temp(screen_t *s, int16_t t_tenths, bool fault)
+/* A temperature in the display units chosen in HomeKit (°C, or °F: Temperature Display Units). */
+static void set_temp(screen_t *s, int16_t t_tenths, bool fault, bool fahrenheit)
 {
     if (fault || t_tenths == SH_TEMP_INVALID) {
         const uint8_t dashes[DIGITS] = { SEG_MINUS, SEG_MINUS, SEG_MINUS };
         set_seg(s, dashes);
     } else {
         s->is_temp = true;
-        s->temp = t_tenths;
+        s->temp = sh_hap_display_temp(t_tenths, fahrenheit);
     }
 }
 
@@ -170,7 +175,7 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
         set_seg(s, s_net[v->value != 0]);
     } else if (v->pos == SH_MENU_SSN) {
         set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
-    } else if (v->pos == SH_MENU_HOL) {
+    } else if (v->pos == SH_MENU_HOL || v->pos == SH_MENU_HAP) {
         set_seg(s, s_on_off[v->value != 0]);
     } else {
         set_number(s, v->value);
@@ -237,11 +242,11 @@ static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
     } else if (ms < LABEL_MS) {
         set_seg(s, s_boil);
     } else if (ms < LABEL_MS + VALUE_MS) {
-        set_temp(s, st->t_tank, st->tank_fault);
+        set_temp(s, st->t_tank, st->tank_fault, st->hap_fahrenheit);
     } else if (ms < 2 * LABEL_MS + VALUE_MS) {
         set_seg(s, s_col);
     } else {
-        set_temp(s, st->t_col, st->col_fault);
+        set_temp(s, st->t_col, st->col_fault, st->hap_fahrenheit);
     }
     return true;
 }
@@ -276,7 +281,9 @@ static void display_task(void *arg)
             if (!was_normal || (was_test && !special)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
-            if (st.fup_offer) {
+            if (view.locked) {
+                set_seg(&scr, s_loc);   /* a key with the child lock on: 1 s */
+            } else if (st.fup_offer) {
                 set_seg(&scr, s_fup);   /* a newer firmware: short "menu" confirms */
             } else if (st.test_on) {
                 test_screen(&scr, &st, now_s);

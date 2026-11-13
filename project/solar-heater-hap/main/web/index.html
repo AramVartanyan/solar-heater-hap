@@ -42,6 +42,7 @@ button.row{cursor:pointer}
 .sw{width:51px;height:31px;border-radius:16px;background:var(--green);position:relative;flex:none;border:0;padding:0;cursor:pointer}
 .sw:after{content:'';position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sw.off{background:var(--off)}.sw.off:after{right:auto;left:2px}
+.dim{opacity:.4;cursor:default}
 table{width:100%;border-collapse:collapse;font-size:16px}
 th,td{padding:11px 10px;text-align:left}th{color:var(--sub);font-weight:500;font-size:13px}
 td+td,th+th{text-align:center}tr+tr td{border-top:.5px solid var(--sep)}
@@ -240,13 +241,17 @@ section{display:none}section.on{display:block}
   <div class="row hide" data-f="ota" id="ota-row"><span id="ota-t" style="white-space:pre-line;font-size:15px"></span><button class="sw-btn hide" data-p id="ota-go" data-t="ota_go"></button></div>
  </div>
  <h2 data-f="homekit">HomeKit</h2>
- <div class="grp" data-f="homekit"><div class="row"><span data-t="paired"></span><span class="v">—</span></div></div>
+ <div class="grp" data-f="homekit">
+  <div class="row"><span>Apple HomeKit</span><button class="sw off" id="sw-hap" role="switch" data-p></button></div>
+  <div class="row"><span data-t="paired"></span><span class="v" id="hap-v">—</span></div>
+ </div>
+ <p class="note" data-f="homekit" id="hap-note"></p>
  <h2 data-t="hist" data-f="history"></h2>
  <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl" class="act"></span></a></div>
  <h2 data-t="reset"></h2>
  <div class="grp">
   <button class="row" data-f="reset" data-p data-r="wifi"><span data-t="rs_wifi" class="act"></span></button>
-  <button class="row" data-f="homekit"><span data-t="rs_hk" class="act"></span></button>
+  <button class="row" data-f="homekit" data-p data-r="homekit" id="rs-hk"><span data-t="rs_hk" class="act"></span></button>
   <button class="row" data-f="learned" data-p data-r="learned"><span data-t="rs_learn" class="act"></span></button>
   <button class="row" data-f="history" data-p data-r="history"><span data-t="rs_hist" class="act"></span></button>
   <button class="row" data-f="reset" data-p data-r="defaults"><span data-t="rs_def" class="act"></span></button>
@@ -311,7 +316,7 @@ ota_run:'Обновяване до версия {v}… {p}\nНе изключв�
 ota_noconn:'Няма връзка със сървъра за обновяване',ota_fail:'Обновяването не успя — остава старата версия',
 ota_ap:'Няма интернет (собствена точка за достъп)',a_ota:'Обновяване на фърмуера',d_ota_new:'Инсталира се от „Система“ → „Фърмуер“ → „Обнови“.',
 time_place:'Време и място',tz:'Часова зона',peak:'Пик на колектора',city:'Град (за прогнозата)',
-fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',hist:'История',hist_dl:'Изтегли историята (CSV)',
+fw:'Фърмуер',ver:'Версия',sn:'Сериен номер',ota:'Проверка за обновяване',paired:'Сдвоен',p_yes:'да',p_no:'не',hist:'История',hist_dl:'Изтегли историята (CSV)',
 confirm:'Потвърди',tz_sug:'Браузърът: {tz}',
 reset:'Нулиране',rs_wifi:'Wi-Fi мрежата',rs_hk:'Сдвояванията с HomeKit',rs_learn:'Научените стойности',rs_hist:'Историята',
 rs_def:'Настройки по подразбиране',rs_fact:'Фабрично нулиране',yes:'Да',no:'Не',
@@ -320,6 +325,11 @@ q_defaults:'Връщане на всички параметри (потреби�
 q_factory:'Фабрично нулиране? Изтрива се всичко — настройките и Wi-Fi мрежата. Контролерът ще се рестартира.',
 q_history:'Изтриване на историята (всички дневни обобщения)?',
 q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона, засеченият нагревател, нормалното нощно охлаждане)?',
+q_homekit:'Изтриване на сдвояванията с HomeKit? Контролерът ще се рестартира; после устройството се добавя отново в Apple Home.',
+q_hap_on:'Включване на Apple HomeKit? Контролерът ще се рестартира.',q_hap_off:'Изключване на Apple HomeKit? Контролерът ще се рестартира.',
+hap_paired:'Първо премахнете устройството от Apple Home.',hap_win:'Прозорецът за сдвояване е отворен (10 min) — добавете устройството в Apple Home.',
+hap_closed:'Прозорецът за сдвояване е затворен — отваря се отново за 10 min след рестарт на контролера.',
+hap_wait:'HomeKit работи само при връзка с рутера.',hap_off:'Apple HomeKit е изключен.',hap_sw:'Смяната на превключвателя рестартира контролера.',
 restart:'Контролерът се рестартира…',done:'Готово',bad:'Стойността не е приета',
 a_E1:'Повреден датчик на колектора',d_E1:'Датчикът не отговаря. Помпата работи на проби. Проверете кабела и датчика.',
 a_E2:'Повреден датчик на бойлера',d_E2:'Датчикът не отговаря. Помпата работи само по температурата на колектора. Проверете кабела и датчика.',
@@ -397,7 +407,7 @@ ota_run:'Updating to version {v}… {p}\nDo not switch off the power.',ota_done:
 ota_noconn:'No connection to the update server',ota_fail:'The update failed — the old version stays',
 ota_ap:'No internet (own access point)',a_ota:'Firmware update',d_ota_new:'Install it from "System" → "Firmware" → "Update".',
 time_place:'Time and place',tz:'Time zone',peak:'Collector peak',city:'City (for the forecast)',
-fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',hist:'History',hist_dl:'Download the history (CSV)',
+fw:'Firmware',ver:'Version',sn:'Serial number',ota:'Check for update',paired:'Paired',p_yes:'yes',p_no:'no',hist:'History',hist_dl:'Download the history (CSV)',
 confirm:'Confirm',tz_sug:'Browser: {tz}',
 reset:'Reset',rs_wifi:'Wi-Fi network',rs_hk:'HomeKit pairings',rs_learn:'Learned values',rs_hist:'History',
 rs_def:'Default settings',rs_fact:'Factory reset',yes:'Yes',no:'No',
@@ -406,6 +416,11 @@ q_defaults:'Return all parameters (user and service) to their defaults?',
 q_factory:'Factory reset? Everything is erased — the settings and the Wi-Fi network. The controller will restart.',
 q_history:'Erase the history (all daily summaries)?',
 q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check, the detected heater, the normal night cooling)?',
+q_homekit:'Erase the HomeKit pairings? The controller will restart; then the device is added to Apple Home again.',
+q_hap_on:'Switch Apple HomeKit on? The controller will restart.',q_hap_off:'Switch Apple HomeKit off? The controller will restart.',
+hap_paired:'First remove the device from Apple Home.',hap_win:'The pairing window is open (10 min) — add the device in Apple Home.',
+hap_closed:'The pairing window is closed — it opens again for 10 min after a restart of the controller.',
+hap_wait:'HomeKit works only with a connection to the router.',hap_off:'Apple HomeKit is switched off.',hap_sw:'Changing the switch restarts the controller.',
 restart:'The controller is restarting…',done:'Done',bad:'The value was not accepted',
 a_E1:'Collector sensor fault',d_E1:'The sensor does not answer. The pump runs on probes. Check the cable and the sensor.',
 a_E2:'Tank sensor fault',d_E2:'The sensor does not answer. The pump runs by the collector temperature only. Check the cable and the sensor.',
@@ -564,6 +579,12 @@ function render(){
  $('#n-host').textContent=ap||!nt.host?'—':nt.host+'.local';
  $('#net-v').textContent=t(ap?'net_ap':'net_cp');     /* shown only: the mode is chosen in the menu (nEt) */
  $('#net-note').textContent=fill(ap?'net_ap_note':nt.pend?'net_pend':'net_cp_note',{ap:nt.ap});
+ /* HomeKit: the switch cannot go off while paired (the note says why); the pairings can be erased while HAP runs */
+ const hk=S.hap,hsw=$('#sw-hap'),hfix=!!(hk.on&&hk.paired);
+ hsw.classList.toggle('off',!hk.on);hsw.setAttribute('aria-checked',!!hk.on);hsw.disabled=!unlocked||hfix;hsw.classList.toggle('dim',hfix);
+ $('#hap-v').textContent=hk.on?t(hk.paired?'p_yes':'p_no'):'—';
+ $('#hap-note').textContent=(!hk.on?[t('hap_off'),t('hap_sw')]:hk.paired?[t('hap_paired')]:[t(!hk.run?'hap_wait':hk.win?'hap_win':'hap_closed'),t('hap_sw')]).join('\n');
+ $('#rs-hk').disabled=!unlocked||!hk.run;$('#rs-hk').classList.toggle('dim',!hk.run);
  /* the update: one at a time; on the own access point there is no internet — grey, with the reason */
  const oc=$('#ota-chk');oc.disabled=!unlocked||['check','wait','run','done'].includes(o.st);
  if(o.st=='ap'){oc.classList.add('na');oc.inert=true}
@@ -641,7 +662,9 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
  code=v;if(await post('/api/auth',{})){document.cookie='code='+v+';max-age=31536000;path=/';
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
- if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
+ if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory','homekit'].includes(w)?'restart':'done'));refresh();loadDays()}});
+$('#sw-hap').onclick=async()=>{if(!S)return;const on=S.hap.on?0:1;
+ if(await ask(t(on?'q_hap_on':'q_hap_off'))&&await post('/api/hap',{on})){toast(t('restart'));refresh()}};
 [['#ota-chk','check'],['#ota-go','update']].forEach(([s,c])=>
  $(s).onclick=async()=>{await post('/api/ota',{cmd:c});setTimeout(refresh,300)});
 $('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};

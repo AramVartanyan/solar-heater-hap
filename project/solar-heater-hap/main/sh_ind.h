@@ -14,7 +14,10 @@
  * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
  * other colours -> while the own access point is on (nEt -> AP) steady with a short dark wink (the
  * mirror of the heartbeat), otherwise steady with Wi-Fi, heartbeat without it (or while the setup
- * portal is open).
+ * portal is open). Instead of steady the LED breathes while the HomeKit pairing window is open —
+ * and only then (group F).
+ * HomeKit Identify is a pattern of its own, played once over whatever is shown, in its colour
+ * (sh_led): 3 groups of 2 flashes, as ledIdentify() of outputwrite.
  * Temperatures are tenths of °C, times ms. */
 #pragma once
 
@@ -34,6 +37,14 @@
 #define SH_IND_BLINK_MS         500u    /* OTA: 500 on / 500 off */
 #define SH_IND_WINK_OFF_MS      80u     /* own access point: 80 ms dark every 2 s */
 #define SH_IND_WINK_PERIOD_MS   2000u
+#define SH_IND_BREATHE_HALF_MS  2500u   /* breathing: 2.5 s up, 2.5 s down (squared ramp) ... */
+#define SH_IND_BREATHE_DARK_MS  400u    /* ... and 0.4 s dark at the bottom, as ledBreathe() of outputwrite */
+#define SH_IND_IDENT_FLASH_MS   200u    /* Identify: 3 groups of 2 flashes, 200 ms dark / 200 ms lit ... */
+#define SH_IND_IDENT_GAP_MS     300u    /* ... 300 ms lit between the groups */
+#define SH_IND_IDENT_GROUPS     3u
+#define SH_IND_IDENT_FLASHES    2u
+#define SH_IND_IDENT_GROUP_MS   (SH_IND_IDENT_FLASHES * 2u * SH_IND_IDENT_FLASH_MS + SH_IND_IDENT_GAP_MS)
+#define SH_IND_IDENT_MS         (SH_IND_IDENT_GROUPS * SH_IND_IDENT_GROUP_MS - SH_IND_IDENT_GAP_MS)    /* 3 s */
 
 typedef enum {
     SH_COLOR_OFF = 0,
@@ -54,6 +65,8 @@ typedef enum {
     SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
     SH_IND_BLINK,       /* firmware update */
     SH_IND_WINK,        /* own access point on */
+    SH_IND_BREATHE,     /* HomeKit pairing window open */
+    SH_IND_IDENTIFY,    /* HomeKit Identify: played once by sh_led, never returned by sh_ind_update() */
 } sh_ind_pattern_t;
 
 typedef struct {
@@ -72,6 +85,7 @@ typedef struct {
     bool wifi_portal;
     bool ap;            /* the own access point is on (nEt -> AP) */
     bool ota;           /* a firmware update is being written */
+    bool pair_window;   /* the HomeKit pairing window is open */
 } sh_ind_in_t;
 
 /* The memory of the white / yellow return zones; all zeros at boot. */
@@ -90,3 +104,10 @@ sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const s
 
 /* The LED is lit `ms` after the start of `pattern`. */
 bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms);
+
+/* How bright it is then, 0 ... 100 % of the set brightness: the ramp of the breathing; 0 / 100 for
+ * the other patterns. */
+uint8_t sh_ind_level(sh_ind_pattern_t pattern, uint32_t ms);
+
+/* Identify may be played over `pattern`: over everything but the firmware update. */
+bool sh_ind_identify_ok(sh_ind_pattern_t pattern);
