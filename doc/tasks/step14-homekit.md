@@ -22,9 +22,10 @@
 - [doc/firmware.md](../firmware.md) т. 3 (прозорецът за сдвояване — събитията на SDK) и т. 4 (отменено намаляване
   на мощността); [doc/web-interface.md](../web-interface.md) (т. 2 „Система“ — HomeKit; т. 6 нулирането на
   сдвояванията; т. 7.1); [doc/led-indication.md](../led-indication.md) (дишане — само при отворен прозорец).
-- **esp-homekit-sdk — подмодул `components/homekit`** (форкът `AramVartanyan/esp-homekit-sdk`, основата е
-  `espressif/esp-homekit-sdk`; `git submodule update --init`); `HOMEKIT_PATH` по подразбиране сочи подмодула
-  (`project/solar-heater-hap/CMakeLists.txt`). Зависимостите на `esp_hap_core`
+- **esp-homekit-sdk — подмодул `components/homekit`**: клонът `homekit` на форка `AramVartanyan/esp-homekit-sdk`
+  (основата е `espressif/esp-homekit-sdk`) — само папката `components/homekit` на `master`, обновявана автоматично
+  (GitHub Action); `git submodule update --init`. `HOMEKIT_PATH` по подразбиране е коренът на хранилището
+  (`project/solar-heater-hap/CMakeLists.txt`) — нищо не се клонира отделно. Зависимостите на `esp_hap_core`
   (`json_generator`, `json_parser`, `libsodium`, `mdns`) идват от мениджъра на компонентите (неговият
   `idf_component.yml`). Разликата на форка, която засяга проекта (`hap_mdns_init()` задава името в mDNS от
   `CONFIG_LWIP_LOCAL_HOSTNAME` вместо `"MyHost"`), ще влезе с обновяването на подмодула — редът по-долу важи и в двата

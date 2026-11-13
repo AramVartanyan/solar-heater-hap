@@ -22,3 +22,4 @@
 [submodule "components/homekit"]
 	path = components/homekit
 	url = https://github.com/AramVartanyan/esp-homekit-sdk
+	branch = homekit
