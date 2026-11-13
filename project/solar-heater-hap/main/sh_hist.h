@@ -1,14 +1,14 @@
-/* Daily summaries in the flash (doc/web-interface.md 4.1; doc/tasks/step9-clock-history.md 3.3) —
+/* Daily summaries in the flash (doc/web-interface.md 4.1) —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too. The flash is reached through
  * callbacks (sh_history: the "history" partition; the test: an array with the flash rules — erase
  * to 0xFF by sectors, a write only clears bits).
  *
- * Record, 32 B, little-endian; the fields of later groups are kept already ("no data" until then):
+ * Record, 32 B, little-endian; a field reserved in advance reads 0 ("no data") in older records:
  *   0   date, days since 2020-01-01                       u16
  *   2   collector max, min; tank max, min, 0.1 °C         4 x i16 (0x8000: no data)
  *   10  pump run minutes: charging, protection, other     3 x u16
- *   16  night cooling minutes (group C, 0 until then)     u16
- *   18  heater minutes (group D, 0 until then)            u16
+ *   16  night cooling minutes                             u16
+ *   18  heater minutes                                    u16
  *   20  alarm codes of the day, SH_ALARM_BIT()            u16
  *   22  collector peak, local minute (bits 0-10, 0x7FF: none); clock reliable (bit 15)   u16
  *   24  learned: sunrise, sunset (local minutes, 0xFFFF: no data)                        2 x u16

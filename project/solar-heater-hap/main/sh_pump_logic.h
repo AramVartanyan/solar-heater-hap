@@ -64,15 +64,15 @@ typedef enum {
     SH_PUMP_REASON_CF_RUN,          /* on:  collector sensor faulty, the tank rises */
     SH_PUMP_REASON_CF_WAIT,         /* off: collector sensor faulty, waiting for the next probe */
     SH_PUMP_REASON_CF_HEATER,       /* off: collector sensor faulty, heater running, probe postponed */
-    /* group C: night cooling, vacation, air venting */
+    /* night cooling, vacation, air venting */
     SH_PUMP_REASON_COOL,            /* on:  night cooling of the tank through the collector */
     SH_PUMP_REASON_VACATION,        /* off: vacation, no normal charging */
     SH_PUMP_REASON_AIR_RUN,         /* on:  air venting, run phase */
     SH_PUMP_REASON_AIR_PAUSE,       /* off: air venting, pause phase */
-    /* group D: the heater */
+    /* the heater */
     SH_PUMP_REASON_LEAK_CHECK,      /* off: leak check of the heater (5 min) */
     SH_PUMP_REASON_LEAK_STOP,       /* off: the leak of the heater stopped, no start by the difference */
-    /* group D2: the pulse mode (sensors on the pipes, sh_pulse) */
+    /* the pulse mode (sensors on the pipes, sh_pulse) */
     SH_PUMP_REASON_PULSE,           /* on:  a pulse of 30 s: the pipes show the collector and the tank */
     SH_PUMP_REASON_PULSE_WAIT,      /* off: waiting for the next pulse */
     SH_PUMP_REASON_COUNT
@@ -92,12 +92,12 @@ typedef struct {
     int16_t  frost;                 /* frost threshold, 0.1 °C: on below it, off at >= it + 2 K */
     bool     cool;                  /* night cooling allowed now (sh_cool) */
     bool     charge_off;            /* vacation: no normal charging (col_protect is the vacation limit) */
-    /* group D: the heater (sh_heater) */
+    /* the heater (sh_heater) */
     int16_t  heater_rise;           /* tank rise in 10 min with the pump off = heater, 0.1 K (at least 0.5 K) */
     bool     leak_check;            /* a leak check runs: normal charging off at once */
     bool     leak_stop;             /* the leak is stopped: no charging by the difference */
     bool     leak_resume;           /* the check passed: the pump goes on at once (this step) */
-    /* group D2: the pulse mode (sensors on the pipes) — used by sh_pump_ctl, see sh_pulse.h */
+    /* the pulse mode (sensors on the pipes) — used by sh_pump_ctl, see sh_pulse.h */
     bool     pulse;                 /* pulse mode: the decisions take the reliable values, a stopped
                                      * pump starts only by a pulse (min_run_s: the pulse, 30 s) */
     bool     pulse_due;             /* a pulse is due now (sh_pulse) */

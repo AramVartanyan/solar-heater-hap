@@ -1,5 +1,5 @@
-/* Host test of the menu transitions (main/sh_menu.c; doc/tasks/step2-settings-menu-pump-sensors.md
- * 3.2; doc/tasks/step10-cooling-vacation-seasons.md 3.3 - 3.6) and of the pump test and air
+/* Host test of the menu transitions (main/sh_menu.c; doc/operating-modes.md
+ * 2.5) and of the pump test and air
  * venting screens. Times in ms. */
 
 #include "test_util.h"

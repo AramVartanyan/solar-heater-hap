@@ -1,5 +1,5 @@
 /* Host test of the web interface data and request checks (main/sh_web_api.c;
- * doc/tasks/step6-installer-web.md 3.4, step9-clock-history.md 3.4): the status JSON, the settings
+ * doc/web-interface.md): the status JSON, the settings
  * ("set") with the checks of the menu, the access code, the pump test commands, the resets; the
  * clock, the run time today, the chart, the last days, the time zones, the time of the browser. */
 
@@ -167,16 +167,16 @@ static void test_status_values(void)
     /* a missing function is not in the list (the page greys it out) */
     s = status();
     HAS(&s, "\"frost\"");
-    HAS(&s, "\"vacation\"");                  /* group C: now there */
+    HAS(&s, "\"vacation\"");                  /* now there */
     HAS(&s, "\"season\"");
     HAS(&s, "\"night_cool\"");
     HAS(&s, "\"deaerate\"");
     HAS(&s, "\"col_type\"");
     HAS(&s, "\"tank_vol\"");
     HAS(&s, "\"vac_limit\"");
-    HAS(&s, "\"net_mode\"");                    /* group E: now there */
+    HAS(&s, "\"net_mode\"");                    /* now there */
     HAS(&s, "\"ota\"");
-    HAS(&s, "\"homekit\"");                     /* group F: now there */
+    HAS(&s, "\"homekit\"");                     /* now there */
     HAS_NOT(&s, "\"city\"");
 
     /* "history" only with the history partition */
@@ -262,7 +262,7 @@ static void test_status_buffer(void)
     CHECK_EQ(sh_web_status_json(small, 0, &s), -1);
     CHECK_EQ(sh_web_status_json(s_json, (size_t)len, &s), -1);          /* no room for the NUL */
     CHECK_EQ(sh_web_status_json(s_json, (size_t)len + 1, &s), len);
-    /* the pulse mode (group D2): the age of the values, the next pulse, the reasons, the mounting */
+    /* the pulse mode: the age of the values, the next pulse, the reasons, the mounting */
     sh_web_status_t u = status();
     u.pulse = true;
     u.meas = true;
@@ -389,7 +389,7 @@ static void test_set_installer(void)
     CHECK_EQ(c.inst.v[SH_INST_PRESSURE], 22);                       /* the others stay */
 }
 
-/* Group C (doc/tasks/step10-cooling-vacation-seasons.md 3.1, 3.3 - 3.6): the season, the vacation,
+/* The season, the vacation,
  * the winter set, the night cooling switches — free; the collector and the tank — with the code. */
 static void test_set_group_c(void)
 {
@@ -427,7 +427,7 @@ static void test_set_group_c(void)
     CHECK_EQ(c.inst.v[SH_INST_COL_TYPE], SH_COL_TUBES);
     CHECK_EQ(ch, SH_WEB_CH_INSTALLER);
     CHECK_EQ(set("col_type=2&code=" CODE, &c, &ch), SH_WEB_BAD);
-    /* the mounting of the sensors (group D2): with the code, 0 / 1 */
+    /* the mounting of the sensors: with the code, 0 / 1 */
     CHECK_EQ(set("mount=1", &c, &ch), SH_WEB_DENIED);
     CHECK_EQ(set("mount=1&code=" CODE, &c, &ch), SH_WEB_OK);
     CHECK_EQ(c.inst.v[SH_INST_MOUNT], SH_MOUNT_PIPES);
@@ -447,7 +447,7 @@ static void test_set_group_c(void)
     CHECK_EQ(set("tank_vol=1010&code=" CODE, &c, &ch), SH_WEB_BAD);
     CHECK_EQ(set("tank_vol=125&code=" CODE, &c, &ch), SH_WEB_BAD);     /* off the 10 l step */
 
-    /* the heater (group D): 0 = none, 0.5 ... 12.0 kW in steps of 0.5, with the code */
+    /* the heater: 0 = none, 0.5 ... 12.0 kW in steps of 0.5, with the code */
     CHECK_EQ(set("heater=35", &c, &ch), SH_WEB_DENIED);
     CHECK_EQ(set("heater=35&code=" CODE, &c, &ch), SH_WEB_OK);
     CHECK_EQ(c.inst.v[SH_INST_HEATER], 35);
@@ -459,7 +459,7 @@ static void test_set_group_c(void)
     CHECK_EQ(set("heater=125&code=" CODE, &c, &ch), SH_WEB_BAD);
 }
 
-/* The heater, its leak and E8 (group D). */
+/* The heater, its leak and E8. */
 static void test_status_group_d(void)
 {
     sh_web_status_t s = status();
@@ -529,7 +529,7 @@ static void test_status_group_c(void)
     HAS(&s, "\"boil\":1277,");
     HAS(&s, "\"vac\":1177}");
 
-    /* the reasons of group C have their own keys */
+    /* the reasons of night cooling, vacation and air venting have their own keys */
     CHECK(strcmp(sh_web_reason_key(SH_PUMP_REASON_COOL), "cool") == 0);
     CHECK(strcmp(sh_web_reason_key(SH_PUMP_REASON_VACATION), "vacation") == 0);
     CHECK(strcmp(sh_web_reason_key(SH_PUMP_REASON_AIR_RUN), "air_run") == 0);
@@ -626,13 +626,13 @@ static void test_reset(void)
     CHECK_EQ(what, SH_WEB_RESET_LEARNED);
     CHECK_EQ(sh_web_reset("what=history", CODE, &what), SH_WEB_DENIED);
     CHECK_EQ(sh_web_reset("what=learned&code=000000", CODE, &what), SH_WEB_DENIED);
-    CHECK_EQ(sh_web_reset("what=homekit&code=" CODE, CODE, &what), SH_WEB_OK);     /* group F */
+    CHECK_EQ(sh_web_reset("what=homekit&code=" CODE, CODE, &what), SH_WEB_OK);     /* the HomeKit pairings */
     CHECK_EQ(what, SH_WEB_RESET_HOMEKIT);
     CHECK_EQ(sh_web_reset("what=city&code=" CODE, CODE, &what), SH_WEB_BAD);
     CHECK_EQ(sh_web_reset("code=" CODE, CODE, &what), SH_WEB_BAD);
 }
 
-/* ---- step 9: chart, days, time zones, browser time ------------------------------------- */
+/* ---- chart, days, time zones, browser time ------------------------------------------- */
 
 static char s_big[SH_WEB_CHART_MAX];
 

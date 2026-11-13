@@ -1,5 +1,5 @@
-/* Alarm and information codes (doc/operating-modes.md 2.1, p. 13; doc/led-indication.md 6;
- * doc/tasks/step5-alarms-indication.md 3.1) — plain C, no ESP-IDF / FreeRTOS, compiled into the
+/* Alarm and information codes (doc/operating-modes.md 2.1, p. 13; doc/led-indication.md 6)
+ * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test as well.
  *
  * Temperatures are tenths of °C, times are seconds of a monotonic clock.
@@ -39,7 +39,7 @@ typedef enum {
     SH_ALARM_E6,
     SH_ALARM_HOT,
     SH_ALARM_FRO,
-    SH_ALARM_E8,                /* group D: the bits before it are kept (history) */
+    SH_ALARM_E8,                /* added later: the bits before it are kept (history) */
     SH_ALARM_COUNT              /* also "no code" */
 } sh_alarm_t;
 

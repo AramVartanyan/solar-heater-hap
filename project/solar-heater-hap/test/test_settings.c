@@ -1,5 +1,5 @@
 /* Host test of the user settings table and checks (main/sh_settings.c;
- * doc/tasks/step2-settings-menu-pump-sensors.md 3.1). */
+ * doc/operating-modes.md 2.5). */
 
 #include <string.h>
 #include "test_util.h"
@@ -136,7 +136,7 @@ static void test_sanitize(void)
     CHECK_EQ(s.v[SH_SET_DIFF_OFF], 4);
 }
 
-/* The winter set, the season, the vacation and the night cooling switches (step 10, 3.3, 3.4). */
+/* The winter set, the season, the vacation and the night cooling switches. */
 static void test_seasons(void)
 {
     CHECK_EQ(DEF.v[SH_SET_COL_MIN_W], 15);          /* winter 15 / 5 / 3, summer 25 / 6 / 4 */

@@ -1,5 +1,5 @@
-/* Plausibility of the sensor readings and the sensor fault (doc/operating-modes.md 2.1, p. 12;
- * doc/tasks/step2-settings-menu-pump-sensors.md 3.5) — plain C, compiled into the host test too.
+/* Plausibility of the sensor readings and the sensor fault (doc/operating-modes.md 2.1, p. 12)
+ * — plain C, compiled into the host test too.
  *
  * A reading fails when the sensor does not answer, the CRC is wrong (both: `ok` false), the value
  * is outside the DS18B20 range (-55 ... +125 °C) or it jumps more than 20 K from the last valid

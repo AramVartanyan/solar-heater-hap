@@ -1,8 +1,8 @@
-/* Web interface (doc/web-interface.md; doc/tasks/step6-installer-web.md 3.4): one page embedded
+/* Web interface (doc/web-interface.md): one page embedded
  * in the firmware and a small JSON API, on an own esp_http_server (port 80). The server runs while
  * the device is connected to the router (CP) or its own access point is on (AP, http://192.168.4.1),
  * and never together with the Wi-Fi setup portal — the portal has its own server on the same port.
- * With Apple HomeKit on (group F) the same handlers are registered on the HTTP server of
+ * With Apple HomeKit on the same handlers are registered on the HTTP server of
  * esp-homekit-sdk once HAP is started (sh_web_attach()); the own server is then not used any more.
  *
  *   GET  /            the page

@@ -1,6 +1,6 @@
 /* Installer data and the limits computed from them (doc/operating-modes.md 2.1: boiling point of
- * the heat transfer fluid, computed limits, frost protection p. 9;
- * doc/tasks/step6-installer-web.md 3.1 - 3.3) — plain C, no ESP-IDF / FreeRTOS, compiled into the
+ * the heat transfer fluid, computed limits, frost protection p. 9)
+ * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test too. Storage in NVS: sh_installer_store.
  *
  *   boiling point   water at the absolute pressure (gauge + 1.013 bar, Antoine equation) plus the
@@ -49,7 +49,7 @@ typedef enum {
     SH_INST_COL_AREA,           /* collector area, 5 - 200 = 0.5 - 20.0 m² */
     SH_INST_TANK_VOL,           /* tank volume, 50 - 1000 l, step 10 */
     SH_INST_HEATER,             /* heater in the tank, 0 = none, 5 - 120 = 0.5 - 12.0 kW, step 0.5 */
-    SH_INST_MOUNT,              /* sh_mount_t: mounting of the sensors (group D2) */
+    SH_INST_MOUNT,              /* sh_mount_t: mounting of the sensors */
     SH_INST_COUNT
 } sh_inst_t;
 

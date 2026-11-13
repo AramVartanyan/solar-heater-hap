@@ -7,7 +7,7 @@
  * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control"; the boiling point, the
  * ceiling of the collector protection and the frost threshold come from the installer data
  * (sh_installer_store) and are logged at boot and when they change.
- * Group C (doc/tasks/step10-cooling-vacation-seasons.md): before the pump decision — sunrise and
+ * Before the pump decision: sunrise and
  * sunset (sh_sun), the season (sh_season; the seasonal values of sh_settings), the night cooling
  * sessions (sh_cool) and the vacation (collector protection at the vacation limit, no charging);
  * the air venting is a command like the pump test. The learned values are kept by sh_learn_store. */

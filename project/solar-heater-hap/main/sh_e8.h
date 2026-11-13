@@ -1,6 +1,6 @@
 /* E8: reverse thermosiphon through a broken gravity check valve (doc/operating-modes.md 2.1,
- * "Аварийни съобщения (т. 13)" — A8, "Признакът на A8 / `E8` — числата";
- * doc/tasks/step12-heater-leak-e8.md 3.4) — plain C, no ESP-IDF / FreeRTOS, compiled into the host
+ * "Аварийни съобщения (т. 13)" — A8, "Признакът на A8 / `E8` — числата")
+ * — plain C, no ESP-IDF / FreeRTOS, compiled into the host
  * test too. E8 is only shown; the pump logic does not change.
  *
  *   night        sh_sun_night() (the learned sunrise / sunset with a reliable clock, otherwise the

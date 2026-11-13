@@ -52,8 +52,8 @@ void sh_pump_decide(const sh_pump_params_t *p, sh_pump_state_t *st, int16_t t_co
     /* The limits follow every valid temperature, whatever the pump does. */
     sh_pump_track_limits(p, st, t_col, t_tank);
 
-    /* 1. Without both temperatures nothing can be judged: off (the full sensor-fault logic is a
-     *    later step). The collector protection ends with the stop. */
+    /* 1. Without both temperatures nothing can be judged: off (the sensor-fault modes are in
+     *    sh_pump_ctl, above this decision). The collector protection ends with the stop. */
     if (!col_ok || !tank_ok) {
         st->col_protect = false;
         st->frost = false;

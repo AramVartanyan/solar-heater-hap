@@ -1,5 +1,5 @@
-/* Status LED indication: state -> (colour, pattern) (doc/led-indication.md 1 - 5;
- * doc/tasks/step5-alarms-indication.md 3.3) — plain C, no ESP-IDF / FreeRTOS, compiled into the
+/* Status LED indication: state -> (colour, pattern) (doc/led-indication.md 1 - 5)
+ * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test as well. sh_led drives the LED.
  *
  * Colour, by priority (first match wins):
@@ -15,7 +15,7 @@
  * other colours -> while the own access point is on (nEt -> AP) steady with a short dark wink (the
  * mirror of the heartbeat), otherwise steady with Wi-Fi, heartbeat without it (or while the setup
  * portal is open). Instead of steady the LED breathes while the HomeKit pairing window is open —
- * and only then (group F).
+ * and only then.
  * HomeKit Identify is a pattern of its own, played once over whatever is shown, in its colour
  * (sh_led): 3 groups of 2 flashes, as ledIdentify() of outputwrite.
  * Temperatures are tenths of °C, times ms. */

@@ -1,5 +1,5 @@
-/* Clock rules (doc/operating-modes.md 3.1; doc/tasks/step9-clock-history.md 3.1) — plain C, no
- * ESP-IDF / FreeRTOS, compiled into the host test too. sh_clock applies them.
+/* Clock rules (doc/operating-modes.md 3.1) — plain C, no ESP-IDF
+ * / FreeRTOS, compiled into the host test too. sh_clock applies them.
  *
  *   browser time  the time sent by the page is taken only when the clock has not been set by SNTP
  *                 in the last 24 h (no internet, AP mode, after a power cut); a value outside

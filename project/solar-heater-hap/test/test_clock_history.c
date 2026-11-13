@@ -1,4 +1,4 @@
-/* Host test of the clock and the history (doc/tasks/step9-clock-history.md 3.1 - 3.3):
+/* Host test of the clock and the history (doc/operating-modes.md 3.1, doc/web-interface.md 4):
  * the time of the browser, the trust of the clock, the zone check by the collector peak
  * (sh_clock_rules); the time zones (sh_tz); the chart and the summary of the day (sh_day); the
  * daily record, the ring in the flash and the CSV (sh_hist). */
@@ -346,7 +346,7 @@ static void test_summary_day(void)
     CHECK(!s_d.sum.valid);
 }
 
-/* The local time jumps within the day (from the other experiment variant, step 9, PR #35). */
+/* The local time jumps within the day. */
 static void test_clock_jumps(void)
 {
     const uint16_t D = 2800;
@@ -643,7 +643,7 @@ static void test_ring(void)
     CHECK_EQ(h9.head, 0);
 }
 
-/* Faults found by the other experiment variant (step 9, PR #35), on this ring. */
+/* Faults of a ring in the flash, checked on this one. */
 static void test_ring_faults(void)
 {
     sh_hist_t h, again;
@@ -728,7 +728,7 @@ static void test_csv(void)
     r.partial = true;
     CHECK(sh_hist_csv_line(buf, sizeof(buf), &r) > 0);
     CHECK(strcmp(buf, "2020-01-01;;;;;0;0;0;0;0;;;0;1;;;\r\n") == 0);
-    /* the learned values, when there are (groups C / D) */
+    /* the learned values, when there are */
     r.sunrise = 6 * 60 + 2;
     r.sunset = 20 * 60 + 41;
     r.cool_target = 55;

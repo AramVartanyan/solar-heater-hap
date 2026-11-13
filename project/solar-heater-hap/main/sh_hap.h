@@ -1,4 +1,4 @@
-/* Apple HomeKit (group F; doc/operating-modes.md 3, doc/tasks/step14-homekit.md): the accessory on
+/* Apple HomeKit (doc/operating-modes.md 3): the accessory on
  * esp-homekit-sdk. What it shows and takes is decided by sh_hap_rules (plain C, host test); this
  * module builds the accessory, starts HAP and passes the values on.
  *

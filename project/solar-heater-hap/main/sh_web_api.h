@@ -1,5 +1,5 @@
 /* Web interface: the data of the page and the checks of its requests
- * (doc/web-interface.md; doc/tasks/step6-installer-web.md 3.4) — plain C, no ESP-IDF / FreeRTOS,
+ * (doc/web-interface.md) — plain C, no ESP-IDF / FreeRTOS,
  * compiled into the host test too. sh_web serves them over HTTP.
  *
  *   status   one JSON object with everything the page shows; temperatures in tenths of °C
@@ -79,16 +79,16 @@ typedef struct {
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;
-    /* the network mode and the name (group E) */
+    /* the network mode and the name */
     bool ap;                    /* the own access point is on: `ip` is its address, no `ssid` */
     bool ap_pending;            /* AP chosen during an update: it starts after it */
     const char *host;           /* the name in the network: "Solar-810840" (mDNS: + ".local") */
     const char *ap_ssid;        /* the name of the own access point: the same text */
-    /* the firmware update (group E) */
+    /* the firmware update */
     sh_ota_phase_t ota;
     int8_t ota_pct;
     const char *ota_version;    /* the newer version, "" / NULL: none */
-    /* Apple HomeKit (group F) */
+    /* Apple HomeKit */
     bool hap_on;                /* the setting */
     bool hap_paired;            /* a controller is paired */
     bool hap_running;           /* HAP is running (connected to the router since boot) */
@@ -110,14 +110,14 @@ typedef struct {
     bool air_on, air_run;
     uint8_t air_cycle;
     uint32_t air_left_s;
-    /* the heater (group D): the sign now, detected with "0 kW", the leak checks, E8 learning */
+    /* the heater: the sign now, detected with "0 kW", the leak checks, E8 learning */
     bool heater_on, heater_det;
     uint8_t leak;               /* sh_leak_phase_t */
     uint32_t leak_left_s;       /* of the running check */
     bool leak_last, leak_last_stop;
     int16_t leak_last_drop;     /* 0.1 K */
     int16_t e8_normal;          /* learned normal night cooling, 0.1 K/h, INT16_MIN: none */
-    /* the pulse mode (group D2): t_col / t_tank are the last reliable values */
+    /* the pulse mode: t_col / t_tank are the last reliable values */
     bool pulse;
     bool meas;                  /* they exist ... */
     uint32_t meas_age_s;        /* ... taken this long ago ... */
