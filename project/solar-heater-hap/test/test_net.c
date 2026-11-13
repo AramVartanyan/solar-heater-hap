@@ -1,4 +1,4 @@
-/* Host test of the network and the firmware update (doc/operating-modes.md 2.5,
+/* Host test of the network and the firmware update (doc/operating-modes.md 6.2,
  * doc/web-interface.md 5): the network mode CP / AP and its times
  * (main/sh_net_rules.c), the menu position nEt with the access code and the labels of the display
  * (main/sh_menu.c), the indication of the access point and of the update (main/sh_ind.c), the

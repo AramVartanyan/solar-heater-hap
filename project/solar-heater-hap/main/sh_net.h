@@ -1,4 +1,4 @@
-/* The network (doc/operating-modes.md 2.5, doc/web-interface.md 5): Wi-Fi through captive-wifi
+/* The network (doc/operating-modes.md 6.2, doc/web-interface.md 5): Wi-Fi through captive-wifi
  * 0.4.0, the mode CP / AP of the menu position nEt, the name in the network and the firmware update. One task,
  * "sh_net", takes the events of captive-wifi and of general-ota, the choices of the menu and of
  * the web interface, and does what the rules say (sh_net_rules, sh_ota — plain C, host test):

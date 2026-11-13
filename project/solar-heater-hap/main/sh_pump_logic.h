@@ -1,4 +1,4 @@
-/* Pump decision, normal mode (doc/operating-modes.md 2.1) — plain C, no ESP-IDF / FreeRTOS, so the
+/* Pump decision, normal mode (doc/operating-modes.md 2 - 4) — plain C, no ESP-IDF / FreeRTOS, so the
  * same file is compiled into the host test (project/solar-heater-hap/test). The pump test, the
  * anti-seize run and the sensor-fault modes are in sh_pump_ctl, which calls this decision in the
  * normal mode.

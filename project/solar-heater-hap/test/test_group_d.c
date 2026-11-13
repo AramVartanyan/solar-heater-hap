@@ -1,4 +1,4 @@
-/* Host test of the heater, its leak and E8 (doc/operating-modes.md 2.1, p. 13, p. 17): the heater
+/* Host test of the heater, its leak and E8 (doc/operating-modes.md 4.4, 5.2): the heater
  * power in the
  * installer data (sh_installer); the heater sign and its threshold, the detection with "0 kW", the
  * probes with a faulty collector sensor on the same threshold (sh_heater, sh_pump_ctl); the

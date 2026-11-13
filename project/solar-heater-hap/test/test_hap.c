@@ -1,4 +1,4 @@
-/* Host test of Apple HomeKit (doc/operating-modes.md 3). What the accessory shows and
+/* Host test of Apple HomeKit (doc/operating-modes.md 8). What the accessory shows and
  * takes (main/sh_hap_rules.c): Active and the vacation, Tmax and its limits, the Current State, the
  * temperatures and their ranges, the display units, the keyboard lock, the Status Fault by the alarms,
  * when a notification goes out and when not, when HAP starts and which web server is used, the

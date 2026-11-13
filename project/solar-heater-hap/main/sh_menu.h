@@ -1,4 +1,4 @@
-/* User menu on the buttons and the display (doc/operating-modes.md 2.5) —
+/* User menu on the buttons and the display (doc/operating-modes.md 6.1) —
  * the transitions in plain C, compiled into the
  * host test too. sh_buttons feeds the keys, sh_display shows the view.
  *

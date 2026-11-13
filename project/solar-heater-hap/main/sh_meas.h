@@ -1,4 +1,4 @@
-/* Plausibility of the sensor readings and the sensor fault (doc/operating-modes.md 2.1, p. 12)
+/* Plausibility of the sensor readings and the sensor fault (doc/operating-modes.md 5.1)
  * — plain C, compiled into the host test too.
  *
  * A reading fails when the sensor does not answer, the CRC is wrong (both: `ok` false), the value

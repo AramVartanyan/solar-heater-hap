@@ -1,4 +1,4 @@
-/* Clock rules (doc/operating-modes.md 3.1) — plain C, no ESP-IDF
+/* Clock rules (doc/operating-modes.md 7) — plain C, no ESP-IDF
  * / FreeRTOS, compiled into the host test too. sh_clock applies them.
  *
  *   browser time  the time sent by the page is taken only when the clock has not been set by SNTP

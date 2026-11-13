@@ -2,7 +2,7 @@
  *
  *   make -C project/solar-heater-hap/test
  *
- * Every rule of the normal mode (doc/operating-modes.md, 2.1) has its own test: exactly at the
+ * Every rule of the normal mode (doc/operating-modes.md, 2 - 4) has its own test: exactly at the
  * threshold, 0.1 K on both sides, the minimum times and the priorities. Temperatures are tenths of °C, times are seconds. */
 
 #include <stdio.h>

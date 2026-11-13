@@ -1,5 +1,5 @@
 /* Host test of the user settings table and checks (main/sh_settings.c;
- * doc/operating-modes.md 2.5). */
+ * doc/operating-modes.md 6.1). */
 
 #include <string.h>
 #include "test_util.h"

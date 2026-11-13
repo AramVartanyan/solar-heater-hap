@@ -1,4 +1,4 @@
-/* The clock (doc/operating-modes.md 3.1): SNTP (pool.ntp.org)
+/* The clock (doc/operating-modes.md 7): SNTP (pool.ntp.org)
  * at every connection to the router and then every 12 h (CONFIG_LWIP_SNTP_UPDATE_DELAY); the time
  * of the browser, taken only without SNTP in the last 24 h; the time zone (default UTC) chosen or
  * confirmed by the installer, kept in NVS (namespace "sh_clock": the name and its POSIX TZ rule);

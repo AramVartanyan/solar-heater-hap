@@ -1,5 +1,5 @@
 /* Host test of the pump control above the normal mode (main/sh_pump_ctl.c): pump test, anti-seize,
- * sensor faults (doc/operating-modes.md 2.1, p. 10 - 12). A simulation with a
+ * sensor faults (doc/operating-modes.md 3.5, 4.3, 5.1). A simulation with a
  * 1 s clock, as the control task runs it. Temperatures are tenths of °C, times are seconds. */
 
 #include <string.h>

@@ -1,4 +1,4 @@
-/* Alarm and information codes (doc/operating-modes.md 2.1, p. 13; doc/led-indication.md 6)
+/* Alarm and information codes (doc/operating-modes.md 5.2; doc/led-indication.md 6)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test as well.
  *

@@ -1,5 +1,5 @@
 /* Three front-panel buttons on GPIO (button library: tap, long press, auto-repeat).
- * Short presses drive the user menu and the pump test (sh_menu; doc/operating-modes.md 2.5), choose
+ * Short presses drive the user menu and the pump test (sh_menu; doc/operating-modes.md 6.1), choose
  * the network mode (nEt -> sh_net) and confirm an offered firmware update ("FUp");
  * "+" / "-" held > 1 s repeat every 200 ms (the value in the menu).
  * "menu" held and released after CONFIG_SH_NET_RESET_HOLD_S (3 - 7 s, default 5): Wi-Fi network erased;

@@ -1,5 +1,5 @@
-/* Host test of night cooling, vacation, seasons, air venting (doc/operating-modes.md 2.1, 2.1.2,
- * 2.2): night cooling —
+/* Host test of night cooling, vacation, seasons, air venting (doc/operating-modes.md 4.1 - 4.3,
+ * 2.2, 2.4): night cooling —
  * triggers and their hours, target, self-learning, heater (sh_cool) and the pump rule
  * (sh_pump_logic); sunrise and sunset (sh_sun); the vacation by day and at night; the seasons
  * (sh_season); the air venting cycles (sh_pump_ctl); the new installer data (sh_installer); the

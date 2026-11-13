@@ -1,4 +1,4 @@
-/* The network mode — position nEt of the menu (doc/operating-modes.md 2.5, the network — nEt)
+/* The network mode — position nEt of the menu (doc/operating-modes.md 6.2)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test too. sh_net feeds the choices and the events of captive-wifi and does what the rules
  * ask for.

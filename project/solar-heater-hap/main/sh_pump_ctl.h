@@ -1,5 +1,5 @@
-/* Pump control above the normal-mode decision (doc/operating-modes.md 2.1: pump test p. 11,
- * anti-seize p. 10, sensor fault p. 12) —
+/* Pump control above the normal-mode decision (doc/operating-modes.md: pump test 4.3,
+ * anti-seize 3.5, sensor fault 5.1) —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test as well.
  *
  * Temperatures are tenths of °C, times are seconds of a monotonic clock (0 = boot).
@@ -21,7 +21,7 @@
  *                             heater sign is active — the threshold of sh_heater)
  *   4. anti-seize start    -> after 24 h off, when the collector is at least as warm as the tank,
  *                             or after 12 h more whatever the temperatures
- * Pulse mode (sensors on the pipes, `p->pulse`; doc/operating-modes.md 2.1, p. 16): the
+ * Pulse mode (sensors on the pipes, `p->pulse`; doc/operating-modes.md 4.5): the
  * decisions take the reliable values (sh_pump_rel_t: the pipes 30 s after the pump started and as
  * long as it runs; a faulty sensor drops its value), with the collector sensor faulty the pipes as
  * they are (the probes are runs of 10 min). In the normal mode and with the tank sensor faulty a

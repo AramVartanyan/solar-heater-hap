@@ -1,4 +1,4 @@
-/* Host test of the pulse mode (doc/operating-modes.md 2.1, p. 16): the pulse mode — the mounting in
+/* Host test of the pulse mode (doc/operating-modes.md 4.5): the pulse mode — the mounting in
  * the installer data (sh_installer); when a pulse is due: the window, the day intervals, the hot
  * collector, the night, the night cooling and the vacation, the frost watch (sh_pulse, sh_cool);
  * the pulse, the reliable values and the decisions by them, the heater sign on the pipe

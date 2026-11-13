@@ -1,5 +1,5 @@
 /* Night cooling of the tank through the collector: when it is allowed, its target and the
- * self-learning (doc/operating-modes.md 2.1, "Нощно охлаждане (т. 7)", "Ваканция (т. 8)")
+ * self-learning (doc/operating-modes.md 4.1 "Нощно охлаждане на бойлера (т. 7)", 4.2 "Ваканция (т. 8)")
  * — plain C, no ESP-IDF / FreeRTOS, compiled
  * into the host test too. The pump itself is decided by sh_pump_logic (rule 6) while a session is
  * active: on when the collector is colder than the tank by the switch-on difference, off below

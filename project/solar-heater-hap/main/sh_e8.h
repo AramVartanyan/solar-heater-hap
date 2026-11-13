@@ -1,5 +1,5 @@
-/* E8: reverse thermosiphon through a broken gravity check valve (doc/operating-modes.md 2.1,
- * "Аварийни съобщения (т. 13)" — A8, "Признакът на A8 / `E8` — числата")
+/* E8: reverse thermosiphon through a broken gravity check valve (doc/operating-modes.md 5.2,
+ * "Аварийни съобщения (т. 13)" — A8 / `E8` and its sign)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the host
  * test too. E8 is only shown; the pump logic does not change.
  *

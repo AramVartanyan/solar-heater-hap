@@ -1,5 +1,5 @@
 /* Host test of the installer data and the computed limits (main/sh_installer.c;
- * doc/operating-modes.md 2.1): ranges and checks, the boiling point at the points
+ * doc/operating-modes.md 1.5, 3.3, 3.4): ranges and checks, the boiling point at the points
  * of the glycol table and between them, the ceiling of the collector protection, the frost
  * threshold. Temperatures are tenths of °C, the pressure tenths of bar. */
 

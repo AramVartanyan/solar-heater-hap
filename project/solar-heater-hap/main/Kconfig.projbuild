@@ -252,7 +252,7 @@ menu "Device Settings"
             help
                 The sensors on the pipes outside the collector and the tank (metal pipes only):
                 the pump runs in pulses of 30 s and the decisions take the values measured 30 s
-                after the pump started (doc/operating-modes.md 2.1, p. 16).
+                after the pump started (doc/operating-modes.md 4.5).
 
     endmenu
 
