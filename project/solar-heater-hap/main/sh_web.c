@@ -400,6 +400,7 @@ static esp_err_t reset_post(httpd_req_t *req)
             ESP_LOGW(TAG, "web: settings reset to the defaults");
             sh_settings_reset();
             sh_installer_reset();
+            sh_hap_defaults_reset();    /* the keyboard unlocked, °C; HomeKit and the pairing stay */
             break;
         case SH_WEB_RESET_WIFI:         /* after the answer: the restart closes the connection */
             ESP_LOGW(TAG, "web: Wi-Fi reset");

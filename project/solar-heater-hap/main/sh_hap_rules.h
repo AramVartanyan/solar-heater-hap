@@ -24,7 +24,12 @@
  * In the pulse mode the temperatures are the last reliable values (the caller passes them).
  * The temperatures are answered when a controller reads them and are never sent on their own; a
  * notification goes out when one of these changes: Active, Current State, Heating Threshold, Lock
- * Physical Controls, Status Fault (either sensor).
+ * Physical Controls, Status Fault (either sensor) — and the Temperature Display Units, when "Default
+ * settings" of the web interface puts them back to °C.
+ * "Default settings" (no restart) takes the standard path of a changed parameter, with the
+ * notifications: the vacation and Tmax (sh_settings), the keyboard unlocked ("UnL" if it was locked),
+ * the units °C. The setting "Apple HomeKit" and the pairing are not touched: only the factory reset
+ * brings them back.
  *
  * HAP runs only with the setting "Apple HomeKit" on (default) and only once the device is connected
  * to the router; it is never stopped again. The setting changes with a restart only, and it cannot
@@ -63,6 +68,7 @@ typedef struct {
     sh_pump_reason_t reason;
     uint8_t alarms;             /* SH_ALARM_BIT() of sh_alarm_t */
     bool lock;                  /* the keyboard is locked */
+    bool fahrenheit;            /* the display units are °F */
 } sh_hap_in_t;
 
 /* The characteristics that are notified when they change. */
@@ -73,6 +79,7 @@ typedef struct {
     uint8_t lock;               /* 0 / 1 */
     uint8_t col_fault;          /* Status Fault of "Collector": 0 / 1 */
     uint8_t tank_fault;         /* Status Fault of "Tank": 0 / 1 */
+    uint8_t units;              /* Temperature Display Units: SH_HAP_UNITS_C / _F */
 } sh_hap_view_t;
 
 void sh_hap_view(const sh_hap_in_t *in, sh_hap_view_t *out);
@@ -83,6 +90,7 @@ void sh_hap_view(const sh_hap_in_t *in, sh_hap_view_t *out);
 #define SH_HAP_CH_LOCK          0x08
 #define SH_HAP_CH_COL_FAULT     0x10
 #define SH_HAP_CH_TANK_FAULT    0x20
+#define SH_HAP_CH_UNITS         0x40
 
 /* The characteristics to notify: those that differ between `was` and `now` (0: nothing to send). */
 unsigned sh_hap_changed(const sh_hap_view_t *was, const sh_hap_view_t *now);
@@ -127,6 +135,23 @@ int16_t sh_hap_entered_whole(int16_t shown, sh_hap_qty_t qty, bool fahrenheit);
 
 /* The quantity of a menu setting: tbo and C.Lo are temperatures, d.on and d.oF differences. */
 sh_hap_qty_t sh_hap_setting_qty(sh_setting_t id);
+
+/* ---- "Default settings" ------------------------------------------------------------------ */
+
+/* What sh_hap keeps in NVS. */
+typedef struct {
+    bool on;                    /* the setting "Apple HomeKit" */
+    bool paired;                /* a controller is paired */
+    bool lock;                  /* the keyboard is locked */
+    bool fahrenheit;            /* the display units are °F */
+} sh_hap_kept_t;
+
+#define SH_HAP_DEF_LOCK         0x01    /* the keyboard has to be unlocked */
+#define SH_HAP_DEF_UNITS        0x02    /* the units have to go back to °C */
+
+/* "Reset -> Default settings": what has to change, each by the standard path of its parameter (0:
+ * nothing). `on` and `paired` are never among them. */
+unsigned sh_hap_defaults(const sh_hap_kept_t *k);
 
 /* ---- when HAP runs ---------------------------------------------------------------------- */
 

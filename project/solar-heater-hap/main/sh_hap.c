@@ -96,6 +96,19 @@ static void lock_set(bool on, const char *source)
     sh_buttons_lock_changed(on);
 }
 
+/* The display units from Apple Home, or back to °C by "Default settings": stored, published (the
+ * display and the web interface); the notification as for the lock. s_lock held. */
+static void units_set(bool fahrenheit, const char *source)
+{
+    if (fahrenheit == s_fahrenheit) {
+        return;
+    }
+    ESP_LOGI(TAG, "display units °%c (%s)", fahrenheit ? 'F' : 'C', source);
+    s_fahrenheit = fahrenheit;
+    store(KEY_UNITS, fahrenheit);
+    publish();
+}
+
 /* ---- the values ------------------------------------------------------------------------- */
 
 /* s_lock held */
@@ -108,6 +121,7 @@ static void view_now(sh_hap_view_t *v)
     const sh_hap_in_t in = {
         .vacation = set.v[SH_SET_VACATION] != 0, .tmax = set.v[SH_SET_TANK_MAX],
         .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms, .lock = s_lock_on,
+        .fahrenheit = s_fahrenheit,
     };
     sh_hap_view(&in, v);
 }
@@ -148,6 +162,9 @@ static void push(void)
     }
     if (ch & SH_HAP_CH_TANK_FAULT) {
         set_u8(c_tank_fault, now.tank_fault);
+    }
+    if (ch & SH_HAP_CH_UNITS) {
+        set_u8(c_units, now.units);
     }
     s_sent = now;
     xSemaphoreGive(s_lock);
@@ -210,11 +227,9 @@ static int heater_write(hap_write_data_t write_data[], int count, void *serv_pri
             ok = sh_hap_write_target((int)w->val.u);
         } else if (w->hc == c_units) {
             ok = sh_hap_write_units((int)w->val.u, &flag);
-            if (ok && flag != s_fahrenheit) {
-                ESP_LOGI(TAG, "HomeKit: display units °%c", flag ? 'F' : 'C');
-                s_fahrenheit = flag;
-                store(KEY_UNITS, flag);
-                publish();
+            if (ok) {
+                units_set(flag, "Apple Home");
+                s_sent.units = flag ? SH_HAP_UNITS_F : SH_HAP_UNITS_C;
             }
         } else if (w->hc == c_lock) {
             ok = sh_hap_write_lock((int)w->val.u, &flag);
@@ -496,6 +511,20 @@ void sh_hap_set_lock(bool on, const char *source)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     lock_set(on, source);
+    xSemaphoreGive(s_lock);
+}
+
+void sh_hap_defaults_reset(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const sh_hap_kept_t kept = { .on = s_on, .paired = s_paired, .lock = s_lock_on, .fahrenheit = s_fahrenheit };
+    const unsigned what = sh_hap_defaults(&kept);
+    if (what & SH_HAP_DEF_LOCK) {
+        lock_set(false, "default settings");
+    }
+    if (what & SH_HAP_DEF_UNITS) {
+        units_set(false, "default settings");
+    }
     xSemaphoreGive(s_lock);
 }
 

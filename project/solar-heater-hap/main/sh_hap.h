@@ -54,5 +54,10 @@ esp_err_t sh_hap_set_enabled(bool on);
  * `source`: for the log. Any task. */
 void sh_hap_set_lock(bool on, const char *source);
 
+/* "Reset -> Default settings" of the web interface (no restart): the keyboard unlocked, the units
+ * °C — as an ordinary change of each (stored, shown, notified). The setting "Apple HomeKit" and the
+ * pairing stay. The vacation and Tmax are reset by sh_settings and notified like any change. */
+void sh_hap_defaults_reset(void);
+
 /* Erases the pairings (the controller restarts). ESP_ERR_INVALID_STATE: HAP is not running. */
 esp_err_t sh_hap_reset_pairings(void);

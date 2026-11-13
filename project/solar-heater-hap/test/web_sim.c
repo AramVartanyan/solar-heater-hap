@@ -860,6 +860,23 @@ static void handle(int fd, const char *page, size_t page_len)
                 printf("HomeKit pairings erased: the controller restarts\n");
             }
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
+            /* default settings: the keyboard unlocked, °C; "Apple HomeKit" and the pairing stay —
+             * those only the factory reset brings back */
+            const sh_hap_kept_t kept = { .on = s_hap_on, .paired = s_hap_paired, .lock = s_key_lock,
+                                         .fahrenheit = s_hap_f };
+            const unsigned def = sh_hap_defaults(&kept);
+            if (def & SH_HAP_DEF_LOCK) {
+                s_key_lock = false;
+                printf("default settings: keyboard unlocked, the display shows UnL\n");
+            }
+            if (def & SH_HAP_DEF_UNITS) {
+                s_hap_f = false;
+            }
+            if (what == SH_WEB_RESET_FACTORY) {
+                s_hap_on = true;
+                s_hap_paired = false;
+                s_hap_win = s_hap_run;
+            }
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
         }

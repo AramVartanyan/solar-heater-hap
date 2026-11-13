@@ -20,6 +20,7 @@ void sh_hap_view(const sh_hap_in_t *in, sh_hap_view_t *out)
     out->lock = in->lock;
     out->col_fault = (in->alarms & COL_FAULTS) != 0;
     out->tank_fault = (in->alarms & TANK_FAULTS) != 0;
+    out->units = in->fahrenheit ? SH_HAP_UNITS_F : SH_HAP_UNITS_C;
 }
 
 unsigned sh_hap_changed(const sh_hap_view_t *was, const sh_hap_view_t *now)
@@ -42,6 +43,9 @@ unsigned sh_hap_changed(const sh_hap_view_t *was, const sh_hap_view_t *now)
     }
     if (was->tank_fault != now->tank_fault) {
         ch |= SH_HAP_CH_TANK_FAULT;
+    }
+    if (was->units != now->units) {
+        ch |= SH_HAP_CH_UNITS;
     }
     return ch;
 }
@@ -158,6 +162,11 @@ sh_hap_qty_t sh_hap_setting_qty(sh_setting_t id)
     default:
         return SH_HAP_QTY_NONE;
     }
+}
+
+unsigned sh_hap_defaults(const sh_hap_kept_t *k)
+{
+    return (k->lock ? SH_HAP_DEF_LOCK : 0u) | (k->fahrenheit ? SH_HAP_DEF_UNITS : 0u);
 }
 
 bool sh_hap_start_due(bool enabled, bool connected, bool started)

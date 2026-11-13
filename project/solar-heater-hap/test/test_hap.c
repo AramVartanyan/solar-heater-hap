@@ -676,6 +676,70 @@ static unsigned step(sh_hap_view_t *sent, const sh_hap_in_t *in)
     return ch;
 }
 
+static const char *file(const char *path);
+
+/* ---- "Reset -> Default settings": the standard path of each parameter, with the notifications */
+
+static void test_default_settings(void)
+{
+    /* what sh_hap keeps: the keyboard unlocked, the units °C — only what differs */
+    sh_hap_kept_t k = { .on = true, .paired = true, .lock = true, .fahrenheit = true };
+    CHECK_EQ(sh_hap_defaults(&k), SH_HAP_DEF_LOCK | SH_HAP_DEF_UNITS);
+    k.fahrenheit = false;
+    CHECK_EQ(sh_hap_defaults(&k), SH_HAP_DEF_LOCK);             /* "UnL" on the display */
+    k.lock = false;
+    k.fahrenheit = true;
+    CHECK_EQ(sh_hap_defaults(&k), SH_HAP_DEF_UNITS);            /* not locked: no "UnL" */
+    k.fahrenheit = false;
+    CHECK_EQ(sh_hap_defaults(&k), 0);                           /* nothing to do */
+    /* the setting "Apple HomeKit" and the pairing are never touched, whatever they are */
+    for (int i = 0; i < 4; i++) {
+        const sh_hap_kept_t was = { .on = (i & 1) != 0, .paired = (i & 2) != 0, .lock = true, .fahrenheit = true };
+        sh_hap_kept_t now = was;
+        CHECK_EQ(sh_hap_defaults(&now), SH_HAP_DEF_LOCK | SH_HAP_DEF_UNITS);
+        CHECK_EQ(now.on, was.on);
+        CHECK_EQ(now.paired, was.paired);
+        CHECK_EQ(sh_hap_set(was.on, was.on, was.paired), SH_HAP_SET_SAME);      /* no restart either */
+    }
+    /* the unlock is the ordinary change of the lock: stored once, "UnL" for 1 s */
+    bool lock = true;
+    CHECK(sh_hap_lock_change(&lock, false));
+    ui_t u = { .now = 1000, .ctx = { .locked = true } };
+    sh_menu_lock_changed(&u.m, false, u.now);
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_UNL);
+    CHECK_EQ(view(&u, 1000).notice, SH_MENU_NOTICE_NONE);
+    CHECK(!sh_hap_lock_change(&lock, false));                   /* was not locked: nothing, no "UnL" */
+
+    /* HomeKit hears of everything that the reset changes: the vacation (Active), Tmax (Heating
+     * Threshold), the lock and the units — and of nothing that it leaves as it was */
+    sh_hap_in_t in = { .vacation = true, .tmax = 55, .lock = true, .fahrenheit = true, .reason = SH_PUMP_REASON_VACATION };
+    sh_hap_view_t sent = view_of(&in);
+    CHECK_EQ(sent.units, SH_HAP_UNITS_F);
+    in.vacation = false;                                        /* the defaults of sh_settings */
+    in.tmax = 70;
+    in.lock = false;
+    in.fahrenheit = false;
+    sh_hap_view_t now = view_of(&in);
+    CHECK_EQ(sh_hap_changed(&sent, &now),
+             SH_HAP_CH_ACTIVE | SH_HAP_CH_THRESHOLD | SH_HAP_CH_LOCK | SH_HAP_CH_UNITS);
+    CHECK_EQ(now.active, 1);
+    CHECK_EQ(now.threshold, 70);
+    CHECK_EQ(now.lock, 0);
+    CHECK_EQ(now.units, SH_HAP_UNITS_C);
+    sent = now;
+    now = view_of(&in);                                         /* a second reset: nothing more */
+    CHECK_EQ(sh_hap_changed(&sent, &now), 0);
+    /* the units alone (already at the default values otherwise) */
+    in.fahrenheit = true;
+    sent = view_of(&in);
+    in.fahrenheit = false;
+    now = view_of(&in);
+    CHECK_EQ(sh_hap_changed(&sent, &now), SH_HAP_CH_UNITS);
+    /* the server calls it on "defaults" */
+    const char *srv = file("../main/sh_web.c");
+    CHECK(strstr(srv, "sh_hap_defaults_reset();") != NULL);
+}
+
 static void test_notifications(void)
 {
     sh_hap_in_t in = normal();
@@ -712,7 +776,7 @@ static void test_notifications(void)
     CHECK_EQ(step(&sent, &in), SH_HAP_CH_THRESHOLD);
     CHECK_EQ(step(&sent, &in), 0);
 
-    /* the child lock */
+    /* the keyboard lock */
     in.lock = true;
     CHECK_EQ(step(&sent, &in), SH_HAP_CH_LOCK);
     in.lock = false;
@@ -741,12 +805,12 @@ static void test_notifications(void)
     /* the temperatures are not among the notified values at all: they are answered on a read
      * (sh_hap_temp()), so a changing temperature never sends anything */
     const unsigned all = SH_HAP_CH_ACTIVE | SH_HAP_CH_CUR_STATE | SH_HAP_CH_THRESHOLD | SH_HAP_CH_LOCK |
-                         SH_HAP_CH_COL_FAULT | SH_HAP_CH_TANK_FAULT;
+                         SH_HAP_CH_COL_FAULT | SH_HAP_CH_TANK_FAULT | SH_HAP_CH_UNITS;
     const sh_hap_view_t a = { .active = 0, .cur_state = SH_HAP_IDLE, .threshold = 30 };
     const sh_hap_view_t b = { .active = 1, .cur_state = SH_HAP_HEATING, .threshold = 85, .lock = 1,
-                              .col_fault = 1, .tank_fault = 1 };
+                              .col_fault = 1, .tank_fault = 1, .units = SH_HAP_UNITS_F };
     CHECK_EQ(sh_hap_changed(&a, &b), all);
-    CHECK_EQ(all, 0x3F);                                        /* six characteristics, no temperature */
+    CHECK_EQ(all, 0x7F);                                        /* seven characteristics, no temperature */
     CHECK_EQ(sh_hap_changed(&b, &b), 0);
 }
 
@@ -1132,6 +1196,7 @@ int main(void)
     test_lock();
     test_status_fault();
     test_notifications();
+    test_default_settings();
     test_start();
     test_setting();
     test_pairing_window();
