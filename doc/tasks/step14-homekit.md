@@ -22,8 +22,12 @@
 - [doc/firmware.md](../firmware.md) т. 3 (прозорецът за сдвояване — събитията на SDK) и т. 4 (отменено намаляване
   на мощността); [doc/web-interface.md](../web-interface.md) (т. 2 „Система“ — HomeKit; т. 6 нулирането на
   сдвояванията; т. 7.1); [doc/led-indication.md](../led-indication.md) (дишане — само при отворен прозорец).
-- **esp-homekit-sdk** (`espressif/esp-homekit-sdk`, `HOMEKIT_PATH` — виж `project/solar-heater-hap/CMakeLists.txt`
-  и `components/homekit/esp-homekit_lib.txt`); примерът на интеграция — проектът `mppt-1k` (`mppt_hap.c`,
+- **esp-homekit-sdk — форкът `AramVartanyan/esp-homekit-sdk`** (основата е `espressif/esp-homekit-sdk`;
+  `HOMEKIT_PATH` — виж `project/solar-heater-hap/CMakeLists.txt` и `components/homekit/esp-homekit_lib.txt`).
+  Разликата, която засяга проекта: `hap_mdns_init()` задава името в mDNS от `CONFIG_LWIP_LOCAL_HOSTNAME` (в оригинала
+  — `"MyHost"`). Промените на форка в `app_wifi` (индикацията, името в рутера) не засягат проекта — той ползва
+  `captive-wifi`. **`button` — версията в `components/button` на това хранилище** (не тази на SDK-то; редът в
+  `CMakeLists.txt` вече я поставя с предимство). Примерът на интеграция — проектът `mppt-1k` (`mppt_hap.c`,
   `app_main.c`; **само за четене** — не се пипа). Библиотеките — само с наличния им API; не се променят.
 - Съществуващият код в `project/solar-heater-hap/main/` (особено `sh_net` / `sh_net_rules`, `sh_web`, `sh_menu`,
   `sh_ind` / `sh_led`, `sh_control`, `sh_state`, `sh_settings`), тестовете и заместителят на страницата
@@ -64,6 +68,10 @@
 - При включен HAP **уеб интерфейсът е на сървъра на HAP** (страниците се регистрират там), а **`Solar-xxxxxx.local`
   — в неговия mDNS**; при изключен — както сега (собственият сървър и mDNS). Двата механизма не се превключват по
   време на работа. Мощността на радиото не се пипа.
+- **Редът при mDNS (включен HAP):** mDNS се пуска **от HAP** (`hap_start()` → `hap_mdns_init()`; ако mDNS вече е
+  пуснат от приложението, `hap_mdns_init()` връща грешка) и чак **след това** приложението задава името
+  `Solar-xxxxxx` (`mdns_hostname_set(captive_wifi_ap_ssid())` — името е от MAC адреса, не константа от Kconfig) и
+  добавя уеб услугата (`_http._tcp`, порт 80). При изключен HAP — собственият mDNS, както сега.
 - Светодиодът — **дишане само при отворен прозорец за сдвояване**; иначе — индикацията за връзка, както сега.
 - Уеб интерфейс, „Система“ → „HomeKit“: „Сдвоен“ (да / не) и превключвателят; „Нулиране → Сдвояванията с
   HomeKit“ (Да / Не, с кода; изтрива сдвояванията) — стават активни.
