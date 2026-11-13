@@ -57,6 +57,8 @@
  *   http://localhost:8080/sim?hkwin=0    the 10 min of the pairing window are over
  *   http://localhost:8080/sim?hkrun=0    HAP is not running (no connection to the router since
  *                                        boot): the pairings cannot be reset; hkrun=1: running
+ *   http://localhost:8080/sim?hkf=1      °F chosen in Apple Home (Temperature Display Units): the
+ *                                        page shows and takes °F, the data stay °C; hkf=0: °C
  * The switch and "Reset -> HomeKit pairings" "restart" the controller (the console says so).
  * POSIX sockets, one request at a time. */
 
@@ -116,7 +118,7 @@ static const sh_alarm_params_t ALARM = {
 };
 static time_t s_start, s_silent_until;
 /* Apple HomeKit: the setting, paired, HAP running, the pairing window */
-static bool s_hap_on = true, s_hap_paired, s_hap_run = true, s_hap_win = true;
+static bool s_hap_on = true, s_hap_paired, s_hap_run = true, s_hap_win = true, s_hap_f;
 
 /* monotonic s since the "boot", which was a day before the start (room for the made-up day) */
 static uint32_t now_s(void)
@@ -550,7 +552,7 @@ static void reply_state(int fd)
         .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = AP_SSID, .ap_ssid = AP_SSID,
         .ota = s_ota.phase, .ota_pct = s_ota.pct, .ota_version = s_ota.version,
         .hap_on = s_hap_on, .hap_paired = s_hap_paired, .hap_running = s_hap_on && s_hap_run,
-        .hap_window = s_hap_on && s_hap_run && s_hap_win,
+        .hap_window = s_hap_on && s_hap_run && s_hap_win, .fahrenheit = s_hap_f,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
@@ -661,6 +663,9 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "hkwin=")) && sscanf(p + 6, "%d", &v) == 1 && !v) {
         s_hap_win = sh_hap_window(s_hap_win, SH_HAP_EVT_TIMED_OUT, s_hap_paired);
+    }
+    if ((p = strstr(query, "hkf=")) && sscanf(p + 4, "%d", &v) == 1) {
+        s_hap_f = v != 0;
     }
     if ((p = strstr(query, "hkrun=")) && sscanf(p + 6, "%d", &v) == 1) {
         s_hap_run = v != 0;

@@ -193,9 +193,10 @@ int sh_web_status_json(char *buf, size_t size, const sh_web_status_t *s)
     put_str(&o, s->ota_version ? s->ota_version : "");
     put(&o, ",\"pct\":");
     put_or_null(&o, s->ota == SH_OTA_RUNNING && s->ota_pct >= 0, s->ota_pct);
-    /* Apple HomeKit: the setting, paired, running (the pairings can be reset), the pairing window */
-    put(&o, "},\"hap\":{\"on\":%d,\"paired\":%d,\"run\":%d,\"win\":%d},", s->hap_on, s->hap_paired,
-        s->hap_running, s->hap_window);
+    /* Apple HomeKit: the setting, paired, running (the pairings can be reset), the pairing window;
+     * "f": the page shows °F (everything here stays in °C / K) */
+    put(&o, "},\"hap\":{\"on\":%d,\"paired\":%d,\"run\":%d,\"win\":%d,\"f\":%d},", s->hap_on, s->hap_paired,
+        s->hap_running, s->hap_window, s->fahrenheit);
 
     static const char *const trust[] = {
         [SH_CLOCK_UNSET] = "unset", [SH_CLOCK_TZ_UNCONFIRMED] = "tz",

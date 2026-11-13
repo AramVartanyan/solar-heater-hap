@@ -30,8 +30,10 @@
   esp-homekit-sdk — подмодулът `components/homekit`. Аксесоар `Solar-xxxxxx` (категория Heater, Armo Ltd., Solar
   Heater, сериен номер — основният MAC, версията на фърмуера) с три услуги: **Heater Cooler** (основна; Active —
   изкл. = ваканция, Current State — Idle / Heating / Cooling (нощно охлаждане), Target State — само Heat, Current
-  Temperature — бойлерът, Heating Threshold — Tmax 30 – 85 °C, Name, Temperature Display Units — °C / °F на нашия
-  дисплей (към HomeKit винаги °C), Lock Physical Controls — детска защита) и датчиците **`Collector`**
+  Temperature — бойлерът, Heating Threshold — Tmax 30 – 85 °C, Name, Temperature Display Units — °C / °F за
+  всичко, което потребителят вижда: дисплеят (температурите и `tbo`, `C.Lo`, `d.on`, `d.oF` в менюто) и уеб
+  интерфейсът (показване и въвеждане); вътрешно, в NVS, в историята / CSV и към HomeKit — винаги °C / K; Lock
+  Physical Controls — детска защита) и датчиците **`Collector`**
   (−40 … 200 °C; Status Fault при `E1`, `E5`) и **`Tank`** (Status Fault при `E2`, `E4`). Температурите се подават
   само при четене; известия при промяна — Active, Current State, Heating Threshold, Lock Physical Controls, Status
   Fault. **Identify** — светодиодът по шаблона на `ledIdentify()` (3 × 2 мигания). Кодът за сдвояване — от

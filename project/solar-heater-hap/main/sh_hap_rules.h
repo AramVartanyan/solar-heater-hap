@@ -10,8 +10,11 @@
  *     Target Heater Cooler State  Heat only
  *     Current Temperature         the tank, 0 ... 100 °C
  *     Heating Threshold           Tmax, 30 ... 85 °C, step 1
- *     Temperature Display Units   set by HomeKit only: the units of our display; the values sent
- *                                 to HomeKit are always °C
+ *     Temperature Display Units   set by HomeKit only (kept in NVS, °C without a choice): what the
+ *                                 user sees — the display (the temperatures and the menu values)
+ *                                 and the web interface — is shown in °F; everything inside stays
+ *                                 in °C / K: the measurements, the logic, the settings in NVS, the
+ *                                 history and its CSV, and the values sent to HomeKit
  *     Lock Physical Controls      the child lock: no menu and no pump test from the buttons ("LoC"
  *                                 for 1 s, sh_menu); the resets by holding "menu" and the web
  *                                 interface are not locked
@@ -32,6 +35,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "sh_pump_logic.h"
+#include "sh_settings.h"
 
 /* Current Heater Cooler State (HAP: 0 Inactive is not used) */
 typedef enum {
@@ -94,9 +98,29 @@ bool sh_hap_write_threshold(float v, int16_t *tmax);    /* rounded to 1 °C, 30 
 bool sh_hap_write_units(int v, bool *fahrenheit);       /* 0 °C, 1 °F */
 bool sh_hap_write_lock(int v, bool *lock);              /* 0 / 1 */
 
-/* A temperature as our display shows it: tenths of °C, or of °F with the display units of HomeKit
- * (SH_TEMP_INVALID stays). */
+/* ---- the display units: converted only where a value is shown or entered ------------------ */
+
+/* A temperature as it is shown: tenths of °C, or of °F (to 0.1 °F) with the display units of
+ * HomeKit (SH_TEMP_INVALID stays). */
 int16_t sh_hap_display_temp(int16_t t, bool fahrenheit);
+
+/* What a value in whole units is: a temperature, a temperature difference, or neither. */
+typedef enum {
+    SH_HAP_QTY_NONE = 0,        /* seconds, on / off ...: never converted */
+    SH_HAP_QTY_TEMP,            /* °C  ->  °F = °C * 1.8 + 32 */
+    SH_HAP_QTY_DIFF,            /* K   ->  °F = K * 1.8 (no + 32) */
+} sh_hap_qty_t;
+
+/* A whole value as it is shown: °C / K, or rounded to a whole °F. The stored value and its step
+ * stay 1 °C / 1 K, so in °F the shown values step unevenly (tbo: 86, 88, 90, 91 ...). */
+int16_t sh_hap_display_whole(int16_t v, sh_hap_qty_t qty, bool fahrenheit);
+
+/* The value to store for an entered one (the web interface): the nearest whole °C / K. What
+ * sh_hap_display_whole() shows comes back as the same stored value. */
+int16_t sh_hap_entered_whole(int16_t shown, sh_hap_qty_t qty, bool fahrenheit);
+
+/* The quantity of a menu setting: tbo and C.Lo are temperatures, d.on and d.oF differences. */
+sh_hap_qty_t sh_hap_setting_qty(sh_setting_t id);
 
 /* ---- when HAP runs ---------------------------------------------------------------------- */
 

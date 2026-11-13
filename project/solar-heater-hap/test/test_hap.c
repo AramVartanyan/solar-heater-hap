@@ -220,6 +220,143 @@ typedef struct {
     sh_menu_ctx_t ctx;
 } ui_t;
 
+static sh_menu_act_t key(ui_t *u, sh_key_t k, uint32_t dt);
+static sh_menu_view_t view(ui_t *u, uint32_t dt);
+static char s_json[SH_WEB_STATUS_MAX];
+
+/* ---- °F: only what is shown and entered; inside everything stays °C / K ------------------ */
+
+static void test_display_units(void)
+{
+    const sh_hap_qty_t T = SH_HAP_QTY_TEMP, D = SH_HAP_QTY_DIFF, N = SH_HAP_QTY_NONE;
+
+    /* °C chosen (or nothing chosen): nothing is converted */
+    CHECK_EQ(sh_hap_display_whole(70, T, false), 70);
+    CHECK_EQ(sh_hap_display_whole(6, D, false), 6);
+    CHECK_EQ(sh_hap_entered_whole(70, T, false), 70);
+    CHECK_EQ(sh_hap_entered_whole(6, D, false), 6);
+
+    /* a temperature: * 1.8 + 32, rounded to a whole °F */
+    CHECK_EQ(sh_hap_display_whole(0, T, true), 32);
+    CHECK_EQ(sh_hap_display_whole(100, T, true), 212);
+    CHECK_EQ(sh_hap_display_whole(70, T, true), 158);
+    CHECK_EQ(sh_hap_display_whole(25, T, true), 77);
+    CHECK_EQ(sh_hap_display_whole(31, T, true), 88);            /* 87.8 */
+    CHECK_EQ(sh_hap_display_whole(33, T, true), 91);            /* 91.4 */
+    CHECK_EQ(sh_hap_display_whole(-40, T, true), -40);
+    CHECK_EQ(sh_hap_display_whole(-18, T, true), 0);            /* -0.4 */
+    CHECK_EQ(sh_hap_display_whole(-19, T, true), -2);           /* -2.2 */
+    CHECK_EQ(sh_hap_display_whole(250, T, true), 482);
+    /* a difference: * 1.8 only, no + 32 */
+    CHECK_EQ(sh_hap_display_whole(0, D, true), 0);
+    CHECK_EQ(sh_hap_display_whole(1, D, true), 2);              /* 1.8 */
+    CHECK_EQ(sh_hap_display_whole(2, D, true), 4);              /* 3.6 */
+    CHECK_EQ(sh_hap_display_whole(3, D, true), 5);              /* 5.4 */
+    CHECK_EQ(sh_hap_display_whole(4, D, true), 7);              /* 7.2 */
+    CHECK_EQ(sh_hap_display_whole(5, D, true), 9);
+    CHECK_EQ(sh_hap_display_whole(6, D, true), 11);             /* 10.8 */
+    CHECK_EQ(sh_hap_display_whole(20, D, true), 36);
+    /* anything else (seconds, on / off) is never converted */
+    CHECK_EQ(sh_hap_display_whole(300, N, true), 300);
+    CHECK_EQ(sh_hap_entered_whole(300, N, true), 300);
+
+    /* which menu value is what */
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_TANK_MAX), T);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_COL_MIN), T);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_COL_MIN_W), T);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_DIFF_ON), D);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_DIFF_OFF), D);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_DIFF_ON_W), D);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_DIFF_OFF_W), D);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_TEST_S), N);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_SEASON), N);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_VACATION), N);
+    CHECK_EQ(sh_hap_setting_qty(SH_SET_NCOOL), N);
+
+    /* the step stays 1 °C / 1 K of the stored value: in °F the shown values step unevenly */
+    const int16_t tbo_f[] = { 86, 88, 90, 91, 93, 95, 97, 99, 100, 102 };
+    for (int i = 0; i < 10; i++) {
+        CHECK_EQ(sh_hap_display_whole((int16_t)(30 + i), T, true), tbo_f[i]);
+    }
+    CHECK_EQ(sh_hap_display_whole(85, T, true), 185);           /* the top of tbo: 3 digits */
+
+    /* entering: the nearest whole °C / K; what is shown comes back as the same stored value —
+     * over every range a page or the menu has (tbo, C.Lo, the collector maximum, d.on, d.oF) */
+    for (int16_t c = -40; c <= 250; c++) {
+        const int16_t f = sh_hap_display_whole(c, T, true);
+        CHECK_EQ(sh_hap_entered_whole(f, T, true), c);
+        CHECK(f > sh_hap_display_whole((int16_t)(c - 1), T, true));     /* no two values look the same */
+    }
+    for (int16_t k = 0; k <= 30; k++) {
+        CHECK_EQ(sh_hap_entered_whole(sh_hap_display_whole(k, D, true), D, true), k);
+    }
+    CHECK_EQ(sh_hap_entered_whole(140, T, true), 60);
+    CHECK_EQ(sh_hap_entered_whole(141, T, true), 61);           /* 60.6 */
+    CHECK_EQ(sh_hap_entered_whole(150, T, true), 66);           /* 65.6 */
+    CHECK_EQ(sh_hap_entered_whole(32, T, true), 0);
+    CHECK_EQ(sh_hap_entered_whole(10, D, true), 6);             /* 5.6 */
+    CHECK_EQ(sh_hap_entered_whole(9, D, true), 5);
+
+    /* the temperatures with tenths: to 0.1 °F */
+    CHECK_EQ(sh_hap_display_temp(523, true), 1261);             /* 52.3 °C = 126.14 °F */
+    CHECK_EQ(sh_hap_display_temp(1, true), 322);                /* 0.1 °C = 32.18 °F */
+    CHECK_EQ(sh_hap_display_temp(-1, true), 318);
+
+    /* the logic gets the same values in °C and in °F: the menu stores the same whatever the
+     * display shows — the units are no input of it */
+    ui_t u = { .now = 1000, .ctx = { .hap_on = true } };
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);                                  /* tbo */
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(sh_menu_setting(view(&u, 0).pos, false), SH_SET_TANK_MAX);
+    const int16_t shown_f[] = { 158, 160, 162, 163 };           /* 70, 71, 72, 73 °C */
+    for (int i = 0; i < 4; i++) {
+        CHECK_EQ(view(&u, 0).value, 70 + i);                    /* the value of the menu: °C */
+        CHECK_EQ(sh_hap_display_whole(view(&u, 0).value, sh_hap_setting_qty(SH_SET_TANK_MAX), true), shown_f[i]);
+        CHECK_EQ(sh_hap_display_whole(view(&u, 0).value, sh_hap_setting_qty(SH_SET_TANK_MAX), false), 70 + i);
+        if (i < 3) {
+            key(&u, SH_KEY_PLUS, 100);
+        }
+    }
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_SAVE);
+    CHECK_EQ(u.m.value, 73);                                    /* stored in °C */
+    CHECK_EQ(u.m.id, SH_SET_TANK_MAX);
+    /* HomeKit and the rules behind it: the units are not among their inputs */
+    sh_hap_in_t hin = normal();
+    CHECK_EQ(view_of(&hin).threshold, 70);
+
+    /* the web interface: the same data whatever the units — only the flag for the page differs */
+    sh_web_status_t s = {
+        .t_col = 523, .t_tank = 418,
+        .cfg = { .settings = S, .frost = true,
+                 .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } },
+        .col_protect = 1100, .name = "Solar-810840", .version = "0.1.0", .serial = "E8F60A810840",
+        .ssid = "Home", .ip = "192.168.1.7", .rssi = -41, .host = "Solar-810840", .ap_ssid = "Solar-810840",
+        .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
+        .cool_until = -1, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
+    };
+    static char c_json[SH_WEB_STATUS_MAX];
+    CHECK(sh_web_status_json(c_json, sizeof(c_json), &s) > 0);
+    CHECK(strstr(c_json, "\"win\":0,\"f\":0},") != NULL);
+    s.fahrenheit = true;
+    CHECK(sh_web_status_json(s_json, sizeof(s_json), &s) > 0);
+    char *flag = strstr(s_json, "\"f\":1},");
+    CHECK(flag != NULL);
+    if (flag) {
+        flag[4] = '0';
+    }
+    CHECK(strcmp(s_json, c_json) == 0);
+    CHECK(strstr(c_json, "\"tank\":418,\"col\":523,") != NULL);                     /* tenths of °C */
+    CHECK(strstr(c_json, "\"tbo\":{\"v\":70,\"min\":30,\"max\":85,\"step\":1}") != NULL);
+    /* and a request is in °C / K: the page converts before it sends */
+    sh_web_config_t cfg = s.cfg;
+    unsigned ch = 0;
+    CHECK_EQ(sh_web_set("tbo=66", CODE, &cfg, &ch), SH_WEB_OK);
+    CHECK_EQ(cfg.settings.v[SH_SET_TANK_MAX], 66);
+    CHECK_EQ(sh_web_set("tbo=150", CODE, &cfg, &ch), SH_WEB_BAD);                   /* °F is not taken */
+}
+
 static sh_menu_act_t key(ui_t *u, sh_key_t k, uint32_t dt)
 {
     u->now += dt;
@@ -696,8 +833,6 @@ static void test_identify(void)
 
 /* ---- the web interface ------------------------------------------------------------------ */
 
-static char s_json[SH_WEB_STATUS_MAX];
-
 #define HAS(s, text)                                                                \
     do {                                                                            \
         CHECK(sh_web_status_json(s_json, sizeof(s_json), (s)) > 0);                 \
@@ -733,15 +868,15 @@ static void test_web(void)
     /* the function is there: its elements are not grey */
     HAS(&s, "\"homekit\"]");
     /* the setting, paired, running, the pairing window */
-    HAS(&s, "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0},");
+    HAS(&s, "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},");
     s.hap_on = true;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":0,\"win\":0},");     /* waiting for the router */
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},");     /* waiting for the router */
     s.hap_running = true;
     s.hap_window = true;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":1,\"win\":1},");
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":1,\"win\":1,\"f\":0},");
     s.hap_paired = true;
     s.hap_window = false;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":1,\"run\":1,\"win\":0},");
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":1,\"run\":1,\"win\":0,\"f\":0},");
     /* the whole status still fits its buffer */
     CHECK(sh_web_status_json(s_json, sizeof(s_json), &s) < SH_WEB_STATUS_MAX - 256);
 
@@ -762,6 +897,13 @@ static void test_web(void)
     CHECK(strstr(page, "Първо премахнете устройството от Apple Home") != NULL);
     CHECK(strstr(page, "First remove the device from Apple Home") != NULL);
     CHECK(strstr(page, "q_homekit:") != NULL);
+    /* °F: the page converts what it shows and what is entered (the data stay °C) */
+    CHECK(strstr(page, "S.hap.f") != NULL);
+    CHECK(strstr(page, "data-k=\"tbo\" data-u=\"t\"") != NULL);
+    CHECK(strstr(page, "data-k=\"d_on\" data-u=\"d\"") != NULL);
+    CHECK(strstr(page, "data-k=\"col_max\" data-u=\"t\"") != NULL);
+    CHECK(strstr(page, "data-k=\"press\" data-u") == NULL);                 /* bar: not a temperature */
+    CHECK(strstr(page, "data-k=\"col_area\" data-u") == NULL);
     CHECK(strstr(page, "<button class=\"row\" data-f=\"homekit\"><span") == NULL);    /* the old dead row */
     /* the server: the setting and the reset reach sh_hap; the pages can move to the server of HAP */
     const char *srv = file("../main/sh_web.c");
@@ -782,6 +924,7 @@ int main(void)
     test_current_state();
     test_temperatures();
     test_units();
+    test_display_units();
     test_lock();
     test_status_fault();
     test_notifications();

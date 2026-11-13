@@ -118,7 +118,7 @@ static esp_err_t state_get(httpd_req_t *req)
         .ap = ap_mode, .ap_pending = net.ap_pending, .host = sh_net_name(), .ap_ssid = captive_wifi_ap_ssid(),
         .ota = net.ota, .ota_pct = net.ota_pct, .ota_version = net.ota_version,
         .hap_on = sh_hap_enabled(), .hap_paired = sh_hap_paired(), .hap_running = sh_hap_running(),
-        .hap_window = st.hap_pair_window,
+        .hap_window = st.hap_pair_window, .fahrenheit = st.hap_fahrenheit,
         .clock = {
             .trust = ci.trust, .sntp = ci.sntp, .min = ci.lt.set ? (int16_t)ci.lt.min : -1,
             .tz = ci.tz, .tz_confirmed = ci.tz_confirmed, .peak = ci.peak.peak,

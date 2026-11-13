@@ -162,7 +162,8 @@ static void code_screen(screen_t *s, uint8_t part)
     set_seg(s, seg);
 }
 
-static void menu_screen(screen_t *s, const sh_menu_view_t *v)
+/* `st`: the season (which setting a position is) and the display units chosen in HomeKit. */
+static void menu_screen(screen_t *s, const sh_menu_view_t *v, const sh_state_t *st)
 {
     if (v->mode == SH_MENU_LIST) {
         set_seg(s, s_items[v->pos < SH_MENU_ITEMS ? v->pos : SH_MENU_END]);
@@ -178,7 +179,9 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
     } else if (v->pos == SH_MENU_HOL || v->pos == SH_MENU_HAP) {
         set_seg(s, s_on_off[v->value != 0]);
     } else {
-        set_number(s, v->value);
+        /* tbo, C.Lo, d.on, d.oF in °F if chosen (the stored value and its step stay °C / K) */
+        const sh_setting_t id = sh_menu_setting(v->pos, st->modes.winter);
+        set_number(s, sh_hap_display_whole(v->value, sh_hap_setting_qty(id), st->hap_fahrenheit));
     }
 }
 
@@ -274,7 +277,7 @@ static void display_task(void *arg)
         screen_t scr = { 0 };
         const bool normal = view.mode == SH_MENU_NORMAL;
         if (!normal) {
-            menu_screen(&scr, &view);   /* no alarms or test in the menu */
+            menu_screen(&scr, &view, &st);  /* no alarms or test in the menu */
         } else {
             /* the offered update, the test or the air venting instead of the cycle */
             const bool special = st.fup_offer || st.test_on || st.modes.air_on;

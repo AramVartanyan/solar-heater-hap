@@ -109,8 +109,46 @@ int16_t sh_hap_display_temp(int16_t t, bool fahrenheit)
     if (!fahrenheit || t == SH_TEMP_INVALID) {
         return t;
     }
-    const int32_t f = (int32_t)t * 9;       /* tenths of °F = tenths of °C * 9 / 5 + 320, rounded */
-    return (int16_t)((f >= 0 ? f + 2 : f - 2) / 5 + 320);
+    return (int16_t)(((int32_t)t * 9 + (t >= 0 ? 2 : -2)) / 5 + 320);   /* tenths: * 9 / 5 + 320, rounded */
+}
+
+/* a / b rounded to the nearest whole number (b > 0) */
+static int32_t div_round(int32_t a, int32_t b)
+{
+    return (a >= 0 ? a + b / 2 : a - b / 2) / b;
+}
+
+int16_t sh_hap_display_whole(int16_t v, sh_hap_qty_t qty, bool fahrenheit)
+{
+    if (!fahrenheit || qty == SH_HAP_QTY_NONE) {
+        return v;
+    }
+    return (int16_t)(div_round((int32_t)v * 9, 5) + (qty == SH_HAP_QTY_TEMP ? 32 : 0));
+}
+
+int16_t sh_hap_entered_whole(int16_t shown, sh_hap_qty_t qty, bool fahrenheit)
+{
+    if (!fahrenheit || qty == SH_HAP_QTY_NONE) {
+        return shown;
+    }
+    return (int16_t)div_round(((int32_t)shown - (qty == SH_HAP_QTY_TEMP ? 32 : 0)) * 5, 9);
+}
+
+sh_hap_qty_t sh_hap_setting_qty(sh_setting_t id)
+{
+    switch (id) {
+    case SH_SET_TANK_MAX:
+    case SH_SET_COL_MIN:
+    case SH_SET_COL_MIN_W:
+        return SH_HAP_QTY_TEMP;
+    case SH_SET_DIFF_ON:
+    case SH_SET_DIFF_OFF:
+    case SH_SET_DIFF_ON_W:
+    case SH_SET_DIFF_OFF_W:
+        return SH_HAP_QTY_DIFF;
+    default:
+        return SH_HAP_QTY_NONE;
+    }
 }
 
 bool sh_hap_start_due(bool enabled, bool connected, bool started)

@@ -92,6 +92,7 @@ typedef struct {
     bool hap_paired;            /* a controller is paired */
     bool hap_running;           /* HAP is running (connected to the router since boot) */
     bool hap_window;            /* the pairing window is open */
+    bool fahrenheit;            /* the display units chosen in HomeKit: the page shows °F (the data stay °C) */
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
     bool history;               /* the history partition is there */

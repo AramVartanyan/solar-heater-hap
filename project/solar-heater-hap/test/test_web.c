@@ -88,7 +88,7 @@ static void test_status(void)
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"cp\",\"pend\":0,"
         "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
         "\"ota\":{\"st\":\"idle\",\"ver\":\"\",\"pct\":null},"
-        "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0},"
+        "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
         "\"run\":[0,0,0,0]}") == 0);
 }
