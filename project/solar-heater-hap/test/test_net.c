@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the network and the firmware update (doc/operating-modes.md 6.2,
  * doc/web-interface.md 5): the network mode CP / AP and its times
  * (main/sh_net_rules.c), the menu position nEt with the access code and the labels of the display

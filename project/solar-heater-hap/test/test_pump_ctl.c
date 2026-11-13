@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the pump control above the normal mode (main/sh_pump_ctl.c): pump test, anti-seize,
  * sensor faults (doc/operating-modes.md 3.5, 4.3, 5.1). A simulation with a
  * 1 s clock, as the control task runs it. Temperatures are tenths of °C, times are seconds. */

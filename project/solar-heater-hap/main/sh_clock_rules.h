@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Clock rules (doc/operating-modes.md 7) — plain C, no ESP-IDF
  * / FreeRTOS, compiled into the host test too. sh_clock applies them.
  *

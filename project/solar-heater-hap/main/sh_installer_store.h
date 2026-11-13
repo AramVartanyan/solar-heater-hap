@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Installer data in the "nvs" partition (namespace "sh_installer"): read at boot, a missing or
  * out-of-range value -> its default (Kconfig "Installer data"); written only when a value changes.
  * Changed from the "Service" section of the web interface; a change applies at once (the control

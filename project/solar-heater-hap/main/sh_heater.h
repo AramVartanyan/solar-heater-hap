@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The heater in the tank: its sign, the guaranteed daylight and the leak checks of the heater
  * (doc/operating-modes.md 4.4, "Нагревател и „порочен кръг“ (т. 17)") —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too.

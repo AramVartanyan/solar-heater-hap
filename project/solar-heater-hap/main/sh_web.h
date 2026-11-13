@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Web interface (doc/web-interface.md): one page embedded
  * in the firmware and a small JSON API, on an own esp_http_server (port 80). The server runs while
  * the device is connected to the router (CP) or its own access point is on (AP, http://192.168.4.1),

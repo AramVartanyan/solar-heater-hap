@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Resets that end with a restart: from the menu button (sh_buttons) and from the web interface
  * (sh_web). The settings reset without a restart is in sh_settings_store / sh_installer_store. */
 #pragma once

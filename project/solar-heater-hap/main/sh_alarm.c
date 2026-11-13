@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Alarm and information codes — see sh_alarm.h. */
 
 #include <stddef.h>

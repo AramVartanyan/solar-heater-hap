@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Plausibility of the sensor readings and the sensor fault (doc/operating-modes.md 5.1)
  * — plain C, compiled into the host test too.
  *

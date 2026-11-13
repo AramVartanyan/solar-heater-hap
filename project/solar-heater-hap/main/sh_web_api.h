@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Web interface: the data of the page and the checks of its requests
  * (doc/web-interface.md) — plain C, no ESP-IDF / FreeRTOS,
  * compiled into the host test too. sh_web serves them over HTTP.

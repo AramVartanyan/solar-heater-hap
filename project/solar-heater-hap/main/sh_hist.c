@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Daily summaries in the flash — see sh_hist.h. */
 
 #include <stdarg.h>

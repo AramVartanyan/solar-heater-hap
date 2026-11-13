@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* History (doc/web-interface.md 4, 4.1): a task of its
  * own, once a second, feeds the day in RAM (sh_day: the chart, the summary of the day) from the
  * published state (sh_state) and the clock (sh_clock). At local midnight, with a set clock, the

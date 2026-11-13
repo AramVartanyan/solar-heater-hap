@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The clock (doc/operating-modes.md 7): SNTP (pool.ntp.org)
  * at every connection to the router and then every 12 h (CONFIG_LWIP_SNTP_UPDATE_DELAY); the time
  * of the browser, taken only without SNTP in the last 24 h; the time zone (default UTC) chosen or

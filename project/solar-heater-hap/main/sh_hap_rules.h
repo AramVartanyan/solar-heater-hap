@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Apple HomeKit: what the accessory shows and takes (doc/operating-modes.md 8)
  * — plain C, no ESP-IDF / FreeRTOS / esp-homekit-sdk, compiled into the
  * host test too. sh_hap builds the accessory with esp-homekit-sdk and feeds these rules.

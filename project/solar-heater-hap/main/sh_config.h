@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Solar heater controller — pins and fixed parameters (Kconfig "Device Settings"). */
 #pragma once
 

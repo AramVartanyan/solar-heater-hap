@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Pump decision, normal mode — see sh_pump_logic.h. */
 
 #include <stddef.h>

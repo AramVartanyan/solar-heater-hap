@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 #include "outputwrite.h"
 #include "sh_config.h"
 #include "sh_relay.h"

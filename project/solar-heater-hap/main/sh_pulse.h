@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Pulse mode: the sensors on the pipes (doc/operating-modes.md 4.5, "Импулсен режим — датчици
  * на тръбите (т. 16)") — when the next pulse is due. Plain C, no
  * ESP-IDF / FreeRTOS, compiled into the host test too. The pulse itself, the reliable values and the

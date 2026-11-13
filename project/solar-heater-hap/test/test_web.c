@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the web interface data and request checks (main/sh_web_api.c;
  * doc/web-interface.md): the status JSON, the settings
  * ("set") with the checks of the menu, the access code, the pump test commands, the resets; the

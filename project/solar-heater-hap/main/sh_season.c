@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Seasons: the automatic choice — see sh_season.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

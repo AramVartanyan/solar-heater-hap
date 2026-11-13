@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of Apple HomeKit (doc/operating-modes.md 8). What the accessory shows and
  * takes (main/sh_hap_rules.c): Active and the vacation, Tmax and its limits, the Current State, the
  * temperatures and their ranges, the display units, the keyboard lock, the Status Fault by the alarms,

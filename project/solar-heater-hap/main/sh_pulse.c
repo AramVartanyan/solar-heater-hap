@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Pulse mode: when the next pulse is due — see sh_pulse.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

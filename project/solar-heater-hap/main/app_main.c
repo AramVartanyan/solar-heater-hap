@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Solar water heater controller — Waveshare ESP32-S3-Zero (project solar-heater-hap)
  *
  * Boot order:

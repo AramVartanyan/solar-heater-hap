@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* User settings (the button menu, doc/operating-modes.md 6.1; the seasons, 2.2): table, ranges
  * and checks — plain C, compiled into the host test too. Storage in NVS: sh_settings_store.
  *

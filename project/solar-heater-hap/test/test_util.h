@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Minimal checks for the host tests (no framework). */
 #pragma once
 

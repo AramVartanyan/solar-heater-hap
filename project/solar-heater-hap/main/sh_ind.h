@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Status LED indication: state -> (colour, pattern) (doc/led-indication.md 1 - 5)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the
  * host test as well. sh_led drives the LED.

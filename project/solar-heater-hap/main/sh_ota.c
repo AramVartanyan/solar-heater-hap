@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Firmware update rules — see sh_ota.h. */
 
 #include <stdio.h>

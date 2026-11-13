@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"

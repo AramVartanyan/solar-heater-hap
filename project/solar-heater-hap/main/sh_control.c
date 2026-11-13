@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

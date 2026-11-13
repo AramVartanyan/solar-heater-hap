@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* TM1637, 3 digits (doc/hardware.md), library esp_tm1637 1.1.1. The display task is the only one
  * that writes to the display; it shows, in this order of precedence:
  *   - the user menu (sh_buttons / sh_menu): item names, the value (blinking while edited); after

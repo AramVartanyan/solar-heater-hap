@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Three front-panel buttons on GPIO (button library: tap, long press, auto-repeat).
  * Short presses drive the user menu and the pump test (sh_menu; doc/operating-modes.md 6.1), choose
  * the network mode (nEt -> sh_net) and confirm an offered firmware update ("FUp");

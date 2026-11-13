@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the pump decision (main/sh_pump_logic.c) — no ESP-IDF needed.
  *
  *   make -C project/solar-heater-hap/test
