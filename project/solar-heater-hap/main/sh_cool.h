@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Night cooling of the tank through the collector: when it is allowed, its target and the
  * self-learning (doc/operating-modes.md 4.1 "Нощно охлаждане на бойлера (т. 7)", 4.2 "Ваканция (т. 8)")
  * — plain C, no ESP-IDF / FreeRTOS, compiled

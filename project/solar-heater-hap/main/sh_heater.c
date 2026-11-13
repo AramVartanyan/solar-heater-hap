@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The heater: sign, detection, guaranteed daylight, leak checks — see sh_heater.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

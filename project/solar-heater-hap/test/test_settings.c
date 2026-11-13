@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the user settings table and checks (main/sh_settings.c;
  * doc/operating-modes.md 6.1). */
 

@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of night cooling, vacation, seasons, air venting (doc/operating-modes.md 4.1 - 4.3,
  * 2.2, 2.4): night cooling —
  * triggers and their hours, target, self-learning, heater (sh_cool) and the pump rule

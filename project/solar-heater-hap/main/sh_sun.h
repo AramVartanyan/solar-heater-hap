@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Sunrise and sunset seen by the collector (doc/operating-modes.md 2.4,
  * "Изгрев и залез") — plain C, no ESP-IDF /
  * FreeRTOS, compiled into the host test too.

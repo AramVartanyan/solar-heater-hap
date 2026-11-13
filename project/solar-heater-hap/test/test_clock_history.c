@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the clock and the history (doc/operating-modes.md 7, doc/web-interface.md 4):
  * the time of the browser, the trust of the clock, the zone check by the collector peak
  * (sh_clock_rules); the time zones (sh_tz); the chart and the summary of the day (sh_day); the

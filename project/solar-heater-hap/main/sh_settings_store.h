@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* User settings in the "nvs" partition (namespace "sh_settings"): read at boot, a missing or
  * invalid value -> its default (Kconfig "Control"); written only when a value changes. The factory
  * reset erases the partition, so the defaults come back. Table and checks: sh_settings.

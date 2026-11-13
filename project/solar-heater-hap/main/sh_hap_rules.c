@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Apple HomeKit: the rules — see sh_hap_rules.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

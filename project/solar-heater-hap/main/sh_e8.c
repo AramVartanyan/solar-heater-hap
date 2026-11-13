@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* E8: reverse thermosiphon — see sh_e8.h. */
 
 #include <stdlib.h>

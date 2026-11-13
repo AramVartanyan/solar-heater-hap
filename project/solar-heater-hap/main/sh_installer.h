@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Installer data and the limits computed from them (doc/operating-modes.md: installer data 1.5,
  * boiling point of the heat transfer fluid and computed limits 3.3, frost protection 3.4)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the

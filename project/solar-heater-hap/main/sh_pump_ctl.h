@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Pump control above the normal-mode decision (doc/operating-modes.md: pump test 4.3,
  * anti-seize 3.5, sensor fault 5.1) —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test as well.

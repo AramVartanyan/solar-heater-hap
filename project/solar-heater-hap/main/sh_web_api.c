@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Web interface: status and request checks — see sh_web_api.h. */
 
 #include <stdarg.h>

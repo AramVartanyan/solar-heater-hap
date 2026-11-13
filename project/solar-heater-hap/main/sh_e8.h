@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* E8: reverse thermosiphon through a broken gravity check valve (doc/operating-modes.md 5.2,
  * "Аварийни съобщения (т. 13)" — A8 / `E8` and its sign)
  * — plain C, no ESP-IDF / FreeRTOS, compiled into the host

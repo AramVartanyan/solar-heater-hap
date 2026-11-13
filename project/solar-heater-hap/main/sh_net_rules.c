@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The network mode — see sh_net_rules.h. */
 
 #include <stdio.h>

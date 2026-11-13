@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Supported time zones — see sh_tz.h. Rules: the POSIX TZ footer of the tz database files. */
 
 #include <string.h>

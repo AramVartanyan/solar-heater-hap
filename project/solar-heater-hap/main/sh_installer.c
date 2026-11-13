@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Installer data and the computed limits — see sh_installer.h. */
 
 #include <math.h>

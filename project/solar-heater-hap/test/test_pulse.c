@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the pulse mode (doc/operating-modes.md 4.5): the pulse mode — the mounting in
  * the installer data (sh_installer); when a pulse is due: the window, the day intervals, the hot
  * collector, the night, the night cooling and the vacation, the frost watch (sh_pulse, sh_cool);

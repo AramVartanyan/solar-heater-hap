@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Pump relay: GPIO -> transistor -> relay coil (pull-down keeps it off at reset).
  * Only drives the output; sh_control publishes the pump state and logs the changes. */
 #pragma once

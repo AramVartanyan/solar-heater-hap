@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Onboard WS2812 status LED (doc/led-indication.md): a colour and a pattern from sh_ind. The
  * patterns run on one periodic esp_timer (10 ms); the LED is written only when what it shows
  * changes. Brightness: CONFIG_SH_LED_BRIGHTNESS; the breathing (HomeKit pairing window) goes between

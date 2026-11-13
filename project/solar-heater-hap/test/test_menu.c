@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the menu transitions (main/sh_menu.c; doc/operating-modes.md
  * 6.1) and of the pump test and air
  * venting screens. Times in ms. */

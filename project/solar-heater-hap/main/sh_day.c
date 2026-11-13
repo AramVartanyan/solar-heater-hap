@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The day in RAM — see sh_day.h. */
 
 #include <string.h>

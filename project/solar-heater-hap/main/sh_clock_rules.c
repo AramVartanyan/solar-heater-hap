@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Clock rules — see sh_clock_rules.h. */
 
 #include "sh_clock_rules.h"

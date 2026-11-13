@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* User settings: table, ranges and checks — see sh_settings.h. */
 
 #include "sh_settings.h"

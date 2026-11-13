@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Firmware update — when it is checked, offered and started (doc/web-interface.md 5) —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too. sh_net runs general-ota as these
  * rules ask and feeds its results back.

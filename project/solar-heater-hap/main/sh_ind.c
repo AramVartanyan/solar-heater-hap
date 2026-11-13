@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Status LED indication — see sh_ind.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

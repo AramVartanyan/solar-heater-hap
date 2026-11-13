@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the sensor reading checks and the sensor fault (main/sh_meas.c;
  * doc/operating-modes.md 5.1). Temperatures in tenths of °C. */
 

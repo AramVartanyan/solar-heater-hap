@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Apple HomeKit (doc/operating-modes.md 8): the accessory on
  * esp-homekit-sdk. What it shows and takes is decided by sh_hap_rules (plain C, host test); this
  * module builds the accessory, starts HAP and passes the values on.

@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Learned values in the "nvs" partition (namespace "sh_learn"): the sunrises and sunsets of the last
  * days (sh_sun), the correction of the night cooling target with its count of quiet mornings
  * (sh_cool), the heater detected with "0 kW" (sh_heater) and the normal night cooling of the tank

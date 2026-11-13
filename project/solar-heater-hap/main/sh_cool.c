@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Night cooling: sessions, target, self-learning — see sh_cool.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

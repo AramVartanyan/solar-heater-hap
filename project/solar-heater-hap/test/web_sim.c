@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Stand-in for the firmware, to try the page of the web interface in a browser on the computer
  * (doc/web-interface.md): serves main/web/index.html
  * and the API of main/sh_web.c with the same plain-C code (sh_web_api, sh_installer, sh_settings,

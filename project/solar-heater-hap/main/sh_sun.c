@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Sunrise and sunset seen by the collector — see sh_sun.h. */
 
 #include "sh_state.h"           /* SH_TEMP_INVALID */

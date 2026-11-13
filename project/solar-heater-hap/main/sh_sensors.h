@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* DS18B20 collector / tank, each on its own 1-Wire GPIO (doc/hardware.md), library ds18b20.
  * Both sensors convert at the same time. A failed reading (no answer, CRC, out of range, jump
  * > 20 K) is repeated at once with a new conversion; a failed measurement keeps the last valid

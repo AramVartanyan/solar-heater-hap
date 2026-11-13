@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* The day in RAM (doc/web-interface.md 4, 4.1) — plain C,
  * no ESP-IDF / FreeRTOS, compiled into the host test too. Fed once a second by sh_history.
  *

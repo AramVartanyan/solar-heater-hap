@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Host test of the heater, its leak and E8 (doc/operating-modes.md 4.4, 5.2): the heater
  * power in the
  * installer data (sh_installer); the heater sign and its threshold, the detection with "0 kW", the

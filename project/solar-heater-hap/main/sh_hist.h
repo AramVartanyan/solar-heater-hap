@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Daily summaries in the flash (doc/web-interface.md 4.1) —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too. The flash is reached through
  * callbacks (sh_history: the "history" partition; the test: an array with the flash rules — erase

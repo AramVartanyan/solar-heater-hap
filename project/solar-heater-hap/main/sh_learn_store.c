@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 #include <string.h>
 #include "esp_log.h"
 #include "nvs.h"

@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Control loop: every second takes the last published measurement from sh_state and the current
  * settings (sh_settings_store), lets sh_pump_ctl decide (pump test, anti-seize, sensor faults,
  * normal mode — doc/operating-modes.md 2 - 4), drives the relay, publishes the pump state with its

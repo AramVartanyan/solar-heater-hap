@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Shared state: the single place where modules publish and read values. */
 #pragma once
 

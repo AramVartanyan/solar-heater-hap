@@ -1,3 +1,5 @@
+/* Created by Aram Vartanyan (c) 2026 */
+
 /* Plausibility of the sensor readings — see sh_meas.h. */
 
 #include <stdlib.h>
