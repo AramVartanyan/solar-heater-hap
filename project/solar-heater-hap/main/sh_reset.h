@@ -7,6 +7,7 @@
 typedef enum {
     SH_RESET_WIFI,          /* the stored Wi-Fi network only */
     SH_RESET_FACTORY,       /* everything in the "nvs" partition */
+    SH_RESET_RESTART,       /* nothing erased: a restart only (the setting "Apple HomeKit" changed) */
 } sh_reset_t;
 
 /* Erases and restarts; does not return. */

@@ -53,6 +53,8 @@ typedef struct {
     bool    wifi_connected;
     bool    wifi_portal;        /* captive-wifi setup portal active */
     bool    hap_pair_window;    /* HomeKit pairing window open */
+    bool    hap_lock;           /* the keyboard is locked (HomeKit Lock Physical Controls; sh_hap) */
+    bool    hap_fahrenheit;     /* HomeKit Temperature Display Units: the display shows °F */
     bool    vacation;
     bool    net_ap;             /* network mode AP: the own access point is on (sh_net) */
     bool    ota_running;        /* a firmware update is being written */
@@ -72,6 +74,7 @@ void sh_state_set_pump(bool on, sh_pump_reason_t reason);
 void sh_state_set_test(bool on, uint32_t start_s, uint32_t end_s);
 void sh_state_set_wifi(bool connected, bool portal);
 void sh_state_set_net(bool ap, bool ota_running, bool fup_offer, bool fup);
+void sh_state_set_hap(bool pair_window, bool lock, bool fahrenheit);
 void sh_state_set_alarms(uint8_t alarms);
 void sh_state_set_vacation(bool on);
 void sh_state_set_modes(const sh_modes_t *modes);

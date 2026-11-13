@@ -22,9 +22,11 @@ void sh_reset_now(sh_reset_t what)
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "NVS erase failed: %s", esp_err_to_name(err));
         }
-    } else {
+    } else if (what == SH_RESET_WIFI) {
         ESP_LOGW(TAG, "erasing the stored Wi-Fi network, restarting");
         captive_wifi_clear_credentials();
+    } else {
+        ESP_LOGW(TAG, "restarting");
     }
     vTaskDelay(pdMS_TO_TICKS(500));
     esp_restart();

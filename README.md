@@ -31,7 +31,7 @@ _Тази секция се попълва постепенно, докато с
 
 ## Софтуер
 
-- **Платформа:** ESP-IDF **5.5.x**, target `esp32s3`; HomeKit — [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (в следваща фаза)
+- **Платформа:** ESP-IDF **5.5.x**, target `esp32s3`; HomeKit — [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (подмодул `components/homekit`, клонът `homekit` на форка [AramVartanyan/esp-homekit-sdk](https://github.com/AramVartanyan/esp-homekit-sdk))
 - **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `solar-heater-hap.bin`, едно име от основния MAC адрес — `Solar-xxxxxx`: в рутера,
   по mDNS (`Solar-xxxxxx.local`) и на точката за достъп (за настройка на Wi-Fi и за режим `AP`)
 - Драйвер за WS2812 светодиода: `espressif/led_strip` (RMT, минимална конфигурация) — виж [doc/firmware.md](doc/firmware.md)
@@ -42,7 +42,6 @@ _Тази секция се попълва постепенно, докато с
 ```sh
 git clone --recursive https://github.com/AramVartanyan/solar-heater-hap.git
 # (или след обикновен clone: git submodule update --init)
-export HOMEKIT_PATH=/path/to/esp-homekit-sdk      # нужно от фазата с HomeKit нататък
 cd solar-heater-hap/project/solar-heater-hap
 idf.py set-target esp32s3
 idf.py build flash monitor
@@ -64,7 +63,7 @@ idf.py build flash monitor
 | Хранилище | Роля |
 |---|---|
 | [button](https://github.com/AramVartanyan/button) | Бутони — собствена поправена версия, която замества `button` от esp-homekit-sdk (git submodule в `components/button`) |
-| esp-homekit-sdk (`components/homekit`) | HomeKit — препратка, задава се с `HOMEKIT_PATH` |
+| [esp-homekit-sdk](https://github.com/AramVartanyan/esp-homekit-sdk) (`components/homekit`) | HomeKit — git submodule, клонът `homekit` на форка (само `components/homekit` от `master`, обновява се автоматично с GitHub Action); `HOMEKIT_PATH` по подразбиране е коренът на това хранилище |
 
 При външен `HOMEKIT_PATH` папката `components/` на това хранилище се добавя последна, така че собственият `button`
 има предимство пред този от SDK-то.
@@ -86,7 +85,7 @@ solar-heater-hap/
 ├── README.md, Changelog.md, LICENSE
 ├── components/               — компоненти от esp-homekit-sdk
 │   ├── button/               — собствена поправена версия (git submodule)
-│   └── homekit/              — препратка към esp-homekit-sdk (HOMEKIT_PATH)
+│   └── homekit/              — подмодул: клонът homekit на форка esp-homekit-sdk
 ├── project/
 │   ├── common/               — общи библиотеки (git submodules)
 │   │   ├── captive-wifi/

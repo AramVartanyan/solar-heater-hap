@@ -14,6 +14,11 @@
  * is not stored: CP at every boot. One name everywhere — captive_wifi_ap_ssid(), built from the base
  * MAC ("Solar-810840"): the network of the portal / AP, the DHCP hostname and mDNS; its last 6
  * characters are the access code, the base MAC in capitals is the serial number.
+ * Apple HomeKit (group F, sh_hap): with the setting on, HAP is started on the first connection to the
+ * router; from then on its HTTP server (port 80) serves the web interface and its mDNS carries the
+ * name — mDNS is then started by HAP and only afterwards given the name and the web service. With
+ * the setting off (and on the own access point before HAP was started) the own server and, on the
+ * router, the own mDNS are used.
  * Firmware update (general-ota, CONFIG_GENERAL_OTA_URL): one automatic check after boot, "FUp"
  * and its confirmation, the check and the update from the web interface, the wait for the pump —
  * sh_ota; the restart after a written update is the one of general-ota. */
@@ -44,6 +49,14 @@ const char *sh_net_name(void);
 
 /* The serial number: "E8F60A810840" (after sh_net_init()). */
 const char *sh_net_serial_number(void);
+
+/* mDNS: the name "Solar-xxxxxx.local" and the web service (_http._tcp, port 80). `own`: mDNS is
+ * started here (HAP is not used); otherwise HAP has started it (hap_start()) and only the name and
+ * the service are set. */
+esp_err_t sh_net_mdns_start(bool own);
+
+/* HAP could not be started (sh_hap): the own web server and the own mDNS take over. Any task. */
+void sh_net_hap_failed(void);
 
 /* What the web interface shows. */
 typedef struct {

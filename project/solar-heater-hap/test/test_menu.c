@@ -69,9 +69,9 @@ static void test_list_order_and_wrap(void)
 {
     ui_t u = ui();
     key(&u, SH_KEY_MENU, 0);
-    /* SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, End (doc/operating-modes.md 2.5) */
+    /* SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC, End (doc/operating-modes.md 2.5, 3) */
     const uint8_t order[] = { SH_MENU_HOL, SH_MENU_TBO, SH_MENU_CLO, SH_MENU_DON, SH_MENU_DOF, SH_MENU_TST,
-                              SH_MENU_NET, SH_MENU_END, SH_MENU_SSN };
+                              SH_MENU_NET, SH_MENU_HAP, SH_MENU_LOC, SH_MENU_END, SH_MENU_SSN };
     for (unsigned i = 0; i < sizeof(order); i++) {
         CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
         CHECK_EQ(u.m.pos, order[i]);
@@ -79,7 +79,11 @@ static void test_list_order_and_wrap(void)
     key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
     CHECK_EQ(u.m.pos, SH_MENU_END);
     key(&u, SH_KEY_MINUS, 100);
-    CHECK_EQ(u.m.pos, SH_MENU_NET);                             /* nEt is the last one before End */
+    CHECK_EQ(u.m.pos, SH_MENU_LOC);                             /* LoC is the last one before End */
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(u.m.pos, SH_MENU_HAP);                             /* HAP ... */
+    key(&u, SH_KEY_MINUS, 100);
+    CHECK_EQ(u.m.pos, SH_MENU_NET);                             /* ... right after nEt */
     key(&u, SH_KEY_MINUS, 100);
     CHECK_EQ(u.m.pos, SH_MENU_TST);
     key(&u, SH_KEY_PLUS_REPEAT, 100);                           /* no repetition in the list */
@@ -157,8 +161,10 @@ static void test_edit_limits_and_repeat(void)
 
     u = ui();                                                   /* tSt: 30 s steps */
     key(&u, SH_KEY_MENU, 0);
-    key(&u, SH_KEY_MINUS, 100);
-    key(&u, SH_KEY_MINUS, 100);
+    key(&u, SH_KEY_MINUS, 100);                                 /* End */
+    key(&u, SH_KEY_MINUS, 100);                                 /* LoC */
+    key(&u, SH_KEY_MINUS, 100);                                 /* HAP */
+    key(&u, SH_KEY_MINUS, 100);                                 /* nEt */
     key(&u, SH_KEY_MINUS, 100);
     key(&u, SH_KEY_MENU, 100);
     CHECK_EQ(u.m.pos, SH_MENU_TST);

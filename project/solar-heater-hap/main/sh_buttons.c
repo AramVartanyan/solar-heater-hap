@@ -12,6 +12,7 @@
 #include "sh_control.h"
 #include "sh_reset.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_buttons.h"
 
 static const char *TAG = "sh_buttons";
@@ -31,6 +32,10 @@ typedef enum {
     EVT_TAP_PLUS,
     EVT_PUSH_MINUS,         /* a new press (clears the "repeated" mark) */
     EVT_PUSH_PLUS,
+    EVT_RELEASE_MINUS,
+    EVT_RELEASE_PLUS,
+    EVT_LOCKED,             /* the keyboard lock has changed (any source) */
+    EVT_UNLOCKED,
     EVT_REPEAT_MINUS,       /* held > 1 s, every 200 ms */
     EVT_REPEAT_PLUS,
     EVT_MENU_NET_REACHED,   /* held NET s: releasing now resets the Wi-Fi network */
@@ -46,6 +51,10 @@ static SemaphoreHandle_t s_menu_lock;
 
 /* The library reports a tap also on the release after a hold: a press that repeated is not a tap. */
 static bool s_repeated_minus, s_repeated_plus;
+
+/* "+" and "-" held together: 3 s lock / unlock; such a press is never a "+" or a "-". */
+static sh_chord_t s_chord;
+#define CHORD_POLL_MS   50      /* while both are held */
 
 static void post(void *arg)
 {
@@ -68,19 +77,28 @@ static uint32_t now_ms(void)
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
-static void menu_key(sh_key_t key)
+static void get_ctx(sh_menu_ctx_t *ctx)
+{
+    sh_state_t st;
+    sh_state_get(&st);
+    *ctx = (sh_menu_ctx_t){
+        .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
+        .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fup_offer = st.fup_offer,
+        .hap_on = sh_hap_enabled(), .hap_paired = sh_hap_paired(), .locked = st.hap_lock,
+    };
+}
+
+/* A key, or (`chord`) "+" and "-" held together for 3 s. */
+static void menu_key(sh_key_t key, bool chord)
 {
     sh_settings_t settings;
     sh_settings_get(&settings);
-    sh_state_t st;
-    sh_state_get(&st);
+    sh_menu_ctx_t ctx;
+    get_ctx(&ctx);
 
     xSemaphoreTake(s_menu_lock, portMAX_DELAY);
-    const sh_menu_ctx_t ctx = {
-        .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
-        .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fup_offer = st.fup_offer,
-    };
-    const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
+    const sh_menu_act_t act = chord ? sh_menu_chord(&s_menu, &ctx)
+                                    : sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
     const sh_setting_t id = (sh_setting_t)s_menu.id;
     const int16_t value = s_menu.value;
     xSemaphoreGive(s_menu_lock);
@@ -109,8 +127,37 @@ static void menu_key(sh_key_t key)
         ESP_LOGI(TAG, "menu: firmware update confirmed");
         sh_net_update(SH_OTA_CMD_CONFIRM);
         break;
+    case SH_MENU_ACT_HAP:
+        ESP_LOGI(TAG, "menu: HAP -> %s", value ? "on" : "oFF");
+        sh_hap_set_enabled(value != 0);     /* stores it and restarts */
+        break;
+    case SH_MENU_ACT_LOCK:
+        sh_hap_set_lock(true, "the buttons");       /* "LoC" comes back through sh_buttons_lock_changed() */
+        break;
+    case SH_MENU_ACT_UNLOCK:
+        sh_hap_set_lock(false, "the buttons");
+        break;
     case SH_MENU_ACT_NONE:
         break;
+    }
+}
+
+/* "menu" held for a reset: not with the keyboard locked ("LoC"). */
+static bool hold_allowed(void)
+{
+    sh_menu_ctx_t ctx;
+    get_ctx(&ctx);
+    xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+    const bool ok = sh_menu_hold(&s_menu, now_ms(), &ctx);
+    xSemaphoreGive(s_menu_lock);
+    return ok;
+}
+
+void sh_buttons_lock_changed(bool locked)
+{
+    if (s_queue) {
+        const btn_evt_t evt = locked ? EVT_LOCKED : EVT_UNLOCKED;
+        xQueueSend(s_queue, &evt, 0);
     }
 }
 
@@ -132,50 +179,83 @@ static void buttons_task(void *arg)
     (void)arg;
     btn_evt_t evt;
     for (;;) {
-        if (xQueueReceive(s_queue, &evt, portMAX_DELAY) != pdTRUE) {
+        /* while "+" and "-" are held together their 3 s are watched */
+        const bool got = xQueueReceive(s_queue, &evt, sh_chord_holding(&s_chord) ? pdMS_TO_TICKS(CHORD_POLL_MS)
+                                                                                : portMAX_DELAY) == pdTRUE;
+        if (sh_chord_step(&s_chord, now_ms())) {
+            ESP_LOGI(TAG, "+ and - held %u s", SH_MENU_CHORD_MS / 1000u);
+            menu_key(SH_KEY_MENU, true);
+        }
+        if (!got) {
             continue;
         }
         switch (evt) {
         case EVT_TAP_MENU:
             ESP_LOGD(TAG, "button menu");
-            menu_key(SH_KEY_MENU);
+            menu_key(SH_KEY_MENU, false);
             break;
         case EVT_TAP_MINUS:
             ESP_LOGD(TAG, "button -");
-            if (!s_repeated_minus) {
-                menu_key(SH_KEY_MINUS);
+            if (!s_repeated_minus && !sh_chord_swallow(&s_chord, false)) {
+                menu_key(SH_KEY_MINUS, false);
             }
             break;
         case EVT_TAP_PLUS:
             ESP_LOGD(TAG, "button +");
-            if (!s_repeated_plus) {
-                menu_key(SH_KEY_PLUS);
+            if (!s_repeated_plus && !sh_chord_swallow(&s_chord, true)) {
+                menu_key(SH_KEY_PLUS, false);
             }
             break;
         case EVT_PUSH_MINUS:
             s_repeated_minus = false;
+            sh_chord_button(&s_chord, false, true, now_ms());
             break;
         case EVT_PUSH_PLUS:
             s_repeated_plus = false;
+            sh_chord_button(&s_chord, true, true, now_ms());
+            break;
+        case EVT_RELEASE_MINUS:
+            sh_chord_button(&s_chord, false, false, now_ms());
+            break;
+        case EVT_RELEASE_PLUS:
+            sh_chord_button(&s_chord, true, false, now_ms());
             break;
         case EVT_REPEAT_MINUS:
             s_repeated_minus = true;
-            menu_key(SH_KEY_MINUS_REPEAT);
+            if (!sh_chord_swallow(&s_chord, false)) {
+                menu_key(SH_KEY_MINUS_REPEAT, false);
+            }
             break;
         case EVT_REPEAT_PLUS:
             s_repeated_plus = true;
-            menu_key(SH_KEY_PLUS_REPEAT);
+            if (!sh_chord_swallow(&s_chord, true)) {
+                menu_key(SH_KEY_PLUS_REPEAT, false);
+            }
+            break;
+        case EVT_LOCKED:
+        case EVT_UNLOCKED:
+            xSemaphoreTake(s_menu_lock, portMAX_DELAY);
+            sh_menu_lock_changed(&s_menu, evt == EVT_LOCKED, now_ms());
+            xSemaphoreGive(s_menu_lock);
             break;
         case EVT_MENU_NET_REACHED:
-            ESP_LOGI(TAG, "menu held %d s: release now to reset the Wi-Fi network, "
-                     "keep holding until %d s for a factory reset", CONFIG_SH_NET_RESET_HOLD_S,
-                     CONFIG_SH_FACTORY_RESET_HOLD_S);
+            if (hold_allowed()) {
+                ESP_LOGI(TAG, "menu held %d s: release now to reset the Wi-Fi network, "
+                         "keep holding until %d s for a factory reset", CONFIG_SH_NET_RESET_HOLD_S,
+                         CONFIG_SH_FACTORY_RESET_HOLD_S);
+            } else {
+                ESP_LOGI(TAG, "menu held %d s: the keyboard is locked, no reset", CONFIG_SH_NET_RESET_HOLD_S);
+            }
             break;
         case EVT_MENU_NET_RELEASE:
-            reset_and_restart(false);       /* does not return */
+            if (hold_allowed()) {
+                reset_and_restart(false);   /* does not return */
+            }
             break;
         case EVT_MENU_FACTORY:
-            reset_and_restart(true);        /* does not return */
+            if (hold_allowed()) {
+                reset_and_restart(true);    /* does not return */
+            }
             break;
         }
     }
@@ -190,10 +270,14 @@ static button_handle_t add(gpio_num_t gpio, btn_evt_t tap)
     return b;
 }
 
-/* "+" / "-": a press, and the repetition while held (only the value in the menu uses it). */
-static esp_err_t add_repeat(button_handle_t b, btn_evt_t push, btn_evt_t repeat)
+/* "+" / "-": a press and a release (the two held together), and the repetition while held (only
+ * the value in the menu uses it). */
+static esp_err_t add_repeat(button_handle_t b, btn_evt_t push, btn_evt_t release, btn_evt_t repeat)
 {
     esp_err_t err = iot_button_set_evt_cb(b, BUTTON_CB_PUSH, post, (void *)(intptr_t)push);
+    if (err == ESP_OK) {
+        err = iot_button_set_evt_cb(b, BUTTON_CB_RELEASE, post, (void *)(intptr_t)release);
+    }
     if (err == ESP_OK) {
         err = iot_button_set_serial_cb(b, REPEAT_AFTER_S, pdMS_TO_TICKS(REPEAT_MS), post,
                                        (void *)(intptr_t)repeat);
@@ -215,9 +299,9 @@ esp_err_t sh_buttons_init(void)
     if (!menu || !minus || !plus) {
         return ESP_FAIL;
     }
-    esp_err_t err = add_repeat(minus, EVT_PUSH_MINUS, EVT_REPEAT_MINUS);
+    esp_err_t err = add_repeat(minus, EVT_PUSH_MINUS, EVT_RELEASE_MINUS, EVT_REPEAT_MINUS);
     if (err == ESP_OK) {
-        err = add_repeat(plus, EVT_PUSH_PLUS, EVT_REPEAT_PLUS);
+        err = add_repeat(plus, EVT_PUSH_PLUS, EVT_RELEASE_PLUS, EVT_REPEAT_PLUS);
     }
     if (err == ESP_OK) {
         err = iot_button_add_on_release_cb(menu, CONFIG_SH_NET_RESET_HOLD_S, post,

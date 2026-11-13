@@ -7,7 +7,8 @@
  *   4. measurement task, control task, history task
  *   5. the network (sh_net: captive-wifi in the mode CP, the name Solar-xxxxxx, mDNS, firmware
  *      update), SNTP (at every connection to the router) and the web interface (on the router or on
- *      the own access point); HomeKit follows in a later phase
+ *      the own access point); Apple HomeKit (sh_hap) is started by sh_net on the first connection
+ *      to the router, if its setting is on — the web interface is then on the server of HAP
  */
 
 #include "freertos/FreeRTOS.h"
@@ -27,6 +28,7 @@
 #include "sh_control.h"
 #include "sh_web.h"
 #include "sh_net.h"
+#include "sh_hap.h"
 #include "sh_clock.h"
 #include "sh_history.h"
 
@@ -59,7 +61,8 @@ void app_main(void)
     sh_control_start();
     sh_history_start();
 
-    ESP_ERROR_CHECK(sh_net_init());                 /* 5. network, clock, web */
+    ESP_ERROR_CHECK(sh_hap_init());                 /* 5. HomeKit setting, network, clock, web */
+    ESP_ERROR_CHECK(sh_net_init());
     sh_clock_start();
     ESP_ERROR_CHECK(sh_web_init());
     ESP_ERROR_CHECK(sh_net_start());

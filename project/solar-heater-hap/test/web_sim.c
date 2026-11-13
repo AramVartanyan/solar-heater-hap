@@ -49,6 +49,19 @@
  *                                        comes 1 min after the start; the console says when)
  * A check answers after 2 s, an update takes 30 s and "restarts" into the new version; with the pump
  * running (/sim?col=900&tank=400) a confirmed update waits.
+ * Apple HomeKit (group F, doc/tasks/step14-homekit.md): the setting and its refusal while paired are
+ * the rules of the firmware (sh_hap_rules); HAP "runs" from the start, not paired, the pairing
+ * window open:
+ *   http://localhost:8080/sim?hkpair=1   a controller is paired (the switch becomes inactive, with
+ *                                        the note); hkpair=0: removed in Apple Home (the window opens)
+ *   http://localhost:8080/sim?hkwin=0    the 10 min of the pairing window are over
+ *   http://localhost:8080/sim?hkrun=0    HAP is not running (no connection to the router since
+ *                                        boot): the pairings cannot be reset; hkrun=1: running
+ *   http://localhost:8080/sim?hkf=1      °F chosen in Apple Home (Temperature Display Units): the
+ *                                        page shows and takes °F, the data stay °C; hkf=0: °C
+ *   http://localhost:8080/sim?klock=1    the keyboard is locked from the buttons ("+" and "-" held
+ *                                        3 s) or from Apple Home; klock=0: unlocked
+ * The switch and "Reset -> HomeKit pairings" "restart" the controller (the console says so).
  * POSIX sockets, one request at a time. */
 
 #define _POSIX_C_SOURCE 200809L
@@ -78,6 +91,7 @@
 #include "sh_pulse.h"
 #include "sh_net_rules.h"
 #include "sh_ota.h"
+#include "sh_hap_rules.h"
 
 #define CODE    "810840"
 #define AP_SSID "Solar-" CODE    /* the one name: the network, the host name, mDNS */
@@ -105,6 +119,9 @@ static const sh_alarm_params_t ALARM = {
     .e6_time_s = 600, .e6_col_rise = 100, .e6_tank_rise = 5, .e6_diff = 200, .e6_clear_diff = 100,
 };
 static time_t s_start, s_silent_until;
+/* Apple HomeKit: the setting, paired, HAP running, the pairing window */
+static bool s_hap_on = true, s_hap_paired, s_hap_run = true, s_hap_win = true, s_hap_f;
+static bool s_key_lock;                 /* the keyboard lock: one variable for every source */
 
 /* monotonic s since the "boot", which was a day before the start (room for the made-up day) */
 static uint32_t now_s(void)
@@ -537,6 +554,8 @@ static void reply_state(int fd)
         .rssi = s_net.mode == SH_NET_AP ? 0 : -41,
         .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = AP_SSID, .ap_ssid = AP_SSID,
         .ota = s_ota.phase, .ota_pct = s_ota.pct, .ota_version = s_ota.version,
+        .hap_on = s_hap_on, .hap_paired = s_hap_paired, .hap_running = s_hap_on && s_hap_run,
+        .hap_window = s_hap_on && s_hap_run && s_hap_win, .fahrenheit = s_hap_f, .key_lock = s_key_lock,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
@@ -640,6 +659,24 @@ static void sim_set(const char *query)
         ota_do(sh_ota_cmd(&s_ota, SH_OTA_CMD_CONFIRM, &in, sim_ms()));
         printf("FUp: \"menu\" -> %s\n", s_ota.phase == SH_OTA_RUNNING ? "the update starts"
                : s_ota.phase == SH_OTA_WAITING ? "the update waits for the pump" : "nothing is offered");
+    }
+    if ((p = strstr(query, "hkpair=")) && sscanf(p + 7, "%d", &v) == 1) {
+        s_hap_paired = v != 0;
+        s_hap_win = sh_hap_window(s_hap_win, v ? SH_HAP_EVT_PAIRED : SH_HAP_EVT_UNPAIRED, v ? 1 : 0);
+    }
+    if ((p = strstr(query, "hkwin=")) && sscanf(p + 6, "%d", &v) == 1 && !v) {
+        s_hap_win = sh_hap_window(s_hap_win, SH_HAP_EVT_TIMED_OUT, s_hap_paired);
+    }
+    if ((p = strstr(query, "klock=")) && sscanf(p + 6, "%d", &v) == 1 && sh_hap_lock_change(&s_key_lock, v != 0)) {
+        printf("keyboard %s (the buttons / Apple Home): the display shows %s\n", v ? "locked" : "unlocked",
+               v ? "LoC" : "UnL");
+    }
+    if ((p = strstr(query, "hkf=")) && sscanf(p + 4, "%d", &v) == 1) {
+        s_hap_f = v != 0;
+    }
+    if ((p = strstr(query, "hkrun=")) && sscanf(p + 6, "%d", &v) == 1) {
+        s_hap_run = v != 0;
+        s_hap_win = v && sh_hap_window(false, SH_HAP_EVT_STARTED, s_hap_paired);
     }
     if ((p = strstr(query, "ap=")) && sscanf(p + 3, "%d", &v) == 1) {
         /* the choice of the menu; AP is possible because "the router does not answer" */
@@ -812,7 +849,34 @@ static void handle(int fd, const char *page, size_t page_len)
             for (int i = 0; i < SH_E8_DAYS; i++) {
                 s_e8.l.rate[i] = SH_E8_NO_RATE;
             }
+        } else if (what == SH_WEB_RESET_HOMEKIT) {
+            if (res == SH_WEB_OK && !(s_hap_on && s_hap_run)) {
+                reply_res(fd, SH_WEB_BAD);              /* HAP is not running */
+                return;
+            }
+            if (res == SH_WEB_OK) {                     /* erased; after the "restart" the window is open */
+                s_hap_paired = false;
+                s_hap_win = sh_hap_window(false, SH_HAP_EVT_STARTED, 0);
+                printf("HomeKit pairings erased: the controller restarts\n");
+            }
         } else if (res == SH_WEB_OK && what != SH_WEB_RESET_WIFI) {
+            /* default settings: the keyboard unlocked, °C; "Apple HomeKit" and the pairing stay —
+             * those only the factory reset brings back */
+            const sh_hap_kept_t kept = { .on = s_hap_on, .paired = s_hap_paired, .lock = s_key_lock,
+                                         .fahrenheit = s_hap_f };
+            const unsigned def = sh_hap_defaults(&kept);
+            if (def & SH_HAP_DEF_LOCK) {
+                s_key_lock = false;
+                printf("default settings: keyboard unlocked, the display shows UnL\n");
+            }
+            if (def & SH_HAP_DEF_UNITS) {
+                s_hap_f = false;
+            }
+            if (what == SH_WEB_RESET_FACTORY) {
+                s_hap_on = true;
+                s_hap_paired = false;
+                s_hap_win = s_hap_run;
+            }
             s_cfg = (sh_web_config_t){ .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } }, .frost = true,
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
         }
@@ -824,6 +888,23 @@ static void handle(int fd, const char *page, size_t page_len)
             const sh_ota_in_t in = { .online = s_net.mode == SH_NET_CP, .pump_on = s_pump.on,
                                      .alarms = s_alarm.active, .air = s_pump.air };
             ota_do(sh_ota_cmd(&s_ota, cmd, &in, sim_ms()));
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/hap") == 0) {
+        bool on = false;
+        const sh_web_res_t res = sh_web_hap(body, CODE, s_hap_on, s_hap_paired, &on);
+        if (res == SH_WEB_OK && on != s_hap_on) {
+            s_hap_on = on;                              /* stored; HAP starts (or not) after the "restart" */
+            s_hap_win = on && s_hap_run && sh_hap_window(false, SH_HAP_EVT_STARTED, s_hap_paired);
+            printf("Apple HomeKit %s: the controller restarts\n", on ? "on" : "off");
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/lock") == 0) {
+        bool on = false;
+        const sh_web_res_t res = sh_web_lock(body, CODE, &on);
+        if (res == SH_WEB_OK && sh_hap_lock_change(&s_key_lock, on)) {
+            printf("keyboard %s (the web interface): the display shows %s, HomeKit is notified\n",
+                   on ? "locked" : "unlocked", on ? "LoC" : "UnL");
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {
