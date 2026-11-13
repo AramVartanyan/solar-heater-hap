@@ -1,7 +1,0 @@
-esp-hap library — copied into this repository (ESPRESSIF MIT License, see the headers of the files)
-Source: https://github.com/AramVartanyan/esp-homekit-sdk (fork of https://github.com/espressif/esp-homekit-sdk),
-folder components/homekit, commit 77e780f (equal to the original at the time of the copy).
-The folders here are the SDK's components (esp_hap_core, esp_hap_apple_profiles, esp_hap_extras,
-esp_hap_platform, hkdf-sha, mu_srp); project/solar-heater-hap/CMakeLists.txt adds components/homekit to the
-build (HOMEKIT_PATH defaults to this repository). The button component is this repository's own
-(components/button), not the SDK's. To update: copy the fork's components/homekit again and note the commit.

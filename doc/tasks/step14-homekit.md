@@ -22,12 +22,12 @@
 - [doc/firmware.md](../firmware.md) т. 3 (прозорецът за сдвояване — събитията на SDK) и т. 4 (отменено намаляване
   на мощността); [doc/web-interface.md](../web-interface.md) (т. 2 „Система“ — HomeKit; т. 6 нулирането на
   сдвояванията; т. 7.1); [doc/led-indication.md](../led-indication.md) (дишане — само при отворен прозорец).
-- **esp-homekit-sdk — копиран в това хранилище**: `components/homekit` (от форка `AramVartanyan/esp-homekit-sdk`,
-  основата е `espressif/esp-homekit-sdk`; източникът и commit-ът — в `components/homekit/esp-homekit_lib.txt`);
-  `HOMEKIT_PATH` по подразбиране сочи това хранилище — нищо не се клонира. Зависимостите на `esp_hap_core`
+- **esp-homekit-sdk — подмодул `components/homekit`** (форкът `AramVartanyan/esp-homekit-sdk`, основата е
+  `espressif/esp-homekit-sdk`; `git submodule update --init`); `HOMEKIT_PATH` по подразбиране сочи подмодула
+  (`project/solar-heater-hap/CMakeLists.txt`). Зависимостите на `esp_hap_core`
   (`json_generator`, `json_parser`, `libsodium`, `mdns`) идват от мениджъра на компонентите (неговият
   `idf_component.yml`). Разликата на форка, която засяга проекта (`hap_mdns_init()` задава името в mDNS от
-  `CONFIG_LWIP_LOCAL_HOSTNAME` вместо `"MyHost"`), ще влезе при следващото копиране — редът по-долу важи и в двата
+  `CONFIG_LWIP_LOCAL_HOSTNAME` вместо `"MyHost"`), ще влезе с обновяването на подмодула — редът по-долу важи и в двата
   случая. Промените на форка в `app_wifi` (индикацията, името в рутера) не засягат проекта — той ползва
   `captive-wifi`. **`button` — версията в `components/button` на това хранилище** (не тази на SDK-то; редът в
   `CMakeLists.txt` вече я поставя с предимство). Примерът на интеграция — проектът `mppt-1k` (`mppt_hap.c`,

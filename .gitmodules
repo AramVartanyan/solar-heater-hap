@@ -19,3 +19,6 @@
 [submodule "project/common/ds18b20"]
 	path = project/common/ds18b20
 	url = https://github.com/AramVartanyan/ds18b20
+[submodule "components/homekit"]
+	path = components/homekit
+	url = https://github.com/AramVartanyan/esp-homekit-sdk
