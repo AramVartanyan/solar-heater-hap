@@ -175,15 +175,15 @@ section{display:none}section.on{display:block}
  <div class="grp">
   <label class="row" data-f="fluid"><span data-t="kind"></span><span class="v"><select data-p id="i-fluid"><option value="0" data-t="water"></option><option value="1" data-t="glycol"></option></select></span></label>
   <label class="row" data-f="fluid"><span data-t="conc"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="glycol"> %</span></label>
-  <label class="row" data-f="pressure"><span data-t="press"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="press" data-m="10"> bar</span></label>
+  <label class="row" data-f="pressure"><span data-t="press"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="press" data-m="10"> bar</span></label>
  </div>
  <h2 data-t="col_tank"></h2>
  <div class="grp">
   <label class="row" data-f="col_type"><span data-t="col_kind"></span><span class="v"><select data-p data-k="col_type"><option value="0" data-t="flat"></option><option value="1" data-t="tubes"></option></select></span></label>
-  <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="col_area" data-m="10"> m²</span></label>
+  <label class="row" data-f="col_type"><span data-t="col_area"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="col_area" data-m="10"> m²</span></label>
   <label class="row" data-f="col_max"><span data-t="col_max"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="col_max"> °C</span></label>
   <label class="row" data-f="tank_vol"><span data-t="tank_vol"></span><span class="v"><input type="number" inputmode="numeric" data-p data-k="tank_vol"> l</span></label>
-  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="number" inputmode="decimal" data-p data-k="heater" data-m="10"> kW</span></label>
+  <label class="row" data-f="heater"><span data-t="heater_kw"></span><span class="v"><input type="text" inputmode="decimal" autocomplete="off" data-p data-k="heater" data-m="10"> kW</span></label>
   <div class="row" data-f="mount"><span data-t="mount"></span><span class="v">— ›</span></div>
  </div>
  <h2 data-t="calc"></h2>
@@ -405,6 +405,9 @@ let S=null,C=null,D=null,TZ=null,lang,code='',unlocked=false,leftAt=0,toastT=0;
 let BZ='';try{BZ=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
 const t=k=>T[lang][k]||k;
 const deg=v=>(v/10).toFixed(1).replace('-','−');
+/* decimal fields: typed with "," or "." (the phone keyboard follows its locale), shown with the separator of the page language */
+const num=x=>Number(String(x).trim().replace(/\s/g,'').replace(',','.'));
+const dec=x=>{const s=String(x);return lang=='bg'?s.replace('.',','):s};
 const p2=n=>String(n).padStart(2,'0'),hm=m=>p2(Math.floor(m/60))+':'+p2(m%60);
 const dur=m=>m>=60?Math.floor(m/60)+' h '+m%60+' min':m+' min';
 
@@ -502,7 +505,7 @@ function render(){
  $('#b-start').classList.toggle('hide',!!S.test);$('#test-ctl').classList.toggle('hide',!S.test);
  $('#sw-fro').classList.toggle('off',!S.fro);$('#sw-fro').setAttribute('aria-checked',!!S.fro);
  $$('[data-k]').forEach(e=>{const o=S.set[e.dataset.k]||S.inst[e.dataset.k],m=+e.dataset.m||1;
-  e.min=o.min/m;e.max=o.max/m;e.step=(o.step||1)/m;if(document.activeElement!=e)e.value=o.v/m});
+  e.min=o.min/m;e.max=o.max/m;e.step=(o.step||1)/m;if(document.activeElement!=e)e.value=e.type=='text'?dec(o.v/m):o.v/m});
  const f=$('#i-fluid');if(document.activeElement!=f)f.value=S.inst.fluid.v;
  $$('[data-p]').forEach(e=>e.disabled=!unlocked);
  if(!S.inst.fluid.v)$('[data-k=glycol]').disabled=true;
@@ -567,8 +570,8 @@ $$('.tabs div').forEach(d=>d.onclick=()=>{
  $$('section').forEach(s=>s.classList.toggle('on',s.id==d.dataset.s));scrollTo(0,0)});
 $('#l-bg').onclick=()=>setLang('bg');$('#l-en').onclick=()=>setLang('en');
 $$('[data-k]').forEach(e=>e.onchange=async()=>{
- const v=Math.round(e.value*(+e.dataset.m||1));e.blur();
- if(e.value!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
+ const v=Math.round(num(e.value)*(+e.dataset.m||1));e.blur();
+ if(e.value.trim()!==''&&!isNaN(v))await post('/api/set',{[e.dataset.k]:v});refresh()});
 $('#i-fluid').onchange=async e=>{const v=+e.target.value;e.target.blur();
  await post('/api/set',v?{fluid:1,glycol:S.inst.glycol.v}:{fluid:0});refresh()};
 $('#sw-fro').onclick=async()=>{await post('/api/set',{fro:S&&S.fro?0:1});refresh()};
