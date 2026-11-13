@@ -5,6 +5,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "mdns.h"
@@ -37,7 +38,7 @@ typedef struct {
 static QueueHandle_t s_queue;
 static SemaphoreHandle_t s_lock;        /* s_info */
 static sh_net_info_t s_info;
-static char s_name[SH_NET_NAME_MAX];
+static char s_serial[SH_NET_SERIAL_LEN + 1];
 
 /* Only the network task uses them */
 static sh_net_t s_net;
@@ -137,7 +138,7 @@ static void on_wifi(captive_wifi_event_t evt, uint32_t now_s)
         sh_state_set_wifi(true, false);
         sh_clock_connected();
         sh_web_enable(true);
-        ESP_LOGI(TAG, "connected: http://%s.local/", s_name);
+        ESP_LOGI(TAG, "connected: http://%s.local/", sh_net_name());
         break;
     case CAPTIVE_WIFI_EVT_STA_DISCONNECTED:
         sh_state_set_wifi(false, captive_wifi_portal_active());
@@ -219,7 +220,11 @@ static void net_task(void *arg)
                 on_wifi((captive_wifi_event_t)m.arg, now_s);
                 break;
             case MSG_MODE:
-                do_net(sh_net_choose(&s_net, (sh_net_mode_t)m.arg, sh_ota_updating(&s_ota), now_s));
+                if (m.arg == SH_NET_AP && captive_wifi_is_connected()) {
+                    ESP_LOGI(TAG, "nEt: AP is refused — connected to the router");
+                }
+                do_net(sh_net_choose(&s_net, (sh_net_mode_t)m.arg, captive_wifi_is_connected(),
+                                     sh_ota_updating(&s_ota), now_s));
                 if (s_net.ap_pending && !had_pending) {
                     ESP_LOGI(TAG, "nEt: AP is postponed until the firmware update is over");
                 }
@@ -280,7 +285,12 @@ const char *sh_net_access_code(void)
 
 const char *sh_net_name(void)
 {
-    return s_name;
+    return captive_wifi_ap_ssid();
+}
+
+const char *sh_net_serial_number(void)
+{
+    return s_serial;
 }
 
 void sh_net_get(sh_net_info_t *out)
@@ -297,21 +307,28 @@ esp_err_t sh_net_init(void)
     if (!s_queue || !s_lock) {
         return ESP_ERR_NO_MEM;
     }
-    /* the name follows the access point name, which captive-wifi builds in its init */
+    /* one name everywhere: the one captive-wifi builds in its init from the base MAC */
     esp_err_t err = captive_wifi_init(NULL, wifi_event, NULL);
     if (err != ESP_OK) {
         return err;
     }
-    sh_net_hostname(s_name, sizeof(s_name), captive_wifi_ap_ssid());
+    const char *name = sh_net_name();
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BASE);
+    sh_net_serial(s_serial, mac);
+    if (!sh_net_name_ok(name, mac)) {
+        ESP_LOGE(TAG, "the name %s does not follow the base MAC %s (captive-wifi older than ee1c100?)", name,
+                 s_serial);
+    }
     esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (sta) {
-        esp_netif_set_hostname(sta, s_name);
+        esp_netif_set_hostname(sta, name);      /* the name at the router (DHCP) */
     }
 
     /* mDNS answers on the station only (CONFIG_MDNS_PREDEF_NETIF_AP=n): on the router */
     err = mdns_init();
     if (err == ESP_OK) {
-        err = mdns_hostname_set(s_name);
+        err = mdns_hostname_set(name);
     }
     if (err == ESP_OK) {
         err = mdns_service_add("Solar controller", "_http", "_tcp", 80, NULL, 0);
@@ -321,7 +338,8 @@ esp_err_t sh_net_init(void)
     }
 
     const general_ota_config_t ota = { .cb = ota_event, .auto_reboot = true };
-    ESP_LOGI(TAG, "name in the network %s (%s.local), access code %s", s_name, s_name, sh_net_access_code());
+    ESP_LOGI(TAG, "name in the network %s (%s.local), access code %s, serial number %s", name, name,
+             sh_net_access_code(), s_serial);
     return general_ota_init(&ota);
 }
 

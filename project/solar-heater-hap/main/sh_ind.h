@@ -12,8 +12,9 @@
  *   white    collector < 20 °C (released above 22 °C)
  *   blue     idle
  * Pattern: red -> fast (E4, E5; also with E1 / E2 / E6 at the same time) or double (E1, E2, E6);
- * other colours -> breathing while the own access point is on (nEt -> AP), otherwise steady with
- * Wi-Fi, heartbeat without it (or while the setup portal is open).
+ * other colours -> while the own access point is on (nEt -> AP) steady with a short dark wink (the
+ * mirror of the heartbeat), otherwise steady with Wi-Fi, heartbeat without it (or while the setup
+ * portal is open).
  * Temperatures are tenths of °C, times ms. */
 #pragma once
 
@@ -31,7 +32,8 @@
 #define SH_IND_BEAT_ON_MS       80u     /* heartbeat: 80 ms on every 2 s */
 #define SH_IND_BEAT_PERIOD_MS   2000u
 #define SH_IND_BLINK_MS         500u    /* OTA: 500 on / 500 off */
-#define SH_IND_BREATH_MS        5000u   /* breathing: dark -> full -> dark (as outputwrite) */
+#define SH_IND_WINK_OFF_MS      80u     /* own access point: 80 ms dark every 2 s */
+#define SH_IND_WINK_PERIOD_MS   2000u
 
 typedef enum {
     SH_COLOR_OFF = 0,
@@ -51,7 +53,7 @@ typedef enum {
     SH_IND_FAST,        /* E4, E5 */
     SH_IND_DOUBLE,      /* E1, E2, E6, E8 */
     SH_IND_BLINK,       /* firmware update */
-    SH_IND_BREATH,      /* own access point on */
+    SH_IND_WINK,        /* own access point on */
 } sh_ind_pattern_t;
 
 typedef struct {
@@ -86,9 +88,5 @@ typedef struct {
 /* The indication for `in`; updates the return zones in `st`. Called when the inputs change. */
 sh_ind_out_t sh_ind_update(sh_ind_state_t *st, const sh_ind_params_t *p, const sh_ind_in_t *in);
 
-/* The LED is lit `ms` after the start of `pattern` (breathing: not at its dark ends). */
+/* The LED is lit `ms` after the start of `pattern`. */
 bool sh_ind_lit(sh_ind_pattern_t pattern, uint32_t ms);
-
-/* The brightness `ms` after the start of `pattern`, 0 ... 100 % of the set brightness: 0 / 100 for
- * the on / off patterns, a squared ramp up and down for the breathing. */
-uint8_t sh_ind_level(sh_ind_pattern_t pattern, uint32_t ms);

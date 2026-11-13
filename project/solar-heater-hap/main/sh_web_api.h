@@ -20,7 +20,6 @@
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
- *              net    mode=cp | ap: the network mode, as nEt of the menu (with the code)
  *              ota    cmd=check | update: the firmware update (with the code)
  *            the access code ("code") is the last 6 characters of the setup network name
  *   chart    the day in RAM (sh_day): the 10-min intervals of today / of the last 24 h
@@ -73,15 +72,15 @@ typedef struct {
     int16_t col_protect;        /* collector protection setting, 0.1 °C (limited by the cap here) */
     const char *name;           /* device name */
     const char *version;        /* firmware version */
-    const char *serial;         /* serial number: the MAC of the setup network, 12 hex digits (its last 6 are the access code) */
+    const char *serial;         /* serial number: the base MAC, 12 hex digits in capitals (its last 6, in lower case, are the access code) */
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;
     /* the network mode and the name (group E) */
     bool ap;                    /* the own access point is on: `ip` is its address, no `ssid` */
     bool ap_pending;            /* AP chosen during an update: it starts after it */
-    const char *host;           /* the name in the network: "solar-810841" (mDNS: + ".local") */
-    const char *ap_ssid;        /* the name of the own access point: "SOLAR-810841" */
+    const char *host;           /* the name in the network: "Solar-810840" (mDNS: + ".local") */
+    const char *ap_ssid;        /* the name of the own access point: the same text */
     /* the firmware update (group E) */
     sh_ota_phase_t ota;
     int8_t ota_pct;
@@ -192,9 +191,6 @@ sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s);
 
 /* "tz": a time zone of sh_tz_list by its index; needs the access code. */
 sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz);
-
-/* "net": the network mode; needs the access code. */
-sh_web_res_t sh_web_net(const char *body, const char *code, sh_net_mode_t *mode);
 
 /* "ota": check for a newer firmware, or install the found one; needs the access code. */
 sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd);

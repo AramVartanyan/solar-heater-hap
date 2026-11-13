@@ -35,7 +35,7 @@ CONFIG_LWIP_SO_REUSE=y
 CONFIG_LWIP_MAX_ACTIVE_TCP=12
 CONFIG_LWIP_MAX_LISTENING_TCP=12
 CONFIG_LWIP_UDP_RECVMBOX_SIZE=10
-# (the station takes the name solar-xxxxxx from sh_net; this one is only the default of lwIP)
+# (the station takes the name Solar-xxxxxx from sh_net; this one is only the default of lwIP)
 CONFIG_LWIP_LOCAL_HOSTNAME="solar-heater"
 CONFIG_LWIP_DHCPS=y
 
@@ -49,9 +49,10 @@ CONFIG_GENERAL_OTA_URL="https://raw.githubusercontent.com/AramVartanyan/otafw/ma
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 
-# captive-wifi 0.4.0: setup SoftAP "SOLAR-XXXXXX"; without a stored network the portal closes and
+# captive-wifi 0.4.0: the name "Solar-xxxxxx" (base MAC) — the setup SoftAP, the access point of
+# nEt -> AP, the host name and mDNS; without a stored network the portal closes and
 # the radio goes off after 15 min without a client; access point only for nEt -> AP (sh_net)
-CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="SOLAR"
+CONFIG_CAPTIVE_WIFI_AP_SSID_PREFIX="Solar"
 CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN=15
 CONFIG_CAPTIVE_WIFI_AP_ONLY=y
 
@@ -59,7 +60,7 @@ CONFIG_CAPTIVE_WIFI_AP_ONLY=y
 # room for application web page handlers next to the 8 HAP URIs
 # CONFIG_HAP_HTTP_MAX_URI_HANDLERS=20
 
-# mDNS (sh_net: solar-xxxxxx.local; later also esp-homekit-sdk): on the station only (not on the
+# mDNS (sh_net: Solar-xxxxxx.local; later also esp-homekit-sdk): on the station only (not on the
 # own access point), no console CLI — the console component is not built
 CONFIG_MDNS_ENABLE_CONSOLE_CLI=n
 CONFIG_MDNS_PREDEF_NETIF_AP=n

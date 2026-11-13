@@ -82,6 +82,10 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
             m->mode = SH_MENU_SAVED;
             m->mark_ms = now_ms;
             if (m->pos == SH_MENU_NET) {
+                if (m->value != 0 && ctx->net_connected) {
+                    m->value = 0;               /* refused: "CP" steady for 1 s, no code */
+                    return SH_MENU_ACT_NONE;
+                }
                 return SH_MENU_ACT_NET;
             }
             return m->value != s->v[m->id] ? SH_MENU_ACT_SAVE : SH_MENU_ACT_NONE;

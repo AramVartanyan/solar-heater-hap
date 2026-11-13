@@ -71,7 +71,7 @@ section{display:none}section.on{display:block}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(40,40,40,.92);color:#fff;border-radius:10px;padding:10px 16px;font-size:15px;max-width:88%;text-align:center}
 .dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:24px}
 .box{background:var(--card);border-radius:14px;max-width:320px;width:100%;overflow:hidden;text-align:center}
-.box p{margin:0;padding:20px 18px;font-size:16px;white-space:pre-line}
+.box p{margin:0;padding:20px 18px;font-size:16px}
 .box div{display:flex;border-top:.5px solid var(--sep)}
 .box button{flex:1;border:0;background:none;font:inherit;font-size:17px;color:var(--blue);padding:12px;cursor:pointer}
 .box button+button{border-left:.5px solid var(--sep);font-weight:600;color:var(--red)}
@@ -213,9 +213,9 @@ section{display:none}section.on{display:block}
   <div class="row" data-f="net"><span>Wi-Fi</span><span class="v" id="n-wifi">—</span></div>
   <div class="row" data-f="net"><span data-t="ip"></span><span class="v" id="n-ip">—</span></div>
   <div class="row" data-f="net"><span data-t="host"></span><span class="v" id="n-host">—</span></div>
-  <label class="row" data-f="net_mode"><span data-t="mode"></span><span class="v"><select data-p id="net-sel"><option value="cp" data-t="net_cp"></option><option value="ap" data-t="net_ap"></option></select></span></label>
+  <div class="row" data-f="net_mode"><span data-t="mode"></span><span class="v" id="net-v">—</span></div>
  </div>
- <p class="note hide" data-f="net_mode" id="net-note"></p>
+ <p class="note" data-f="net_mode" id="net-note"></p>
  <h2 data-t="time_place" data-f="timezone"></h2>
  <div class="grp">
   <label class="row" data-f="timezone"><span data-t="tz"></span><span class="v"><select data-p id="tz-sel"></select></span></label>
@@ -294,7 +294,7 @@ test_time:'Време за тест на помпата',by_season:'По сез�
 col_min:'Мин. температура на колектора',d_on:'Разлика за включване',d_off:'Разлика за изключване',
 night_s:'Нощно охлаждане',season_note:'Маркираната колона е текущият сезон.',
 code:'Код за достъп',unlock:'Отключи промените',
-code_note:'Последните 6 знака от името на собствената мрежа на контролера (напр. 810841 от SOLAR-810841). Без кода стойностите само се виждат.',
+code_note:'Последните 6 знака от името на собствената мрежа на контролера (напр. 810840 от Solar-810840). Без кода стойностите само се виждат.',
 bad_code:'Грешен код',
 fluid:'Топлоносител',kind:'Вид',water:'Вода',glycol:'Пропилен-гликол',conc:'Концентрация',press:'Мин. налягане (студена система)',
 col_tank:'Колектор и бойлер',col_max:'Макс. температура на колектора',tank_vol:'Обем на бойлера',mount:'Монтаж на датчиците',
@@ -302,10 +302,9 @@ calc:'Изчислено',boil:'Точка на кипене',cap:'Защита 
 no_start:'Забрана за пускане над',vac_limit:'Праг във ваканция',frost_below:'Защита от замръзване под',
 prot_note:'Настроената защита на колектора ({set} °C) е ограничена до тавана.',
 net:'Мрежа',ip:'IP адрес',host:'Име в мрежата',net_cp:'CP — рутер',net_ap:'AP — без рутер',
-net_ap_note:'Собствена точка за достъп „{ap}“ (без парола), адрес http://192.168.4.1.\nИзключва се 15 min след последното откачане и контролерът се връща към рутера (CP).',
-net_pend:'AP ще се включи след края на обновяването на фърмуера.',ap_later:'AP ще се включи след обновяването',
-q_ap:'Превключване към собствена точка за достъп (AP)?\nВръзката през рутера ще прекъсне. Свържете телефона към мрежата „{ap}“ (без парола) и отворете http://192.168.4.1 в браузъра. Ако телефонът покаже „няма интернет“, останете свързани.',
-q_cp:'Връщане към рутера (CP)?\nВръзката през собствената точка за достъп ще прекъсне.',
+net_ap_note:'Собствена точка за достъп „{ap}“ (без парола), адрес http://192.168.4.1.\nИзключва се 15 min след последното откачане и контролерът се връща към рутера (CP).\nРежимът се избира от менюто на контролера (nEt).',
+net_cp_note:'Режимът се избира от менюто на контролера (nEt). AP — собствена точка за достъп „{ap}“ — може да се избере само когато няма връзка с рутера.',
+net_pend:'AP е избран и ще се включи след края на обновяването на фърмуера.',
 ota_go:'Обнови',ota_check:'Проверка…',ota_ok:'Версията е актуална',ota_new:'Налична е по-нова версия {v}',
 ota_wait:'Версия {v}: обновяването изчаква — помпата работи или има активна защита.',
 ota_run:'Обновяване до версия {v}… {p}\nНе изключвайте захранването.',ota_done:'Версия {v} е записана — контролерът се рестартира…',
@@ -381,7 +380,7 @@ test_time:'Pump test time',by_season:'By season',param:'Parameter',summer:'Summe
 col_min:'Min. collector temperature',d_on:'Switch-on difference',d_off:'Switch-off difference',
 night_s:'Night cooling',season_note:'The highlighted column is the current season.',
 code:'Access code',unlock:'Unlock changes',
-code_note:'The last 6 characters of the controller\'s own network name (e.g. 810841 from SOLAR-810841). Without the code the values are read-only.',
+code_note:'The last 6 characters of the controller\'s own network name (e.g. 810840 from Solar-810840). Without the code the values are read-only.',
 bad_code:'Wrong code',
 fluid:'Heat transfer fluid',kind:'Kind',water:'Water',glycol:'Propylene glycol',conc:'Concentration',press:'Min. pressure (cold system)',
 col_tank:'Collector and tank',col_max:'Max. collector temperature',tank_vol:'Tank volume',mount:'Sensor mounting',
@@ -389,10 +388,9 @@ calc:'Computed',boil:'Boiling point',cap:'Collector protection (ceiling)',prot:'
 no_start:'No pump start above',vac_limit:'Vacation threshold',frost_below:'Frost protection below',
 prot_note:'The collector protection setting ({set} °C) is limited to the ceiling.',
 net:'Network',ip:'IP address',host:'Name in the network',net_cp:'CP — router',net_ap:'AP — no router',
-net_ap_note:'Own access point "{ap}" (no password), address http://192.168.4.1.\nIt switches off 15 min after the last device leaves and the controller returns to the router (CP).',
-net_pend:'AP will start when the firmware update is over.',ap_later:'AP will start after the update',
-q_ap:'Switch to the own access point (AP)?\nThe connection through the router will end. Join the network "{ap}" (no password) with the phone and open http://192.168.4.1 in the browser. If the phone says "no internet", stay connected.',
-q_cp:'Return to the router (CP)?\nThe connection through the own access point will end.',
+net_ap_note:'Own access point "{ap}" (no password), address http://192.168.4.1.\nIt switches off 15 min after the last device leaves and the controller returns to the router (CP).\nThe mode is chosen in the menu of the controller (nEt).',
+net_cp_note:'The mode is chosen in the menu of the controller (nEt). AP — the own access point "{ap}" — can be chosen only without a connection to the router.',
+net_pend:'AP is chosen and will start when the firmware update is over.',
 ota_go:'Update',ota_check:'Checking…',ota_ok:'Up to date',ota_new:'A newer version {v} is available',
 ota_wait:'Version {v}: the update is waiting — the pump runs or a protection is active.',
 ota_run:'Updating to version {v}… {p}\nDo not switch off the power.',ota_done:'Version {v} is written — the controller is restarting…',
@@ -564,8 +562,8 @@ function render(){
  $('#n-wifi').textContent=ap?nt.ap+' (AP)':nt.ssid?nt.ssid+' · '+String(nt.rssi).replace('-','−')+' dBm':'—';
  $('#n-ip').textContent=nt.ip||'—';$('#fw-v').textContent=S.fw;$('#fw-sn').textContent=S.sn||'—';
  $('#n-host').textContent=ap||!nt.host?'—':nt.host+'.local';
- const ns=$('#net-sel');if(document.activeElement!=ns)ns.value=nt.mode;
- const nn=$('#net-note');nn.classList.toggle('hide',!ap&&!nt.pend);nn.textContent=ap?fill('net_ap_note',{ap:nt.ap}):nt.pend?t('net_pend'):'';
+ $('#net-v').textContent=t(ap?'net_ap':'net_cp');     /* shown only: the mode is chosen in the menu (nEt) */
+ $('#net-note').textContent=fill(ap?'net_ap_note':nt.pend?'net_pend':'net_cp_note',{ap:nt.ap});
  /* the update: one at a time; on the own access point there is no internet — grey, with the reason */
  const oc=$('#ota-chk');oc.disabled=!unlocked||['check','wait','run','done'].includes(o.st);
  if(o.st=='ap'){oc.classList.add('na');oc.inert=true}
@@ -644,10 +642,6 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
  if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory'].includes(w)?'restart':'done'));refresh();loadDays()}});
-$('#net-sel').onchange=async e=>{const m=e.target.value;e.target.blur();
- if(S&&m!=S.net.mode&&await ask(fill(m=='ap'?'q_ap':'q_cp',{ap:S.net.ap}))&&await post('/api/net',{mode:m}))
-  toast(t(m=='ap'&&S.ota.st=='run'?'ap_later':'done'));
- refresh()};
 [['#ota-chk','check'],['#ota-go','update']].forEach(([s,c])=>
  $(s).onclick=async()=>{await post('/api/ota',{cmd:c});setTimeout(refresh,300)});
 $('#tz-sel').onchange=async e=>{e.target.blur();if(await post('/api/tz',{tz:e.target.value}))toast(t('done'));refresh();loadChart()};

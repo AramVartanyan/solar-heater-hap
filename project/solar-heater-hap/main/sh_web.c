@@ -97,21 +97,13 @@ static esp_err_t state_get(httpd_req_t *req)
     sh_clock_info_t ci;
     sh_clock_get(&ci);
 
-    /* serial number: the MAC of the setup network (as its name and the access code), as in HomeKit */
-    static char serial[13];
-    if (!serial[0]) {
-        uint8_t mac[6];
-        esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
-        snprintf(serial, sizeof(serial), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
-                 mac[5]);
-    }
     sh_web_status_t s = {
         .t_col = st.t_col, .t_tank = st.t_tank, .col_fault = st.col_fault, .tank_fault = st.tank_fault,
         .pump_on = st.pump_on, .reason = st.pump_reason, .alarms = st.alarms,
         .test_on = st.test_on,
         .test_left_s = st.test_on && st.test_end_s > now_s ? st.test_end_s - now_s : 0,
         .col_protect = SH_CONTROL_COL_PROTECT,
-        .name = sh_net_name(), .version = esp_app_get_description()->version, .serial = serial,
+        .name = sh_net_name(), .version = esp_app_get_description()->version, .serial = sh_net_serial_number(),
         .ssid = ssid, .ip = ip, .rssi = captive_wifi_rssi(),
         .ap = ap_mode, .ap_pending = net.ap_pending, .host = sh_net_name(), .ap_ssid = captive_wifi_ap_ssid(),
         .ota = net.ota, .ota_pct = net.ota_pct, .ota_version = net.ota_version,
@@ -247,7 +239,7 @@ static esp_err_t csv_get(httpd_req_t *req)
     c->req = req;
     c->fail = false;
     httpd_resp_set_type(req, "text/csv; charset=utf-8");
-    char name[48 + SH_NET_NAME_MAX];    /* the header is sent with the first chunk */
+    char name[96];    /* the header is sent with the first chunk */
     snprintf(name, sizeof(name), "attachment; filename=\"%s-history.csv\"", sh_net_name());
     httpd_resp_set_hdr(req, "Content-Disposition", name);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -452,24 +444,6 @@ static esp_err_t tz_post(httpd_req_t *req)
     return answer(req, res);
 }
 
-/* The network mode, as nEt of the menu. The answer goes out first: the switch ends the connection. */
-static esp_err_t net_post(httpd_req_t *req)
-{
-    char body[BODY_MAX];
-    if (!read_body(req, body)) {
-        return ESP_FAIL;
-    }
-    sh_net_mode_t mode = SH_NET_CP;
-    const sh_web_res_t res = sh_web_net(body, s_code, &mode);
-    const esp_err_t err = answer(req, res);
-    if (res == SH_WEB_OK) {
-        ESP_LOGI(TAG, "web: nEt -> %s", mode == SH_NET_AP ? "AP" : "CP");
-        vTaskDelay(pdMS_TO_TICKS(300));
-        sh_net_set_mode(mode);
-    }
-    return err;
-}
-
 static esp_err_t ota_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -524,7 +498,6 @@ static void server_start(void)
         { .uri = "/api/tz",    .method = HTTP_GET,  .handler = tz_get },
         { .uri = "/api/time",  .method = HTTP_POST, .handler = time_post },
         { .uri = "/api/tz",    .method = HTTP_POST, .handler = tz_post },
-        { .uri = "/api/net",   .method = HTTP_POST, .handler = net_post },
         { .uri = "/api/ota",   .method = HTTP_POST, .handler = ota_post },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {

@@ -2,8 +2,10 @@
  * doc/tasks/step7-network-ota.md 3.3) — plain C, no ESP-IDF / FreeRTOS, compiled into the host test
  * too. sh_net runs general-ota as these rules ask and feeds its results back.
  *
- *   - one automatic check, 1 min after boot, only when the device is on the router (CP) then; a
- *     failed automatic check is only logged;
+ *   - one automatic check after boot: 1 min after boot if the device is on the router (CP) then;
+ *     if the connection comes later (a slow router after a power cut, a return from AP) — 1 min
+ *     after it. It is made once: losing and getting the connection again makes no new check, and
+ *     there is none in AP. A failed automatic check is only logged;
  *   - a newer version found by it is offered on the display: "FUp" for 5 s, a short "menu" confirms;
  *     without the confirmation nothing is installed;
  *   - by hand from the web interface: "check", then "update" for a found version;
@@ -65,7 +67,10 @@ typedef struct {
 /* All zeros at boot. */
 typedef struct {
     sh_ota_phase_t phase;
-    bool boot_done;             /* the moment of the automatic check has passed */
+    bool boot_done;             /* the automatic check has been made */
+    bool minute;                /* the first minute after boot is over */
+    bool was_online;            /* on the router at the last step ... */
+    uint32_t online_ms;         /* ... since */
     bool auto_check;            /* the running check is the automatic one */
     bool offer;                 /* "FUp" is on the display ... */
     uint32_t offer_ms;          /* ... since */

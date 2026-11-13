@@ -17,10 +17,9 @@
  *   GET  /api/tz      the supported time zones
  *   POST /api/time    the time of the browser (no code; taken only without SNTP in the last 24 h)
  *   POST /api/tz      the time zone, by its index — with the access code
- *   POST /api/net     the network mode: CP / AP (as nEt of the menu) — with the access code
  *   POST /api/ota     firmware update: check, update — with the access code
  * Answers of the POSTs: 200, 400 (bad request, nothing changed), 403 (access code).
- * The access code: the last 6 characters of the setup network name ("SOLAR-810841" -> 810841). */
+ * The access code: the last 6 characters of the setup network name ("Solar-810840" -> 810840; capitals are taken too). */
 #pragma once
 
 #include <stdbool.h>

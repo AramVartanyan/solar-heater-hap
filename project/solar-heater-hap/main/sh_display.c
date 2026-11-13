@@ -40,7 +40,7 @@ static const uint8_t s_net[2][DIGITS] = {
     { 0, 0x39 /* C */, 0x73 /* P */ },
     { 0, 0x77 /* A */, 0x73 /* P */ },
 };
-/* The characters of the access code (hex): A b C d E F */
+/* The letters of the access code (hex, a ... f): A b C d E F */
 static const uint8_t s_hex[6] = { 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71 };
 /* Air venting: "AIr", then the phase "run" / "PAu" and the minutes left */
 static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
@@ -145,14 +145,14 @@ static bool same(const screen_t *a, const screen_t *b)
     return a->is_temp ? a->temp == b->temp : memcmp(a->seg, b->seg, DIGITS) == 0;
 }
 
-/* One half of the access code ("810841": part 1 "810", part 2 "841"). */
+/* One half of the access code ("810840": part 1 "810", part 2 "840"). */
 static void code_screen(screen_t *s, uint8_t part)
 {
     const char *code = sh_net_access_code() + (part - 1) * DIGITS;
     uint8_t seg[DIGITS] = { 0 };
     for (int i = 0; i < DIGITS && code[i]; i++) {
         const char c = code[i];
-        seg[i] = c >= '0' && c <= '9' ? s_digit[c - '0'] : c >= 'A' && c <= 'F' ? s_hex[c - 'A'] : 0;
+        seg[i] = c >= '0' && c <= '9' ? s_digit[c - '0'] : c >= 'a' && c <= 'f' ? s_hex[c - 'a'] : c >= 'A' && c <= 'F' ? s_hex[c - 'A'] : 0;
     }
     set_seg(s, seg);
 }

@@ -10,7 +10,7 @@
  *   make -C project/solar-heater-hap/test sim        ->  http://localhost:8080/
  *   build/web_sim ../main/web/index.html [port]
  *
- * The access code is 810841. The measurement is set by hand:
+ * The access code is 810840. The measurement is set by hand:
  *   http://localhost:8080/sim?col=1105&tank=720      temperatures, tenths of °C
  *   http://localhost:8080/sim?cf=1&tf=0              sensor faults (collector, tank)
  *   http://localhost:8080/sim?net=0                  answers stop for a while ("no connection")
@@ -39,8 +39,9 @@
  * sunset is 16:50); the season follows the daylight saving time of the zone (Aut) or the choice.
  * The network and the firmware update (group E, doc/tasks/step7-network-ota.md 3.4) run on the
  * rules of the firmware (sh_net_rules, sh_ota) with a made-up update server:
- *   "System" -> "Mode" -> AP             the own access point (the page stays on localhost; the
- *                                        browser counts as its client)
+ *   http://localhost:8080/sim?ap=1       nEt -> AP while the router does not answer: the own access
+ *                                        point (the page stays on localhost; the browser counts
+ *                                        as its client); ap=0: nEt -> CP
  *   http://localhost:8080/sim?apidle=1   the 15 min without a client are over: back to CP
  *   http://localhost:8080/sim?fw=0       the server has nothing newer; fw=1: version 0.2.0 (default)
  *   http://localhost:8080/sim?srv=0      no internet: the check / the update fails; srv=1: back
@@ -78,8 +79,8 @@
 #include "sh_net_rules.h"
 #include "sh_ota.h"
 
-#define CODE    "810841"
-#define AP_SSID "SOLAR-" CODE
+#define CODE    "810840"
+#define AP_SSID "Solar-" CODE    /* the one name: the network, the host name, mDNS */
 
 static sh_web_config_t s_cfg = {
     .settings = { .v = { 70, 25, 6, 4, 300, 15, 5, 3, SH_SEASON_AUTO, 0, 1, 0 } },
@@ -115,7 +116,6 @@ static uint32_t now_s(void)
 
 static sh_net_t s_net;
 static sh_ota_t s_ota;
-static char s_host[SH_NET_NAME_MAX];
 static char s_version[16] = "0.1.0";
 static bool s_fw_new = true, s_inet = true;
 static sh_ota_act_t s_job;              /* what the "server" is busy with ... */
@@ -532,10 +532,10 @@ static void reply_state(int fd)
         .pump_on = s_pump.on, .reason = s_pump.reason, .alarms = s_alarm.active,
         .test_on = s_pump.test, .test_left_s = sh_pump_ctl_test_left(&s_pump, now),
         .cfg = s_cfg, .col_protect = 1100,
-        .name = s_host, .version = s_version, .serial = "E8F60A810841",
+        .name = AP_SSID, .version = s_version, .serial = "E8F60A810840",
         .ssid = s_net.mode == SH_NET_AP ? "" : "A16blue", .ip = s_net.mode == SH_NET_AP ? "192.168.4.1" : "192.168.1.57",
         .rssi = s_net.mode == SH_NET_AP ? 0 : -41,
-        .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = s_host, .ap_ssid = AP_SSID,
+        .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = AP_SSID, .ap_ssid = AP_SSID,
         .ota = s_ota.phase, .ota_pct = s_ota.pct, .ota_version = s_ota.version,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
@@ -641,6 +641,10 @@ static void sim_set(const char *query)
         printf("FUp: \"menu\" -> %s\n", s_ota.phase == SH_OTA_RUNNING ? "the update starts"
                : s_ota.phase == SH_OTA_WAITING ? "the update waits for the pump" : "nothing is offered");
     }
+    if ((p = strstr(query, "ap=")) && sscanf(p + 3, "%d", &v) == 1) {
+        /* the choice of the menu; AP is possible because "the router does not answer" */
+        net_do(sh_net_choose(&s_net, v ? SH_NET_AP : SH_NET_CP, false, sh_ota_updating(&s_ota), now_s()));
+    }
     if ((p = strstr(query, "apidle=")) && sscanf(p + 7, "%d", &v) == 1 && v && s_net.mode == SH_NET_AP) {
         s_net.clients = 0;                              /* the last client left 15 min ago */
         s_net.idle_s = now_s() - SH_NET_AP_IDLE_S;
@@ -741,7 +745,7 @@ static void handle(int fd, const char *page, size_t page_len)
         } else {
             sh_hist_walk(&s_hist, false, 0, csv_line, &c);
             reply_ex(fd, "200 OK", "text/csv; charset=utf-8",
-                     "Content-Disposition: attachment; filename=\"solar-" CODE "-history.csv\"\r\n", csv, c.len);
+                     "Content-Disposition: attachment; filename=\"" AP_SSID "-history.csv\"\r\n", csv, c.len);
         }
     } else if (!post && strcmp(path, "/api/tz") == 0) {
         static char json[SH_WEB_TZ_MAX];
@@ -813,13 +817,6 @@ static void handle(int fd, const char *page, size_t page_len)
                                        .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
         }
         reply_res(fd, res);
-    } else if (post && strcmp(path, "/api/net") == 0) {
-        sh_net_mode_t mode = SH_NET_CP;
-        const sh_web_res_t res = sh_web_net(body, CODE, &mode);
-        if (res == SH_WEB_OK) {
-            net_do(sh_net_choose(&s_net, mode, sh_ota_updating(&s_ota), now_s()));
-        }
-        reply_res(fd, res);
     } else if (post && strcmp(path, "/api/ota") == 0) {
         sh_ota_cmd_t cmd = SH_OTA_CMD_CHECK;
         const sh_web_res_t res = sh_web_ota(body, CODE, &cmd);
@@ -863,7 +860,6 @@ int main(int argc, char **argv)
     }
     s_start = time(NULL);
     s_sntp_s = now_s();
-    sh_net_hostname(s_host, sizeof(s_host), AP_SSID);
     made_up_start();
     printf("page %zu bytes, http://localhost:%d/ (access code %s)\n", page_len, port, CODE);
     fflush(stdout);

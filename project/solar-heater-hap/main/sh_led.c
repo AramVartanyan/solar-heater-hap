@@ -20,7 +20,6 @@ static int64_t s_start_us;
 
 /* What the LED shows (only the timer callback writes the LED) */
 static sh_color_t s_shown = SH_COLOR_COUNT;
-static uint8_t s_shown_level;
 
 static const uint8_t RGB[SH_COLOR_COUNT][3] = {
     [SH_COLOR_OFF]    = {   0,   0,   0 },
@@ -33,12 +32,11 @@ static const uint8_t RGB[SH_COLOR_COUNT][3] = {
     [SH_COLOR_RED]    = { 255,   0,   0 },
 };
 
-/* `level`: 0 ... 100 % of the set brightness (the breathing) */
-static void led_write(sh_color_t color, uint8_t level)
+static void led_write(sh_color_t color)
 {
-    const uint32_t k = CONFIG_SH_LED_BRIGHTNESS * (uint32_t)level;  /* brightness scaling in our layer */
-    led_strip_set_pixel(s_strip, 0, RGB[color][0] * k / 10000, RGB[color][1] * k / 10000,
-                        RGB[color][2] * k / 10000);
+    const uint32_t k = CONFIG_SH_LED_BRIGHTNESS;     /* brightness scaling in our layer */
+    led_strip_set_pixel(s_strip, 0, RGB[color][0] * k / 100, RGB[color][1] * k / 100,
+                        RGB[color][2] * k / 100);
     led_strip_refresh(s_strip);
 }
 
@@ -52,12 +50,10 @@ static void tick(void *arg)
     taskEXIT_CRITICAL(&s_lock);
 
     const uint32_t ms = (uint32_t)((esp_timer_get_time() - start_us) / 1000);
-    const uint8_t level = sh_ind_level(pattern, ms);
-    const sh_color_t now = level ? color : SH_COLOR_OFF;
-    if (now != s_shown || level != s_shown_level) {
-        led_write(now, level);
+    const sh_color_t now = sh_ind_lit(pattern, ms) ? color : SH_COLOR_OFF;
+    if (now != s_shown) {
+        led_write(now);
         s_shown = now;
-        s_shown_level = level;
     }
 }
 
@@ -80,7 +76,7 @@ esp_err_t sh_led_init(void)
         ESP_LOGE(TAG, "led_strip: %s", esp_err_to_name(err));
         return err;
     }
-    led_write(SH_COLOR_OFF, 0);
+    led_write(SH_COLOR_OFF);
     s_shown = SH_COLOR_OFF;
 
     const esp_timer_create_args_t args = { .callback = tick, .name = "sh_led" };

@@ -5,7 +5,7 @@
  *   2. NVS, shared state, user settings, installer data, time zone, history partition
  *   3. hardware: status LED, sensors, display, buttons
  *   4. measurement task, control task, history task
- *   5. the network (sh_net: captive-wifi in the mode CP, the name solar-xxxxxx, mDNS, firmware
+ *   5. the network (sh_net: captive-wifi in the mode CP, the name Solar-xxxxxx, mDNS, firmware
  *      update), SNTP (at every connection to the router) and the web interface (on the router or on
  *      the own access point); HomeKit follows in a later phase
  */

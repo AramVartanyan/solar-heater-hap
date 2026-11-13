@@ -4,15 +4,17 @@
  * the web interface, and does what the rules say (sh_net_rules, sh_ota — plain C, host test):
  *
  *   CP   captive_wifi_start(): the router, the clock (SNTP), the web interface, mDNS
- *        ("solar-xxxxxx.local", _http._tcp); without a stored network the setup portal, which
+ *        ("Solar-xxxxxx.local", _http._tcp); without a stored network the setup portal, which
  *        captive-wifi closes after 15 min without a client (CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN):
  *        the radio stays off until a restart or a choice of nEt
- *   AP   captive_wifi_start_ap(15 min): the open access point "SOLAR-xxxxxx" without a sign-in
+ *   AP   captive_wifi_start_ap(15 min): the open access point "Solar-xxxxxx" without a sign-in
  *        window, the web interface at http://192.168.4.1; after 15 min without a client back to
  *        CP (with a stored network to the router, without one the radio goes off)
- * The mode is not stored: CP at every boot. The name in the network (DHCP hostname, mDNS) is the
- * access point name in lower case ("solar-810841").
- * Firmware update (general-ota, CONFIG_GENERAL_OTA_URL): the automatic check 1 min after boot, "FUp"
+ * AP is chosen in the menu only and only while the device is not connected to the router. The mode
+ * is not stored: CP at every boot. One name everywhere — captive_wifi_ap_ssid(), built from the base
+ * MAC ("Solar-810840"): the network of the portal / AP, the DHCP hostname and mDNS; its last 6
+ * characters are the access code, the base MAC in capitals is the serial number.
+ * Firmware update (general-ota, CONFIG_GENERAL_OTA_URL): one automatic check after boot, "FUp"
  * and its confirmation, the check and the update from the web interface, the wait for the pump —
  * sh_ota; the restart after a written update is the one of general-ota. */
 #pragma once
@@ -28,17 +30,20 @@ esp_err_t sh_net_init(void);
 /* The network task; starts Wi-Fi in CP. After sh_web_init(). */
 esp_err_t sh_net_start(void);
 
-/* nEt chosen in the menu or in the web interface (any task). */
+/* nEt chosen in the menu (any task). AP is refused while connected to the router. */
 void sh_net_set_mode(sh_net_mode_t mode);
 
 /* A firmware update command of the web interface or of the "menu" button (any task). */
 void sh_net_update(sh_ota_cmd_t cmd);
 
-/* The access code, as on the display after nEt -> AP: "810841" (after sh_net_init()). */
+/* The access code, as on the display after nEt -> AP: "810840" (after sh_net_init()). */
 const char *sh_net_access_code(void);
 
-/* The name in the network: "solar-810841" (after sh_net_init()). */
+/* The name in the network: "Solar-810840" (after sh_net_init()). */
 const char *sh_net_name(void);
+
+/* The serial number: "E8F60A810840" (after sh_net_init()). */
+const char *sh_net_serial_number(void);
 
 /* What the web interface shows. */
 typedef struct {

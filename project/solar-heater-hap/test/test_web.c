@@ -32,8 +32,8 @@ static sh_web_status_t status(void)
     const sh_web_status_t s = {
         .t_col = 523, .t_tank = 418, .pump_on = true, .reason = SH_PUMP_REASON_DIFF,
         .cfg = config(), .col_protect = 1100,
-        .name = "solar-810841", .version = "0.1.0", .serial = "E8F60A810841", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
-        .host = "solar-810841", .ap_ssid = "SOLAR-810841",
+        .name = "Solar-810840", .version = "0.1.0", .serial = "E8F60A810840", .ssid = "Home", .ip = "192.168.1.7", .rssi = -41,
+        .host = "Solar-810840", .ap_ssid = "Solar-810840",
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
         .cool_until = -1, .cool_learned = 663, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
     };
@@ -57,7 +57,7 @@ static void test_status(void)
 {
     sh_web_status_t s = status();
     CHECK(strcmp(json(&s),
-        "{\"name\":\"solar-810841\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810841\","
+        "{\"name\":\"Solar-810840\",\"fw\":\"0.1.0\",\"sn\":\"E8F60A810840\","
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
@@ -86,7 +86,7 @@ static void test_status(void)
         "\"heater\":{\"v\":20,\"min\":0,\"max\":120,\"step\":5},\"mount\":{\"v\":0,\"min\":0,\"max\":1}},"
         "\"calc\":{\"boil\":1277,\"cap\":1150,\"prot\":1100,\"prot_set\":1100,\"frost\":40,\"vac\":900},"
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"cp\",\"pend\":0,"
-        "\"host\":\"solar-810841\",\"ap\":\"SOLAR-810841\"},"
+        "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
         "\"ota\":{\"st\":\"idle\",\"ver\":\"\",\"pct\":null},"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
         "\"run\":[0,0,0,0]}") == 0);

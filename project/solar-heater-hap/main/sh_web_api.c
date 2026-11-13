@@ -546,22 +546,6 @@ sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz)
     return SH_WEB_OK;
 }
 
-sh_web_res_t sh_web_net(const char *body, const char *code, sh_net_mode_t *mode)
-{
-    char v[VALUE_MAX];
-    if (!form_get(body, "mode", v)) {
-        return SH_WEB_BAD;
-    }
-    if (strcmp(v, "cp") == 0) {
-        *mode = SH_NET_CP;
-    } else if (strcmp(v, "ap") == 0) {
-        *mode = SH_NET_AP;
-    } else {
-        return SH_WEB_BAD;
-    }
-    return sh_web_code_ok(body, code) ? SH_WEB_OK : SH_WEB_DENIED;
-}
-
 sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd)
 {
     char v[VALUE_MAX];

@@ -15,7 +15,7 @@
 #include "sh_web_api.h"
 
 #define BIT(a)  SH_ALARM_BIT(a)
-#define CODE    "810841"
+#define CODE    "810840"
 
 /* ---- the menu: nEt, the access code, FUp ------------------------------------------------ */
 
@@ -121,6 +121,37 @@ static void test_menu_net(void)
     CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NET);
     CHECK_EQ(view(&u, 0).code_part, 1);
 
+    /* connected to the router: AP is refused — "CP" steady for 1 s, no code, nothing passed on */
+    u = at_net(false);
+    u.ctx.net_connected = true;
+    key(&u, SH_KEY_MENU, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(view(&u, 0).value, 1);                             /* AP can be looked at ... */
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NONE);      /* ... but not chosen */
+    v = view(&u, 0);
+    CHECK_EQ(v.mode, SH_MENU_SAVED);
+    CHECK_EQ(v.value, 0);                                       /* "CP" */
+    CHECK_EQ(v.code_part, 0);
+    CHECK(v.value_visible);
+    CHECK_EQ(view(&u, 999).mode, SH_MENU_SAVED);
+    v = view(&u, 1);
+    CHECK_EQ(v.mode, SH_MENU_LIST);                             /* back in the list at nEt */
+    CHECK_EQ(v.pos, SH_MENU_NET);
+    /* CP while connected is passed on as before (it changes nothing there) */
+    u = at_net(false);
+    u.ctx.net_connected = true;
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NET);
+    CHECK_EQ(u.m.value, 0);
+    /* not connected (no stored network, the router does not answer, the radio is off): allowed */
+    u = at_net(false);
+    u.ctx.net_connected = false;
+    key(&u, SH_KEY_MENU, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NET);
+    CHECK_EQ(u.m.value, 1);
+    CHECK_EQ(view(&u, 0).code_part, 1);
+
     /* not confirmed within 10 s: nothing is chosen */
     u = at_net(false);
     key(&u, SH_KEY_MENU, 100);
@@ -186,9 +217,9 @@ static void test_net_ap_times(void)
     CHECK_EQ(n.mode, SH_NET_CP);                                /* the mode is not stored: CP at boot */
     CHECK_EQ(sh_net_step(&n, false, true, 100), SH_NET_ACT_NONE);
 
-    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, 1000), SH_NET_ACT_START_AP);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 1000), SH_NET_ACT_START_AP);
     CHECK_EQ(n.mode, SH_NET_AP);
-    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, 1001), SH_NET_ACT_NONE);       /* already AP */
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 1001), SH_NET_ACT_NONE);       /* already AP */
     CHECK_EQ(sh_net_event(&n, SH_NET_EVT_AP_STARTED, true, 1002), SH_NET_ACT_NONE);
 
     /* 15 min without a client, counted from the start: +-1 s */
@@ -202,7 +233,7 @@ static void test_net_ap_times(void)
 
     /* a phone on it: no limit; 15 min after the last one leaves */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     sh_net_event(&n, SH_NET_EVT_AP_STARTED, true, 1);
     sh_net_event(&n, SH_NET_EVT_CLIENT_JOINED, true, 600);
     CHECK_EQ(sh_net_step(&n, false, true, 5000), SH_NET_ACT_NONE);
@@ -216,7 +247,7 @@ static void test_net_ap_times(void)
 
     /* a new phone within the 15 min starts the count over */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     sh_net_event(&n, SH_NET_EVT_CLIENT_JOINED, true, 890);
     sh_net_event(&n, SH_NET_EVT_CLIENT_LEFT, true, 895);
     CHECK_EQ(sh_net_step(&n, false, true, 900), SH_NET_ACT_NONE);
@@ -225,7 +256,7 @@ static void test_net_ap_times(void)
 
     /* a "left" without a "joined" does not underflow */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     sh_net_event(&n, SH_NET_EVT_CLIENT_LEFT, true, 500);
     CHECK_EQ(n.clients, 0);
     CHECK_EQ(sh_net_step(&n, false, true, 900), SH_NET_ACT_START_CP);
@@ -235,60 +266,97 @@ static void test_net_back_to_cp(void)
 {
     /* the time is over, a network is stored: the router */
     sh_net_t n = { 0 };
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     CHECK_EQ(sh_net_step(&n, false, true, 900), SH_NET_ACT_START_CP);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK(!n.radio_off);
 
     /* no stored network: the radio goes off (no setup portal for another 15 min) */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     CHECK_EQ(sh_net_step(&n, false, false, 900), SH_NET_ACT_RADIO_OFF);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK(n.radio_off);
     CHECK_EQ(sh_net_step(&n, false, false, 5000), SH_NET_ACT_NONE);             /* it stays off */
     /* ... until a choice of the menu: CP -> the portal, AP -> the access point */
-    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, 6000), SH_NET_ACT_START_CP);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, false, 6000), SH_NET_ACT_START_CP);
     CHECK(!n.radio_off);
     n.radio_off = true;
-    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, 6000), SH_NET_ACT_START_AP);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 6000), SH_NET_ACT_START_AP);
     CHECK(!n.radio_off);
 
     /* captive-wifi's own idle time came first (the radio is off already) */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     CHECK_EQ(sh_net_event(&n, SH_NET_EVT_AP_TIMEOUT, true, 899), SH_NET_ACT_START_CP);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK_EQ(sh_net_step(&n, false, true, 900), SH_NET_ACT_NONE);               /* not twice */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     CHECK_EQ(sh_net_event(&n, SH_NET_EVT_AP_TIMEOUT, false, 899), SH_NET_ACT_NONE);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK(n.radio_off);
     /* ... and after ours: nothing more */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     sh_net_step(&n, false, true, 900);
     CHECK_EQ(sh_net_event(&n, SH_NET_EVT_AP_TIMEOUT, true, 901), SH_NET_ACT_NONE);
 
     /* CP chosen in AP: back at once */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, false, 0);
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
     sh_net_event(&n, SH_NET_EVT_CLIENT_JOINED, true, 10);
-    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, 20), SH_NET_ACT_START_CP);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, false, 20), SH_NET_ACT_START_CP);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK_EQ(sh_net_step(&n, false, true, 5000), SH_NET_ACT_NONE);
 
     /* CP chosen in CP with the radio on: nothing is restarted */
     memset(&n, 0, sizeof(n));
-    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, 0), SH_NET_ACT_NONE);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, false, 0), SH_NET_ACT_NONE);
 
     /* CP without a stored network: the portal ran out of time -> off until a choice of nEt */
     CHECK_EQ(sh_net_event(&n, SH_NET_EVT_PORTAL_TIMEOUT, false, 900), SH_NET_ACT_NONE);
     CHECK(n.radio_off);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK_EQ(sh_net_step(&n, false, false, 90000), SH_NET_ACT_NONE);
-    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, 90001), SH_NET_ACT_START_CP);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, false, 90001), SH_NET_ACT_START_CP);
+    CHECK(!n.radio_off);
+}
+
+/* AP only while the device is not connected to the router. */
+static void test_net_ap_only_offline(void)
+{
+    /* connected: refused, nothing changes (also if asked again and again) */
+    sh_net_t n = { 0 };
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, true, false, 100), SH_NET_ACT_NONE);
+    CHECK_EQ(n.mode, SH_NET_CP);
+    CHECK(!n.ap_pending);
+    CHECK(!n.radio_off);
+    CHECK_EQ(sh_net_step(&n, false, true, 2000), SH_NET_ACT_NONE);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, true, true, 2100), SH_NET_ACT_NONE);  /* during an update too */
+    CHECK(!n.ap_pending);
+    CHECK_EQ(sh_net_step(&n, false, true, 2200), SH_NET_ACT_NONE);
+
+    /* not connected — the router does not answer (a network is stored): allowed; after the 15 min
+     * back to the router, which is tried again */
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 3000), SH_NET_ACT_START_AP);
+    CHECK_EQ(n.mode, SH_NET_AP);
+    CHECK_EQ(sh_net_step(&n, false, true, 3900), SH_NET_ACT_START_CP);
+
+    /* no stored network (the portal is open): allowed */
+    memset(&n, 0, sizeof(n));
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 10), SH_NET_ACT_START_AP);
+
+    /* the radio is off (the portal ran out of time): allowed */
+    memset(&n, 0, sizeof(n));
+    sh_net_event(&n, SH_NET_EVT_PORTAL_TIMEOUT, false, 900);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, false, 1000), SH_NET_ACT_START_AP);
+    CHECK(!n.radio_off);
+
+    /* the radio stops only without a stored network: with one the end of AP is the router */
+    memset(&n, 0, sizeof(n));
+    sh_net_choose(&n, SH_NET_AP, false, false, 0);
+    CHECK_EQ(sh_net_step(&n, false, true, 900), SH_NET_ACT_START_CP);
     CHECK(!n.radio_off);
 }
 
@@ -296,7 +364,7 @@ static void test_net_back_to_cp(void)
 static void test_net_ap_postponed(void)
 {
     sh_net_t n = { 0 };
-    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, true, 100), SH_NET_ACT_NONE);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_AP, false, true, 100), SH_NET_ACT_NONE);
     CHECK_EQ(n.mode, SH_NET_CP);
     CHECK(n.ap_pending);
     CHECK_EQ(sh_net_step(&n, true, true, 150), SH_NET_ACT_NONE);                /* still updating */
@@ -308,8 +376,8 @@ static void test_net_ap_postponed(void)
 
     /* CP chosen meanwhile: the postponed AP is dropped */
     memset(&n, 0, sizeof(n));
-    sh_net_choose(&n, SH_NET_AP, true, 100);
-    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, true, 110), SH_NET_ACT_NONE);
+    sh_net_choose(&n, SH_NET_AP, false, true, 100);
+    CHECK_EQ(sh_net_choose(&n, SH_NET_CP, false, true, 110), SH_NET_ACT_NONE);
     CHECK(!n.ap_pending);
     CHECK_EQ(sh_net_step(&n, false, true, 200), SH_NET_ACT_NONE);
 
@@ -326,23 +394,39 @@ static void test_net_ap_postponed(void)
     CHECK(!sh_ota_updating(&o));
 }
 
+/* One name from the base MAC: the network, the host name, mDNS; the code and the serial number. */
 static void test_net_name(void)
 {
-    char name[SH_NET_NAME_MAX];
-    sh_net_hostname(name, sizeof(name), "SOLAR-810841");
-    CHECK(strcmp(name, "solar-810841") == 0);
-    sh_net_hostname(name, sizeof(name), "SOLAR-A1B2C3");
-    CHECK(strcmp(name, "solar-a1b2c3") == 0);
-    CHECK(strcmp(sh_net_code("SOLAR-810841"), "810841") == 0);
-    CHECK(strcmp(sh_net_code("SOLAR-A1B2C3"), "A1B2C3") == 0);
-    CHECK(strcmp(sh_net_code("841"), "841") == 0);
+    const uint8_t mac[6] = { 0xe8, 0xf6, 0x0a, 0x81, 0x08, 0x40 };      /* the base MAC */
+    const char *name = "Solar-810840";                          /* captive_wifi_ap_ssid() for it */
+    CHECK(sh_net_name_ok(name, mac));
+    CHECK(strcmp(sh_net_code(name), "810840") == 0);            /* the access code */
+    char serial[SH_NET_SERIAL_LEN + 1];
+    sh_net_serial(serial, mac);
+    CHECK(strcmp(serial, "E8F60A810840") == 0);                 /* capitals */
     CHECK_EQ(SH_NET_CODE_LEN, SH_WEB_CODE_LEN);
 
-    char small[8];
-    memset(small, 'x', sizeof(small));
-    sh_net_hostname(small, 6, "SOLAR-810841");                  /* cut, with its NUL */
-    CHECK(strcmp(small, "solar") == 0);
-    CHECK_EQ(small[6], 'x');
+    /* letters: lower case in the name and the code, capitals in the serial number */
+    const uint8_t mac2[6] = { 0xe8, 0xf6, 0x0a, 0xa1, 0xb2, 0xc3 };
+    CHECK(sh_net_name_ok("Solar-a1b2c3", mac2));
+    CHECK(strcmp(sh_net_code("Solar-a1b2c3"), "a1b2c3") == 0);
+    sh_net_serial(serial, mac2);
+    CHECK(strcmp(serial, "E8F60AA1B2C3") == 0);
+    /* the code is the end of the serial number, whatever the case — and is taken in both */
+    CHECK(sh_web_code_ok("code=a1b2c3", sh_net_code("Solar-a1b2c3")));
+    CHECK(sh_web_code_ok("code=A1B2C3", sh_net_code("Solar-a1b2c3")));
+    CHECK(sh_web_code_ok("code=A1b2C3", sh_net_code("Solar-a1b2c3")));
+    CHECK(!sh_web_code_ok("code=a1b2c4", sh_net_code("Solar-a1b2c3")));
+    CHECK(sh_web_code_ok("code=810840", sh_net_code(name)));
+
+    /* a name that is not from the base MAC is noticed: the SoftAP MAC (base + 1), capitals, no "-" */
+    CHECK(!sh_net_name_ok("Solar-810841", mac));
+    CHECK(!sh_net_name_ok("Solar-A1B2C3", mac2));
+    CHECK(!sh_net_name_ok("Solara1b2c3", mac2));
+    CHECK(!sh_net_name_ok("810840", mac));
+    CHECK(!sh_net_name_ok("", mac));
+    CHECK(sh_net_name_ok("Any-Prefix-810840", mac));            /* the prefix is the project's */
+    CHECK(strcmp(sh_net_code("840"), "840") == 0);
 }
 
 /* ---- the indication --------------------------------------------------------------------- */
@@ -362,26 +446,26 @@ static void test_ind_ap_ota(void)
     in.t_col = 500;
     in.ap = true;                                               /* in AP there is no router */
 
-    /* breathing in the colour of the process */
-    CHECK_EQ(ind(&in).pattern, SH_IND_BREATH);
+    /* steady in the colour of the process with a short dark wink — not the breathing */
+    CHECK_EQ(ind(&in).pattern, SH_IND_WINK);
     CHECK_EQ(ind(&in).color, SH_COLOR_BLUE);
     in.pump_on = true;
     CHECK_EQ(ind(&in).color, SH_COLOR_GREEN);
-    CHECK_EQ(ind(&in).pattern, SH_IND_BREATH);
+    CHECK_EQ(ind(&in).pattern, SH_IND_WINK);
     in.alarms = BIT(SH_ALARM_HOT);
     CHECK_EQ(ind(&in).color, SH_COLOR_ORANGE);
-    CHECK_EQ(ind(&in).pattern, SH_IND_BREATH);
+    CHECK_EQ(ind(&in).pattern, SH_IND_WINK);
     in.alarms = 0;
     in.pump_on = false;
     in.vacation = true;
     CHECK_EQ(ind(&in).color, SH_COLOR_PURPLE);
-    CHECK_EQ(ind(&in).pattern, SH_IND_BREATH);
+    CHECK_EQ(ind(&in).pattern, SH_IND_WINK);
     in.vacation = false;
     in.t_col = 950;
     CHECK_EQ(ind(&in).color, SH_COLOR_YELLOW);
     in.t_col = 100;
     CHECK_EQ(ind(&in).color, SH_COLOR_WHITE);
-    CHECK_EQ(ind(&in).pattern, SH_IND_BREATH);
+    CHECK_EQ(ind(&in).pattern, SH_IND_WINK);
 
     /* the alarm patterns come first */
     in.alarms = BIT(SH_ALARM_E4);
@@ -421,30 +505,22 @@ static void test_ind_ap_ota(void)
     CHECK(!sh_ind_lit(SH_IND_BLINK, 500));
     CHECK(!sh_ind_lit(SH_IND_BLINK, 999));
     CHECK(sh_ind_lit(SH_IND_BLINK, 1000));
-    CHECK_EQ(sh_ind_level(SH_IND_BLINK, 100), 100);
-    CHECK_EQ(sh_ind_level(SH_IND_BLINK, 600), 0);
 
-    /* breathing: from dark to the full brightness and back in 5 s, never jumping */
-    CHECK_EQ(sh_ind_level(SH_IND_BREATH, 0), 0);
-    CHECK_EQ(sh_ind_level(SH_IND_BREATH, SH_IND_BREATH_MS / 2), 100);
-    CHECK_EQ(sh_ind_level(SH_IND_BREATH, SH_IND_BREATH_MS), 0);
-    CHECK_EQ(sh_ind_level(SH_IND_BREATH, SH_IND_BREATH_MS / 4), 25);    /* squared ramp */
-    int prev = 0;
-    for (uint32_t ms = 0; ms <= SH_IND_BREATH_MS; ms += 10) {
-        const int l = sh_ind_level(SH_IND_BREATH, ms);
-        CHECK(l >= 0 && l <= 100);
-        CHECK(ms <= SH_IND_BREATH_MS / 2 ? l >= prev : l <= prev);
-        CHECK(l - prev <= 2 && prev - l <= 2);
-        CHECK_EQ(l, sh_ind_level(SH_IND_BREATH, SH_IND_BREATH_MS - ms));        /* symmetric */
-        CHECK_EQ(l, sh_ind_level(SH_IND_BREATH, ms + 3 * SH_IND_BREATH_MS));    /* periodic */
-        prev = l;
+    /* AP: lit all the time but 80 ms every 2 s — the mirror of "CP without a connection" */
+    CHECK_EQ(SH_IND_WINK_OFF_MS, SH_IND_BEAT_ON_MS);
+    CHECK_EQ(SH_IND_WINK_PERIOD_MS, SH_IND_BEAT_PERIOD_MS);
+    CHECK(!sh_ind_lit(SH_IND_WINK, 0));
+    CHECK(!sh_ind_lit(SH_IND_WINK, 79));
+    CHECK(sh_ind_lit(SH_IND_WINK, 80));
+    CHECK(sh_ind_lit(SH_IND_WINK, 1999));
+    CHECK(!sh_ind_lit(SH_IND_WINK, 2000));
+    CHECK(sh_ind_lit(SH_IND_WINK, 2080));
+    unsigned lit = 0;
+    for (uint32_t ms = 0; ms < 2000; ms++) {
+        lit += sh_ind_lit(SH_IND_WINK, ms);
+        CHECK(sh_ind_lit(SH_IND_WINK, ms) != sh_ind_lit(SH_IND_HEARTBEAT, ms));     /* the mirror */
     }
-    /* the other patterns: fully on or off */
-    CHECK_EQ(sh_ind_level(SH_IND_STEADY, 12345), 100);
-    CHECK_EQ(sh_ind_level(SH_IND_HEARTBEAT, 79), 100);
-    CHECK_EQ(sh_ind_level(SH_IND_HEARTBEAT, 80), 0);
-    CHECK_EQ(sh_ind_level(SH_IND_FAST, 150), 0);
-    CHECK_EQ(sh_ind_level(SH_IND_DOUBLE, 250), 100);
+    CHECK_EQ(lit, 1920);
 }
 
 /* ---- the firmware update ---------------------------------------------------------------- */
@@ -464,7 +540,7 @@ static sh_ota_t offered(uint32_t *now)
 
 static void test_ota_boot_check(void)
 {
-    /* 1 min after boot, +-1 s, once, only on the router */
+    /* on the router at the first minute: 1 min after boot, +-1 s, once */
     sh_ota_t o = { 0 };
     CHECK_EQ(SH_OTA_BOOT_CHECK_MS, 60000);
     CHECK_EQ(sh_ota_step(&o, &ONLINE, 0), SH_OTA_ACT_NONE);
@@ -481,13 +557,80 @@ static void test_ota_boot_check(void)
         CHECK_EQ(sh_ota_step(&o, &ONLINE, t), SH_OTA_ACT_NONE);
     }
 
-    /* not on the router at that moment (AP, the portal, no Wi-Fi): no check, not later either */
+    /* case 1 — the router is slower than the device (after a power cut): no connection at the
+     * first minute; the check comes 1 min after the connection, +-1 s */
     memset(&o, 0, sizeof(o));
     const sh_ota_in_t offline = { .online = false };
-    CHECK_EQ(sh_ota_step(&o, &offline, 60000), SH_OTA_ACT_NONE);
+    for (uint32_t t = 0; t <= 150000; t += 200) {
+        CHECK_EQ(sh_ota_step(&o, &offline, t), SH_OTA_ACT_NONE);
+    }
     CHECK_EQ(o.phase, SH_OTA_IDLE);
-    CHECK_EQ(sh_ota_step(&o, &ONLINE, 61000), SH_OTA_ACT_NONE);
-    CHECK_EQ(sh_ota_step(&o, &ONLINE, 600000), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 150200), SH_OTA_ACT_NONE);        /* connected */
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 150200 + 59000), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 150200 + 59999), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 150200 + 60000), SH_OTA_ACT_CHECK);
+    CHECK_EQ(o.phase, SH_OTA_CHECKING);
+    /* connected just before the end of the first minute: at the first minute */
+    memset(&o, 0, sizeof(o));
+    sh_ota_step(&o, &offline, 0);
+    sh_ota_step(&o, &offline, 55000);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 59000), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 60000), SH_OTA_ACT_CHECK);
+    /* the connection is lost again before its minute is over: the minute starts with the next one */
+    memset(&o, 0, sizeof(o));
+    sh_ota_step(&o, &offline, 60000);
+    sh_ota_step(&o, &ONLINE, 100000);
+    sh_ota_step(&o, &offline, 130000);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 170000), SH_OTA_ACT_NONE);        /* 70 s after the first one */
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 229999), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 230000), SH_OTA_ACT_CHECK);
+
+    /* case 2 — the check is made once: losing and getting the connection again makes no new one */
+    memset(&o, 0, sizeof(o));
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 60000), SH_OTA_ACT_CHECK);
+    sh_ota_event(&o, SH_OTA_EVT_CURRENT, "0.1.0", 0, 62000);
+    for (int i = 0; i < 5; i++) {
+        const uint32_t t = 100000 + (uint32_t)i * 300000;
+        CHECK_EQ(sh_ota_step(&o, &offline, t), SH_OTA_ACT_NONE);
+        CHECK_EQ(sh_ota_step(&o, &ONLINE, t + 100000), SH_OTA_ACT_NONE);
+        CHECK_EQ(sh_ota_step(&o, &ONLINE, t + 160000), SH_OTA_ACT_NONE);
+        CHECK_EQ(sh_ota_step(&o, &ONLINE, t + 250000), SH_OTA_ACT_NONE);
+    }
+    CHECK_EQ(o.phase, SH_OTA_CURRENT);
+    /* ... also when that one check failed (only the log) */
+    memset(&o, 0, sizeof(o));
+    sh_ota_step(&o, &ONLINE, 60000);
+    sh_ota_event(&o, SH_OTA_EVT_FAILED, NULL, 0, 65000);
+    sh_ota_step(&o, &offline, 70000);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 80000), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 140000), SH_OTA_ACT_NONE);
+
+    /* case 3 — AP (not online): no check, however long; back in CP and connected — 1 min after
+     * the connection, if it has not been made yet */
+    memset(&o, 0, sizeof(o));
+    sh_ota_step(&o, &ONLINE, 20000);                            /* on the router at first ... */
+    for (uint32_t t = 30000; t <= 1000000; t += 1000) {         /* ... then AP for a quarter of an hour */
+        CHECK_EQ(sh_ota_step(&o, &offline, t), SH_OTA_ACT_NONE);
+    }
+    CHECK_EQ(o.phase, SH_OTA_IDLE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 1001000), SH_OTA_ACT_NONE);       /* CP, connected */
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 1060999), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 1061000), SH_OTA_ACT_CHECK);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 1062000), SH_OTA_ACT_NONE);
+    /* AP chosen after the check was made: no second one after the return */
+    sh_ota_event(&o, SH_OTA_EVT_CURRENT, "0.1.0", 0, 1063000);
+    sh_ota_step(&o, &offline, 1100000);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 2100000), SH_OTA_ACT_NONE);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 2200000), SH_OTA_ACT_NONE);
+
+    /* a check by hand is running at that moment: the automatic one follows it */
+    memset(&o, 0, sizeof(o));
+    sh_ota_step(&o, &ONLINE, 50000);
+    CHECK_EQ(sh_ota_cmd(&o, SH_OTA_CMD_CHECK, &ONLINE, 59000), SH_OTA_ACT_CHECK);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 60000), SH_OTA_ACT_NONE);
+    sh_ota_event(&o, SH_OTA_EVT_CURRENT, "0.1.0", 0, 61000);
+    CHECK(!o.boot_done);
+    CHECK_EQ(sh_ota_step(&o, &ONLINE, 110000), SH_OTA_ACT_CHECK);       /* 1 min on the router */
 
     /* the first step comes late (a slow start): still once */
     memset(&o, 0, sizeof(o));
@@ -709,8 +852,8 @@ static void test_web_status(void)
         .t_col = 523, .t_tank = 418,
         .cfg = { .settings = S, .frost = true,
                  .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } },
-        .col_protect = 1100, .name = "solar-810841", .version = "0.1.0", .serial = "E8F60A810841",
-        .ssid = "Home", .ip = "192.168.1.7", .rssi = -41, .host = "solar-810841", .ap_ssid = "SOLAR-810841",
+        .col_protect = 1100, .name = "Solar-810840", .version = "0.1.0", .serial = "E8F60A810840",
+        .ssid = "Home", .ip = "192.168.1.7", .rssi = -41, .host = "Solar-810840", .ap_ssid = "Solar-810840",
         .clock = { .trust = SH_CLOCK_UNSET, .min = -1, .tz = "UTC", .peak = SH_PEAK_NONE },
         .cool_until = -1, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
     };
@@ -719,9 +862,9 @@ static void test_web_status(void)
     HAS(&s, "\"ota\"]");
 
     /* CP on the router: the mode, the name, nothing checked yet */
-    HAS(&s, "\"name\":\"solar-810841\",");
+    HAS(&s, "\"name\":\"Solar-810840\",");
     HAS(&s, "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"cp\",\"pend\":0,"
-            "\"host\":\"solar-810841\",\"ap\":\"SOLAR-810841\"},"
+            "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
             "\"ota\":{\"st\":\"idle\",\"ver\":\"\",\"pct\":null},");
 
     /* a newer version, then the update with its progress */
@@ -751,25 +894,12 @@ static void test_web_status(void)
     s.rssi = 0;
     s.ota = SH_OTA_CURRENT;
     HAS(&s, "\"net\":{\"ssid\":\"\",\"ip\":\"192.168.4.1\",\"rssi\":0,\"mode\":\"ap\",\"pend\":0,"
-            "\"host\":\"solar-810841\",\"ap\":\"SOLAR-810841\"},"
+            "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
             "\"ota\":{\"st\":\"ap\",\"ver\":\"\",\"pct\":null},");
 }
 
 static void test_web_requests(void)
 {
-    /* the network mode: with the access code only */
-    sh_net_mode_t mode = SH_NET_CP;
-    CHECK_EQ(sh_web_net("mode=ap&code=" CODE, CODE, &mode), SH_WEB_OK);
-    CHECK_EQ(mode, SH_NET_AP);
-    CHECK_EQ(sh_web_net("code=" CODE "&mode=cp", CODE, &mode), SH_WEB_OK);
-    CHECK_EQ(mode, SH_NET_CP);
-    CHECK_EQ(sh_web_net("mode=ap", CODE, &mode), SH_WEB_DENIED);
-    CHECK_EQ(sh_web_net("mode=ap&code=123456", CODE, &mode), SH_WEB_DENIED);
-    CHECK_EQ(sh_web_net("mode=off&code=" CODE, CODE, &mode), SH_WEB_BAD);
-    CHECK_EQ(sh_web_net("mode=AP&code=" CODE, CODE, &mode), SH_WEB_BAD);
-    CHECK_EQ(sh_web_net("code=" CODE, CODE, &mode), SH_WEB_BAD);
-    CHECK_EQ(sh_web_net("", CODE, &mode), SH_WEB_BAD);
-
     /* the update: check, update — with the access code only */
     sh_ota_cmd_t cmd = SH_OTA_CMD_CONFIRM;
     CHECK_EQ(sh_web_ota("cmd=check&code=" CODE, CODE, &cmd), SH_WEB_OK);
@@ -782,6 +912,46 @@ static void test_web_requests(void)
     CHECK_EQ(sh_web_ota("code=" CODE, CODE, &cmd), SH_WEB_BAD);
 }
 
+/* The web interface only shows the mode: no request changes it, the page has no control for it. */
+static char s_file[256 * 1024];
+
+static const char *file(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    CHECK(f != NULL);
+    size_t n = 0;
+    if (f) {
+        n = fread(s_file, 1, sizeof(s_file) - 1, f);
+        fclose(f);
+    }
+    s_file[n] = '\0';
+    return s_file;
+}
+
+static void test_web_mode_shown_only(void)
+{
+    /* the page: a row with the mode, no select / request for it (run from the test folder) */
+    const char *page = file("../main/web/index.html");
+    CHECK(strstr(page, "id=\"net-v\"") != NULL);
+    CHECK(strstr(page, "data-f=\"net_mode\"") != NULL);
+    CHECK(strstr(page, "/api/net") == NULL);
+    CHECK(strstr(page, "net-sel") == NULL);
+    CHECK(strstr(page, "mode:m") == NULL);
+    /* the server: no address for it */
+    const char *srv = file("../main/sh_web.c");
+    CHECK(strstr(srv, "/api/ota") != NULL);
+    CHECK(strstr(srv, "/api/net") == NULL);
+    CHECK(strstr(srv, "sh_net_set_mode") == NULL);
+    /* a "set" request does not know the mode either */
+    sh_web_config_t c = { .settings = S, .frost = true,
+                          .inst = { .v = { SH_FLUID_WATER, 0, 15, 120, SH_COL_FLAT, 20, 150, 20 } } };
+    unsigned ch = 0;
+    CHECK_EQ(sh_web_set("mode=ap&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    CHECK_EQ(sh_web_set("net=1&code=" CODE, CODE, &c, &ch), SH_WEB_BAD);
+    sh_ota_cmd_t cmd;
+    CHECK_EQ(sh_web_ota("cmd=ap&code=" CODE, CODE, &cmd), SH_WEB_BAD);
+}
+
 int main(void)
 {
     test_menu_net();
@@ -789,6 +959,7 @@ int main(void)
     test_display_labels();
     test_net_ap_times();
     test_net_back_to_cp();
+    test_net_ap_only_offline();
     test_net_ap_postponed();
     test_net_name();
     test_ind_ap_ota();
@@ -798,5 +969,6 @@ int main(void)
     test_ota_wait();
     test_web_status();
     test_web_requests();
+    test_web_mode_shown_only();
     return test_summary("test_net");
 }

@@ -1,5 +1,6 @@
 /* The network mode — see sh_net_rules.h. */
 
+#include <stdio.h>
 #include <string.h>
 #include "sh_net_rules.h"
 
@@ -13,11 +14,11 @@ static sh_net_act_t start_ap(sh_net_t *n, uint32_t now_s)
     return SH_NET_ACT_START_AP;
 }
 
-sh_net_act_t sh_net_choose(sh_net_t *n, sh_net_mode_t mode, bool updating, uint32_t now_s)
+sh_net_act_t sh_net_choose(sh_net_t *n, sh_net_mode_t mode, bool connected, bool updating, uint32_t now_s)
 {
     if (mode == SH_NET_AP) {
-        if (n->mode == SH_NET_AP) {
-            return SH_NET_ACT_NONE;
+        if (n->mode == SH_NET_AP || connected) {
+            return SH_NET_ACT_NONE;     /* connected to the router: AP is refused */
         }
         if (updating) {
             n->ap_pending = true;       /* the update needs the router: after its end */
@@ -90,21 +91,22 @@ sh_net_act_t sh_net_step(sh_net_t *n, bool updating, bool has_network, uint32_t 
     return SH_NET_ACT_NONE;
 }
 
-const char *sh_net_code(const char *ap_ssid)
+const char *sh_net_code(const char *name)
 {
-    const size_t len = strlen(ap_ssid);
-    return len > SH_NET_CODE_LEN ? ap_ssid + len - SH_NET_CODE_LEN : ap_ssid;
+    const size_t len = strlen(name);
+    return len > SH_NET_CODE_LEN ? name + len - SH_NET_CODE_LEN : name;
 }
 
-void sh_net_hostname(char *out, size_t size, const char *ap_ssid)
+void sh_net_serial(char out[SH_NET_SERIAL_LEN + 1], const uint8_t mac[6])
 {
-    if (size == 0) {
-        return;
-    }
-    size_t i = 0;
-    for (; ap_ssid[i] && i < size - 1; i++) {
-        const char c = ap_ssid[i];
-        out[i] = c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
-    }
-    out[i] = '\0';
+    snprintf(out, SH_NET_SERIAL_LEN + 1, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
+             mac[5]);
+}
+
+bool sh_net_name_ok(const char *name, const uint8_t mac[6])
+{
+    char end[SH_NET_CODE_LEN + 2];
+    snprintf(end, sizeof(end), "-%02x%02x%02x", mac[3], mac[4], mac[5]);
+    const size_t len = strlen(name);
+    return len > SH_NET_CODE_LEN + 1 && strcmp(name + len - (SH_NET_CODE_LEN + 1), end) == 0;
 }

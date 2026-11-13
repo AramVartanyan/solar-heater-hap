@@ -78,7 +78,7 @@ static void menu_key(sh_key_t key)
     xSemaphoreTake(s_menu_lock, portMAX_DELAY);
     const sh_menu_ctx_t ctx = {
         .test_running = st.test_on, .air_running = st.modes.air_on, .winter = st.modes.winter,
-        .net_ap = st.net_ap, .fup_offer = st.fup_offer,
+        .net_ap = st.net_ap, .net_connected = st.wifi_connected, .fup_offer = st.fup_offer,
     };
     const sh_menu_act_t act = sh_menu_key(&s_menu, key, now_ms(), &ctx, &settings);
     const sh_setting_t id = (sh_setting_t)s_menu.id;

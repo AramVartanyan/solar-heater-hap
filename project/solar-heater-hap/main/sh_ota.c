@@ -32,9 +32,24 @@ sh_ota_act_t sh_ota_step(sh_ota_t *o, const sh_ota_in_t *in, uint32_t now_ms)
     if (o->offer && now_ms - o->offer_ms >= SH_OTA_OFFER_MS) {
         o->offer = false;
     }
-    if (!o->boot_done && now_ms >= SH_OTA_BOOT_CHECK_MS) {
-        o->boot_done = true;            /* once: not later if the device is not on the router now */
-        if (in->online && !busy(o)) {
+    if (in->online && !o->was_online) {
+        o->online_ms = now_ms;
+    }
+    o->was_online = in->online;
+    if (!o->boot_done) {
+        /* at the end of the first minute if on the router then; otherwise 1 min after the
+         * connection came (and is still there) */
+        bool due = false;
+        if (!o->minute) {
+            if (now_ms >= SH_OTA_BOOT_CHECK_MS) {
+                o->minute = true;
+                due = in->online;
+            }
+        } else {
+            due = in->online && now_ms - o->online_ms >= SH_OTA_BOOT_CHECK_MS;
+        }
+        if (due && !busy(o)) {
+            o->boot_done = true;        /* once: a later reconnection makes no new check */
             o->phase = SH_OTA_CHECKING;
             o->auto_check = true;
             return SH_OTA_ACT_CHECK;

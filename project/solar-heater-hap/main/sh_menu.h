@@ -13,8 +13,9 @@
  *                   then the list at the same item
  *   nEt             the network mode (group E): the value is the current mode, "CP" / "AP" ("+" AP,
  *                   "-" CP); "menu" confirms — always passed on (CP switches a radio that is off on
- *                   again); after AP the access code is shown in two parts, 2 s each ("810", "841"),
- *                   instead of the steady value; the mode is not a stored setting
+ *                   again); after AP the access code is shown in two parts, 2 s each ("810", "840"),
+ *                   instead of the steady value; AP while the device is connected to the router is
+ *                   refused: "CP" steady for 1 s, nothing is passed on; the mode is not stored
  *   10 s without a key in the list or on a value -> normal screen, an unconfirmed value is lost.
  * While "FUp" is offered on the normal screen (a newer firmware, 5 s) a short "menu" confirms the
  * update instead of anything else.
@@ -111,6 +112,7 @@ typedef struct {
     bool air_running;           /* the air venting is on */
     bool winter;                /* the current season */
     bool net_ap;                /* the network mode is AP */
+    bool net_connected;         /* connected to the router: AP cannot be chosen */
     bool fup_offer;             /* "FUp" is offered on the display */
 } sh_menu_ctx_t;
 
