@@ -61,7 +61,7 @@ static void test_status(void)
         "\"feat\":[\"alarms\",\"temps\",\"pump\",\"pump_test\",\"settings\",\"frost\",\"fluid\","
         "\"pressure\",\"col_max\",\"calc\",\"net\",\"fw\",\"reset\",\"clock\",\"timezone\",\"run_today\","
         "\"chart\",\"learned\",\"vacation\",\"season\",\"night_cool\",\"deaerate\",\"col_type\",\"tank_vol\","
-        "\"vac_limit\",\"heater\",\"mount\",\"net_mode\",\"ota\",\"homekit\"],"
+        "\"vac_limit\",\"heater\",\"mount\",\"net_mode\",\"ota\",\"homekit\",\"keylock\"],"
         "\"tank\":418,\"col\":523,\"pump\":1,\"why\":\"diff\",\"alarms\":[],\"test\":0,\"left\":0,"
         "\"winter\":0,\"cool\":{\"on\":0,\"target\":null,\"until\":null,\"heater\":0,\"learned\":663,"
         "\"rise\":null,\"set\":null},"
@@ -88,7 +88,7 @@ static void test_status(void)
         "\"net\":{\"ssid\":\"Home\",\"ip\":\"192.168.1.7\",\"rssi\":-41,\"mode\":\"cp\",\"pend\":0,"
         "\"host\":\"Solar-810840\",\"ap\":\"Solar-810840\"},"
         "\"ota\":{\"st\":\"idle\",\"ver\":\"\",\"pct\":null},"
-        "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},"
+        "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},\"lock\":0,"
         "\"clock\":{\"st\":\"unset\",\"sntp\":0,\"min\":null,\"tz\":\"UTC\",\"tzok\":0,\"peak\":null},"
         "\"run\":[0,0,0,0]}") == 0);
 }
@@ -182,7 +182,7 @@ static void test_status_values(void)
     /* "history" only with the history partition */
     HAS_NOT(&s, "\"history\"");
     s.history = true;
-    HAS(&s, "\"heater\",\"mount\",\"net_mode\",\"ota\",\"homekit\",\"history\"],");
+    HAS(&s, "\"heater\",\"mount\",\"net_mode\",\"ota\",\"homekit\",\"keylock\",\"history\"],");
 
     /* the clock and the run time today (whole minutes) */
     s = status();

@@ -1,6 +1,6 @@
 /* Host test of group F (doc/tasks/step14-homekit.md): Apple HomeKit. What the accessory shows and
  * takes (main/sh_hap_rules.c): Active and the vacation, Tmax and its limits, the Current State, the
- * temperatures and their ranges, the display units, the child lock, the Status Fault by the alarms,
+ * temperatures and their ranges, the display units, the keyboard lock, the Status Fault by the alarms,
  * when a notification goes out and when not, when HAP starts and which web server is used, the
  * setting "Apple HomeKit" and its refusal while paired, the pairing window. Then the menu position
  * HAP and "LoC" (main/sh_menu.c), the breathing LED and Identify (main/sh_ind.c) and what the web
@@ -372,66 +372,261 @@ static sh_menu_view_t view(ui_t *u, uint32_t dt)
     return v;
 }
 
+/* in the list at LoC, the keyboard unlocked */
+static ui_t at_loc(void)
+{
+    ui_t u = { .now = 1000, .ctx = { .hap_on = true } };
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
+    key(&u, SH_KEY_MINUS, 100);                                 /* End -> LoC */
+    return u;
+}
+
+/* "+" and "-" go down at `t0` and stay: the time at which their hold is reported, 0 if never
+ * within 10 s (polled every 50 ms, as sh_buttons does). */
+static uint32_t chord_fires(sh_chord_t *c, uint32_t t0)
+{
+    for (uint32_t t = t0; t <= t0 + 10000; t += 50) {
+        if (sh_chord_step(c, t)) {
+            return t;
+        }
+    }
+    return 0;
+}
+
 static void test_lock(void)
 {
+    /* one variable, whoever sets it: a change is reported once (stored, shown, notified) */
     bool lock = false;
+    CHECK(sh_hap_lock_change(&lock, true));                     /* e.g. the buttons */
+    CHECK(lock);
+    CHECK(!sh_hap_lock_change(&lock, true));                    /* already locked: nothing to do */
+    CHECK(sh_hap_lock_change(&lock, false));                    /* e.g. Apple Home unlocks it */
+    CHECK(!lock);
+    CHECK(!sh_hap_lock_change(&lock, false));
+    CHECK(sh_hap_lock_change(&lock, true));                     /* the web interface */
+    CHECK(sh_hap_lock_change(&lock, false));                    /* the buttons again */
+    /* the value of a controller */
     CHECK(sh_hap_write_lock(1, &lock));
     CHECK(lock);
     CHECK(sh_hap_write_lock(0, &lock));
     CHECK(!lock);
     CHECK(!sh_hap_write_lock(2, &lock));
+    /* HomeKit shows it and is notified of every change, whatever the source */
     sh_hap_in_t in = normal();
-    CHECK_EQ(view_of(&in).lock, 0);
+    sh_hap_view_t sent = view_of(&in);
+    CHECK_EQ(sent.lock, 0);
     in.lock = true;
-    CHECK_EQ(view_of(&in).lock, 1);
+    sh_hap_view_t now = view_of(&in);
+    CHECK_EQ(now.lock, 1);
+    CHECK_EQ(sh_hap_changed(&sent, &now), SH_HAP_CH_LOCK);
+    sent = now;
+    in.lock = false;
+    now = view_of(&in);
+    CHECK_EQ(sh_hap_changed(&sent, &now), SH_HAP_CH_LOCK);
 
-    /* locked: "menu" does not open the menu, "LoC" for 1 s */
+    /* ---- locked: no button does anything, a press shows "LoC" for 1 s ---- */
     ui_t u = { .now = 1000, .ctx = { .locked = true } };
-    CHECK(!view(&u, 0).locked);
-    CHECK_EQ(key(&u, SH_KEY_MENU, 0), SH_MENU_ACT_NONE);
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_NONE);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 0), SH_MENU_ACT_NONE);        /* no menu */
     CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
-    CHECK(view(&u, 0).locked);
-    CHECK(view(&u, 999).locked);
-    CHECK(!view(&u, 1).locked);                                 /* 1 s */
-    CHECK_EQ(SH_MENU_LOCKED_MS, 1000);
-    /* "+" does not start the pump test */
-    CHECK_EQ(key(&u, SH_KEY_PLUS, 5000), SH_MENU_ACT_NONE);
-    CHECK(view(&u, 0).locked);
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    CHECK_EQ(view(&u, 999).notice, SH_MENU_NOTICE_LOC);
+    CHECK_EQ(view(&u, 1).notice, SH_MENU_NOTICE_NONE);          /* 1 s */
+    CHECK_EQ(SH_MENU_NOTICE_MS, 1000);
+    CHECK_EQ(key(&u, SH_KEY_PLUS, 5000), SH_MENU_ACT_NONE);     /* no pump test */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
     CHECK_EQ(key(&u, SH_KEY_MINUS, 5000), SH_MENU_ACT_NONE);
-    CHECK(view(&u, 0).locked);
-    /* a held key (repetition) shows nothing new */
-    CHECK_EQ(key(&u, SH_KEY_PLUS_REPEAT, 5000), SH_MENU_ACT_NONE);
-    CHECK(!view(&u, 0).locked);
-    /* a running test (started from the web interface) is not touched from the buttons */
-    u.ctx.test_running = true;
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    CHECK_EQ(key(&u, SH_KEY_PLUS_REPEAT, 5000), SH_MENU_ACT_NONE);  /* a held button too */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    u.ctx.test_running = true;                                  /* a test started from the web interface */
     CHECK_EQ(key(&u, SH_KEY_PLUS, 5000), SH_MENU_ACT_NONE);     /* no +60 s */
-    CHECK_EQ(key(&u, SH_KEY_MINUS, 0), SH_MENU_ACT_NONE);
+    CHECK_EQ(key(&u, SH_KEY_MINUS, 0), SH_MENU_ACT_NONE);       /* no -60 s */
     CHECK_EQ(key(&u, SH_KEY_MENU, 0), SH_MENU_ACT_NONE);        /* no stop */
     u.ctx.test_running = false;
     u.ctx.air_running = true;
-    CHECK_EQ(key(&u, SH_KEY_MENU, 5000), SH_MENU_ACT_NONE);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 5000), SH_MENU_ACT_NONE);     /* the air venting is not stopped */
     u.ctx.air_running = false;
-    u.ctx.fup_offer = true;                                     /* nor is an update confirmed */
-    CHECK_EQ(key(&u, SH_KEY_MENU, 5000), SH_MENU_ACT_NONE);
-    CHECK(view(&u, 0).locked);
+    u.ctx.fup_offer = true;
+    CHECK_EQ(key(&u, SH_KEY_MENU, 5000), SH_MENU_ACT_NONE);     /* "FUp" is not confirmed */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
     u.ctx.fup_offer = false;
-
-    /* unlocked again (from Apple Home): everything as before */
+    /* the resets by holding "menu" (5 s Wi-Fi, 9 s factory) */
+    view(&u, 5000);
+    CHECK(!sh_menu_hold(&u.m, u.now, &u.ctx));
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
     u.ctx.locked = false;
-    CHECK_EQ(key(&u, SH_KEY_PLUS, 5000), SH_MENU_ACT_PLUS);
-    CHECK(!view(&u, 0).locked);
-    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NONE);
-    CHECK_EQ(u.m.mode, SH_MENU_LIST);
+    view(&u, 5000);
+    CHECK(sh_menu_hold(&u.m, u.now, &u.ctx));                   /* unlocked: as before */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_NONE);
 
-    /* the lock closes the way in: a menu that is already open works until it is left */
-    u.ctx.locked = true;
-    CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
-    CHECK_EQ(u.m.pos, SH_MENU_HOL);
-    CHECK(!view(&u, 0).locked);
-    CHECK_EQ(view(&u, SH_MENU_TIMEOUT_MS).mode, SH_MENU_NORMAL);
+    /* ---- "+" and "-" held together for 3 s ---- */
+    CHECK_EQ(SH_MENU_CHORD_MS, 3000);
+    sh_chord_t c = { 0 };
+    sh_chord_button(&c, true, true, 1000);                      /* "+" alone */
+    CHECK(!sh_chord_holding(&c));
+    CHECK(!sh_chord_swallow(&c, true));                         /* an ordinary "+" */
+    CHECK_EQ(chord_fires(&c, 1000), 0);
+    sh_chord_button(&c, false, true, 1400);                     /* "-" joins: the 3 s start here */
+    CHECK(sh_chord_holding(&c));
+    CHECK(!sh_chord_step(&c, 4399));
+    CHECK(sh_chord_step(&c, 4400));
+    CHECK(!sh_chord_step(&c, 4450));                            /* once */
+    CHECK(!sh_chord_step(&c, 60000));
+    /* neither press is a key: no tap, no repetition — also after the release */
+    CHECK(sh_chord_swallow(&c, true));
+    CHECK(sh_chord_swallow(&c, false));
+    sh_chord_button(&c, true, false, 5000);
+    sh_chord_button(&c, false, false, 5100);
+    CHECK(sh_chord_swallow(&c, true));                          /* the taps come at the release */
+    CHECK(sh_chord_swallow(&c, false));
+    CHECK(!sh_chord_holding(&c));
+    /* the next single press is a key again */
+    sh_chord_button(&c, true, true, 6000);
+    CHECK(!sh_chord_swallow(&c, true));
+    sh_chord_button(&c, true, false, 6100);
+    /* released before the 3 s: nothing, and still no "+" / "-" (no pump test by a slip) */
+    sh_chord_button(&c, false, true, 7000);
+    sh_chord_button(&c, true, true, 7100);
+    CHECK(!sh_chord_step(&c, 9000));
+    sh_chord_button(&c, true, false, 9500);
+    CHECK(!sh_chord_step(&c, 12000));
+    CHECK(sh_chord_swallow(&c, true));
+    CHECK(sh_chord_swallow(&c, false));
+    /* one of them released and pressed again: the 3 s start again */
+    sh_chord_button(&c, true, true, 10000);
+    CHECK(!sh_chord_step(&c, 12999));
+    CHECK(sh_chord_step(&c, 13000));
+    sh_chord_button(&c, true, false, 13100);
+    sh_chord_button(&c, false, false, 13100);
+    /* polled as the buttons task does */
+    sh_chord_button(&c, false, true, 20000);
+    sh_chord_button(&c, true, true, 20020);
+    CHECK_EQ(chord_fires(&c, 20050), 23050);
+
+    /* what the hold does: locked -> unlocks, always, whatever is shown */
+    u = (ui_t){ .now = 1000, .ctx = { .locked = true } };
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_UNLOCK);
+    u.ctx.test_running = true;
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_UNLOCK);
+    u.ctx.test_running = false;
+    u.ctx.air_running = true;
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_UNLOCK);
+    u.ctx.air_running = false;
+    u.ctx.fup_offer = true;
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_UNLOCK);
+    /* unlocked -> locks, from the normal screen only */
+    u = (ui_t){ .now = 1000 };
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_LOCK);
+    u.ctx.test_running = true;                                  /* during the pump test: nothing */
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_NONE);
+    u.ctx.test_running = false;
+    u.ctx.air_running = true;                                   /* the air venting screen: nothing */
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_NONE);
+    u.ctx.air_running = false;
+    key(&u, SH_KEY_MENU, 0);                                    /* in the list: nothing */
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_NONE);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_MENU, 100);                                  /* tbo blinks: nothing, the value stays */
+    CHECK_EQ(u.m.mode, SH_MENU_EDIT);
+    CHECK_EQ(sh_menu_chord(&u.m, &u.ctx), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.value, 70);
+    CHECK_EQ(u.m.mode, SH_MENU_EDIT);
+
+    /* ---- the menu position LoC: the last one before End ---- */
+    CHECK_EQ(SH_MENU_LOC, SH_MENU_HAP + 1);
+    CHECK_EQ(SH_MENU_END, SH_MENU_LOC + 1);
+    u = at_loc();
+    CHECK_EQ(u.m.pos, SH_MENU_LOC);
+    /* always opens with "oFF" blinking */
     CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.mode, SH_MENU_EDIT);
+    CHECK_EQ(view(&u, 0).pos, SH_MENU_LOC);
+    CHECK_EQ(view(&u, 0).value, 0);
+    CHECK(!view(&u, 500).value_visible);
+    /* opened by chance: "menu" leaves without locking */
+    CHECK_EQ(key(&u, SH_KEY_MENU, 600), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.mode, SH_MENU_SAVED);                          /* "oFF" steady for 1 s, then the list */
+    CHECK_EQ(view(&u, 1000).mode, SH_MENU_LIST);
+    CHECK_EQ(u.m.pos, SH_MENU_LOC);
+    /* "on" and back to "oFF", no wrap */
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.value, 1);
+    CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.value, 1);
+    CHECK_EQ(key(&u, SH_KEY_MINUS, 100), SH_MENU_ACT_NONE);
+    CHECK_EQ(u.m.value, 0);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_NONE);      /* "oFF" confirmed: not locked */
+    /* only "on" + "menu" locks, and the menu closes */
+    view(&u, 1000);
+    key(&u, SH_KEY_MENU, 100);
+    CHECK_EQ(view(&u, 0).value, 0);                             /* "oFF" again */
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(key(&u, SH_KEY_MENU, 100), SH_MENU_ACT_LOCK);
     CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
-    CHECK(view(&u, 0).locked);
+    /* "on" not confirmed: 10 s later the normal screen, not locked */
+    u = at_loc();
+    key(&u, SH_KEY_MENU, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    CHECK_EQ(view(&u, SH_MENU_TIMEOUT_MS).mode, SH_MENU_NORMAL);
+
+    /* ---- the display at a change, from any source ---- */
+    u = (ui_t){ .now = 1000 };
+    sh_menu_lock_changed(&u.m, true, u.now);                    /* locked */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    CHECK_EQ(view(&u, 999).notice, SH_MENU_NOTICE_LOC);
+    CHECK_EQ(view(&u, 1).notice, SH_MENU_NOTICE_NONE);          /* then what was shown goes on */
+    sh_menu_lock_changed(&u.m, false, u.now);                   /* unlocked */
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_UNL);
+    CHECK_EQ(view(&u, 999).notice, SH_MENU_NOTICE_UNL);
+    CHECK_EQ(view(&u, 1).notice, SH_MENU_NOTICE_NONE);
+    /* the test and the air venting are not touched: the notice is only shown over their screen */
+    u.ctx.test_running = true;
+    sh_menu_lock_changed(&u.m, true, u.now);
+    CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    u.ctx.test_running = false;
+    view(&u, 2000);
+    sh_menu_lock_changed(&u.m, false, u.now);
+    /* locked from Apple Home / the web interface while the menu is open: "LoC" and the normal
+     * screen at once, the unconfirmed value is lost */
+    view(&u, 2000);
+    key(&u, SH_KEY_MENU, 0);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_PLUS, 100);
+    key(&u, SH_KEY_MENU, 100);                                  /* tbo */
+    CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);      /* 71, not confirmed */
+    CHECK_EQ(u.m.mode, SH_MENU_EDIT);
+    sh_menu_lock_changed(&u.m, true, u.now);
+    CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
+    CHECK_EQ(view(&u, 0).mode, SH_MENU_NORMAL);
+    CHECK_EQ(view(&u, 0).notice, SH_MENU_NOTICE_LOC);
+    u.ctx.locked = true;
+    CHECK_EQ(key(&u, SH_KEY_MENU, 2000), SH_MENU_ACT_NONE);     /* and it stays closed */
+    CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
+    /* unlocked while the menu is open cannot happen (a lock closes it); an unlock leaves the mode */
+    u.ctx.locked = false;
+    sh_menu_lock_changed(&u.m, false, u.now);
+    CHECK_EQ(u.m.mode, SH_MENU_NORMAL);
+    CHECK_EQ(key(&u, SH_KEY_PLUS, 2000), SH_MENU_ACT_PLUS);     /* the buttons work again */
+
+    /* ---- the web interface: the same variable, with the access code ---- */
+    bool on = false;
+    CHECK_EQ(sh_web_lock("on=1&code=" CODE, CODE, &on), SH_WEB_OK);
+    CHECK(on);
+    CHECK_EQ(sh_web_lock("code=" CODE "&on=0", CODE, &on), SH_WEB_OK);
+    CHECK(!on);
+    CHECK_EQ(sh_web_lock("on=1", CODE, &on), SH_WEB_DENIED);
+    CHECK_EQ(sh_web_lock("on=1&code=000000", CODE, &on), SH_WEB_DENIED);
+    CHECK_EQ(sh_web_lock("on=2&code=" CODE, CODE, &on), SH_WEB_BAD);
+    CHECK_EQ(sh_web_lock("code=" CODE, CODE, &on), SH_WEB_BAD);
+    /* the web interface itself is not locked: its requests do not know the lock */
+    sh_web_test_t cmd = SH_WEB_TEST_NONE;
+    CHECK_EQ(sh_web_test("cmd=start", false, &cmd), SH_WEB_OK);
+    CHECK_EQ(cmd, SH_WEB_TEST_PLUS);
 }
 
 /* ---- Status Fault by the alarms --------------------------------------------------------- */
@@ -589,7 +784,8 @@ static ui_t at_hap(bool on, bool paired)
     ui_t u = { .now = 1000, .ctx = { .hap_on = on, .hap_paired = paired } };
     key(&u, SH_KEY_MENU, 0);
     key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
-    key(&u, SH_KEY_MINUS, 100);                                 /* End -> HAP */
+    key(&u, SH_KEY_MINUS, 100);                                 /* End -> LoC */
+    key(&u, SH_KEY_MINUS, 100);                                 /* LoC -> HAP */
     return u;
 }
 
@@ -603,16 +799,15 @@ static void test_setting(void)
     CHECK_EQ(sh_hap_set(true, false, true), SH_HAP_SET_REFUSED);    /* first remove it from Apple Home */
     CHECK_EQ(sh_hap_set(false, true, true), SH_HAP_SET_RESTART);    /* on is never refused */
 
-    /* the menu: HAP right after nEt, before End */
+    /* the menu: HAP right after nEt */
     CHECK_EQ(SH_MENU_HAP, SH_MENU_NET + 1);
-    CHECK_EQ(SH_MENU_END, SH_MENU_HAP + 1);
     ui_t u = at_hap(true, false);
     CHECK_EQ(u.m.pos, SH_MENU_HAP);
     CHECK_EQ(key(&u, SH_KEY_MINUS, 100), SH_MENU_ACT_NONE);
     CHECK_EQ(u.m.pos, SH_MENU_NET);
     CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
     CHECK_EQ(key(&u, SH_KEY_PLUS, 100), SH_MENU_ACT_NONE);
-    CHECK_EQ(u.m.pos, SH_MENU_END);
+    CHECK_EQ(u.m.pos, SH_MENU_LOC);
 
     /* the value is the current setting, blinking; "+" on, "-" oFF, no wrap */
     u = at_hap(true, false);
@@ -866,17 +1061,20 @@ static void test_web(void)
         .cool_until = -1, .sunrise = -1, .sunset = -1, .e8_normal = INT16_MIN,
     };
     /* the function is there: its elements are not grey */
-    HAS(&s, "\"homekit\"]");
+    HAS(&s, "\"homekit\",\"keylock\"]");
     /* the setting, paired, running, the pairing window */
-    HAS(&s, "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},");
+    HAS(&s, "\"hap\":{\"on\":0,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},\"lock\":0,");
     s.hap_on = true;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},");     /* waiting for the router */
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":0,\"win\":0,\"f\":0},\"lock\":0,");     /* waiting for the router */
     s.hap_running = true;
     s.hap_window = true;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":1,\"win\":1,\"f\":0},");
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":0,\"run\":1,\"win\":1,\"f\":0},\"lock\":0,");
     s.hap_paired = true;
     s.hap_window = false;
-    HAS(&s, "\"hap\":{\"on\":1,\"paired\":1,\"run\":1,\"win\":0,\"f\":0},");
+    HAS(&s, "\"hap\":{\"on\":1,\"paired\":1,\"run\":1,\"win\":0,\"f\":0},\"lock\":0,");
+    s.key_lock = true;                                          /* the keyboard lock */
+    HAS(&s, "\"f\":0},\"lock\":1,");
+    s.key_lock = false;
     /* the whole status still fits its buffer */
     CHECK(sh_web_status_json(s_json, sizeof(s_json), &s) < SH_WEB_STATUS_MAX - 256);
 
@@ -897,6 +1095,10 @@ static void test_web(void)
     CHECK(strstr(page, "Първо премахнете устройството от Apple Home") != NULL);
     CHECK(strstr(page, "First remove the device from Apple Home") != NULL);
     CHECK(strstr(page, "q_homekit:") != NULL);
+    CHECK(strstr(page, "id=\"sw-lock\"") != NULL);                          /* "Keyboard: locked / unlocked" */
+    CHECK(strstr(page, "id=\"lock-v\"") != NULL);
+    CHECK(strstr(page, "'/api/lock'") != NULL);
+    CHECK(strstr(page, "Клавиатура: заключена") != NULL);
     /* °F: the page converts what it shows and what is entered (the data stay °C) */
     CHECK(strstr(page, "S.hap.f") != NULL);
     CHECK(strstr(page, "data-k=\"tbo\" data-u=\"t\"") != NULL);
@@ -908,6 +1110,8 @@ static void test_web(void)
     /* the server: the setting and the reset reach sh_hap; the pages can move to the server of HAP */
     const char *srv = file("../main/sh_web.c");
     CHECK(strstr(srv, "\"/api/hap\"") != NULL);
+    CHECK(strstr(srv, "\"/api/lock\"") != NULL);
+    CHECK(strstr(srv, "sh_hap_set_lock(") != NULL);
     CHECK(strstr(srv, "sh_hap_set_enabled(") != NULL);
     CHECK(strstr(srv, "sh_hap_reset_pairings(") != NULL);
     CHECK(strstr(srv, "void sh_web_attach(httpd_handle_t") != NULL);

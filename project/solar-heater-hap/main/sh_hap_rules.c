@@ -104,6 +104,15 @@ bool sh_hap_write_lock(int v, bool *lock)
     return true;
 }
 
+bool sh_hap_lock_change(bool *lock, bool want)
+{
+    if (*lock == want) {
+        return false;
+    }
+    *lock = want;
+    return true;
+}
+
 int16_t sh_hap_display_temp(int16_t t, bool fahrenheit)
 {
     if (!fahrenheit || t == SH_TEMP_INVALID) {

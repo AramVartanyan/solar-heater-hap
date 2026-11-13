@@ -25,10 +25,10 @@
 #                     update rules, the web interface (sh_net_rules, sh_ota, sh_menu, sh_ind,
 #                     sh_web_api)
 #   test_hap          group F, Apple HomeKit: the characteristics from the logic and back (Active and
-#                     the vacation, Tmax, Current State, units, child lock, Status Fault), when a
+#                     the vacation, Tmax, Current State, units (°F), keyboard lock, Status Fault), when a
 #                     notification goes out, when HAP starts and which web server is used, the
 #                     setting and its refusal while paired, the pairing window and the breathing LED,
-#                     Identify, the menu position HAP, "LoC", the web interface (sh_hap_rules,
+#                     Identify, the menu positions HAP and LoC, "+" and "-" held together, the web interface (sh_hap_rules,
 #                     sh_menu, sh_ind, sh_web_api)
 
 CC      := gcc

@@ -246,6 +246,9 @@ section{display:none}section.on{display:block}
   <div class="row"><span data-t="paired"></span><span class="v" id="hap-v">—</span></div>
  </div>
  <p class="note" data-f="homekit" id="hap-note"></p>
+ <h2 data-t="keys" data-f="keylock"></h2>
+ <div class="grp" data-f="keylock"><div class="row"><span id="lock-v">—</span><button class="sw off" id="sw-lock" role="switch" data-p></button></div></div>
+ <p class="note" data-f="keylock" data-t="keys_note"></p>
  <h2 data-t="hist" data-f="history"></h2>
  <div class="grp" data-f="history"><a class="row" href="/api/history.csv" download style="text-decoration:none"><span data-t="hist_dl" class="act"></span></a></div>
  <h2 data-t="reset"></h2>
@@ -327,6 +330,8 @@ q_history:'Изтриване на историята (всички дневни
 q_learned:'Нулиране на научените стойности (изгрев и залез, целта на охлаждането, проверката на часовата зона, засеченият нагревател, нормалното нощно охлаждане)?',
 q_homekit:'Изтриване на сдвояванията с HomeKit? Контролерът ще се рестартира; после устройството се добавя отново в Apple Home.',
 q_hap_on:'Включване на Apple HomeKit? Контролерът ще се рестартира.',q_hap_off:'Изключване на Apple HomeKit? Контролерът ще се рестартира.',
+keys:'Клавиатура',k_locked:'Клавиатура: заключена',k_open:'Клавиатура: отключена',
+keys_note:'Заключена: бутоните на контролера не правят нищо (на дисплея LoC).\nЗаключва се и се отключва и от място — „+“ и „−“ заедно за 3 s, и от Apple Home.',
 hap_paired:'Първо премахнете устройството от Apple Home.',hap_win:'Прозорецът за сдвояване е отворен (10 min) — добавете устройството в Apple Home.',
 hap_closed:'Прозорецът за сдвояване е затворен — отваря се отново за 10 min след рестарт на контролера.',
 hap_wait:'HomeKit работи само при връзка с рутера.',hap_off:'Apple HomeKit е изключен.',hap_sw:'Смяната на превключвателя рестартира контролера.',
@@ -418,6 +423,8 @@ q_history:'Erase the history (all daily summaries)?',
 q_learned:'Reset the learned values (sunrise and sunset, the cooling target, the time zone check, the detected heater, the normal night cooling)?',
 q_homekit:'Erase the HomeKit pairings? The controller will restart; then the device is added to Apple Home again.',
 q_hap_on:'Switch Apple HomeKit on? The controller will restart.',q_hap_off:'Switch Apple HomeKit off? The controller will restart.',
+keys:'Keyboard',k_locked:'Keyboard: locked',k_open:'Keyboard: unlocked',
+keys_note:'Locked: the buttons of the controller do nothing (the display shows LoC).\nIt is locked and unlocked on the spot too — "+" and "−" together for 3 s, and from Apple Home.',
 hap_paired:'First remove the device from Apple Home.',hap_win:'The pairing window is open (10 min) — add the device in Apple Home.',
 hap_closed:'The pairing window is closed — it opens again for 10 min after a restart of the controller.',
 hap_wait:'HomeKit works only with a connection to the router.',hap_off:'Apple HomeKit is switched off.',hap_sw:'Changing the switch restarts the controller.',
@@ -598,6 +605,8 @@ function render(){
  hsw.classList.toggle('off',!hk.on);hsw.setAttribute('aria-checked',!!hk.on);hsw.disabled=!unlocked||hfix;hsw.classList.toggle('dim',hfix);
  $('#hap-v').textContent=hk.on?t(hk.paired?'p_yes':'p_no'):'—';
  $('#hap-note').textContent=(!hk.on?[t('hap_off'),t('hap_sw')]:hk.paired?[t('hap_paired')]:[t(!hk.run?'hap_wait':hk.win?'hap_win':'hap_closed'),t('hap_sw')]).join('\n');
+ $('#lock-v').textContent=t(S.lock?'k_locked':'k_open');
+ $('#sw-lock').classList.toggle('off',!S.lock);$('#sw-lock').setAttribute('aria-checked',!!S.lock);
  $('#rs-hk').disabled=!unlocked||!hk.run;$('#rs-hk').classList.toggle('dim',!hk.run);
  /* the update: one at a time; on the own access point there is no internet — grey, with the reason */
  const oc=$('#ota-chk');oc.disabled=!unlocked||['check','wait','run','done'].includes(o.st);
@@ -678,6 +687,7 @@ $$('.unlock').forEach(b=>b.onclick=async()=>{
   $$('.code').forEach(i=>i.value='');lock(false)}});
 $$('[data-r]').forEach(b=>b.onclick=async()=>{const w=b.dataset.r;
  if(await ask(t('q_'+w))&&await post('/api/reset',{what:w})){toast(t(['wifi','factory','homekit'].includes(w)?'restart':'done'));refresh();loadDays()}});
+$('#sw-lock').onclick=async()=>{if(S){await post('/api/lock',{on:S.lock?0:1});refresh()}};
 $('#sw-hap').onclick=async()=>{if(!S)return;const on=S.hap.on?0:1;
  if(await ask(t(on?'q_hap_on':'q_hap_off'))&&await post('/api/hap',{on})){toast(t('restart'));refresh()}};
 [['#ota-chk','check'],['#ota-go','update']].forEach(([s,c])=>

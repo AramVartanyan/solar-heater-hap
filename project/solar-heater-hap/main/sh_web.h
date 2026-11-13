@@ -13,6 +13,7 @@
  *   POST /api/reset   Wi-Fi, HomeKit pairings, default settings, factory, history, learned values —
  *                     with the code
  *   POST /api/hap     the setting "Apple HomeKit": on=0 | 1 — with the code; stored, then a restart
+ *   POST /api/lock    the keyboard lock: on=0 | 1 — with the code
  *   POST /api/auth    checks the access code (the page asks once and keeps it)
  *   GET  /api/chart   the chart of the day (sh_history, RAM)
  *   GET  /api/days    the last 7 daily summaries

@@ -19,6 +19,7 @@
  *                     access code)
  *              hap    on=0 | 1: the setting "Apple HomeKit" (with the code; off is refused while a
  *                     controller is paired)
+ *              lock   on=0 | 1: the keyboard lock (with the code)
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
@@ -92,6 +93,7 @@ typedef struct {
     bool hap_paired;            /* a controller is paired */
     bool hap_running;           /* HAP is running (connected to the router since boot) */
     bool hap_window;            /* the pairing window is open */
+    bool key_lock;              /* the keyboard is locked */
     bool fahrenheit;            /* the display units chosen in HomeKit: the page shows °F (the data stay °C) */
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
@@ -207,6 +209,9 @@ sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd);
 /* "hap": the setting "Apple HomeKit"; needs the access code. `on_now`, `paired`: the setting and
  * the pairing now — switching off while paired is refused (SH_WEB_BAD), as in the menu. */
 sh_web_res_t sh_web_hap(const char *body, const char *code, bool on_now, bool paired, bool *on);
+
+/* "lock": the keyboard lock (Lock Physical Controls); needs the access code. */
+sh_web_res_t sh_web_lock(const char *body, const char *code, bool *on);
 
 /* Key of the firmware update state for the page (it holds the texts): "ap" (no internet: own
  * access point) instead of everything that needs the server, "noconn" for a failed check. */

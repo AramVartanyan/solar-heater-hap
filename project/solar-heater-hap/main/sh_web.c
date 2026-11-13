@@ -32,7 +32,7 @@ static const char *TAG = "sh_web";
 
 /* The handlers of register_uris(). The HTTP server of HAP needs room for them next to its own 8:
  * CONFIG_HAP_HTTP_MAX_URI_HANDLERS (sdkconfig.defaults). */
-#define SH_WEB_URIS     17
+#define SH_WEB_URIS     18
 #ifdef CONFIG_HAP_HTTP_MAX_URI_HANDLERS
 _Static_assert(CONFIG_HAP_HTTP_MAX_URI_HANDLERS >= SH_WEB_URIS + 8,
                "CONFIG_HAP_HTTP_MAX_URI_HANDLERS: no room for the pages of the web interface");
@@ -118,7 +118,7 @@ static esp_err_t state_get(httpd_req_t *req)
         .ap = ap_mode, .ap_pending = net.ap_pending, .host = sh_net_name(), .ap_ssid = captive_wifi_ap_ssid(),
         .ota = net.ota, .ota_pct = net.ota_pct, .ota_version = net.ota_version,
         .hap_on = sh_hap_enabled(), .hap_paired = sh_hap_paired(), .hap_running = sh_hap_running(),
-        .hap_window = st.hap_pair_window, .fahrenheit = st.hap_fahrenheit,
+        .hap_window = st.hap_pair_window, .fahrenheit = st.hap_fahrenheit, .key_lock = st.hap_lock,
         .clock = {
             .trust = ci.trust, .sntp = ci.sntp, .min = ci.lt.set ? (int16_t)ci.lt.min : -1,
             .tz = ci.tz, .tz_confirmed = ci.tz_confirmed, .peak = ci.peak.peak,
@@ -491,6 +491,21 @@ static esp_err_t hap_post(httpd_req_t *req)
     return answer(req, res);
 }
 
+/* The keyboard lock: the same variable as the buttons and Apple Home change. */
+static esp_err_t lock_post(httpd_req_t *req)
+{
+    char body[BODY_MAX];
+    if (!read_body(req, body)) {
+        return ESP_FAIL;
+    }
+    bool on = false;
+    const sh_web_res_t res = sh_web_lock(body, s_code, &on);
+    if (res == SH_WEB_OK) {
+        sh_hap_set_lock(on, "the web interface");
+    }
+    return answer(req, res);
+}
+
 static esp_err_t auth_post(httpd_req_t *req)
 {
     char body[BODY_MAX];
@@ -521,6 +536,7 @@ static void register_uris(httpd_handle_t server)
         { .uri = "/api/tz",    .method = HTTP_POST, .handler = tz_post },
         { .uri = "/api/ota",   .method = HTTP_POST, .handler = ota_post },
         { .uri = "/api/hap",   .method = HTTP_POST, .handler = hap_post },
+        { .uri = "/api/lock",  .method = HTTP_POST, .handler = lock_post },
     };
     _Static_assert(sizeof(uris) / sizeof(uris[0]) == SH_WEB_URIS, "SH_WEB_URIS: the number of handlers");
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {

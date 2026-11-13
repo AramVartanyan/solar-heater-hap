@@ -59,6 +59,8 @@
  *                                        boot): the pairings cannot be reset; hkrun=1: running
  *   http://localhost:8080/sim?hkf=1      °F chosen in Apple Home (Temperature Display Units): the
  *                                        page shows and takes °F, the data stay °C; hkf=0: °C
+ *   http://localhost:8080/sim?klock=1    the keyboard is locked from the buttons ("+" and "-" held
+ *                                        3 s) or from Apple Home; klock=0: unlocked
  * The switch and "Reset -> HomeKit pairings" "restart" the controller (the console says so).
  * POSIX sockets, one request at a time. */
 
@@ -119,6 +121,7 @@ static const sh_alarm_params_t ALARM = {
 static time_t s_start, s_silent_until;
 /* Apple HomeKit: the setting, paired, HAP running, the pairing window */
 static bool s_hap_on = true, s_hap_paired, s_hap_run = true, s_hap_win = true, s_hap_f;
+static bool s_key_lock;                 /* the keyboard lock: one variable for every source */
 
 /* monotonic s since the "boot", which was a day before the start (room for the made-up day) */
 static uint32_t now_s(void)
@@ -552,7 +555,7 @@ static void reply_state(int fd)
         .ap = s_net.mode == SH_NET_AP, .ap_pending = s_net.ap_pending, .host = AP_SSID, .ap_ssid = AP_SSID,
         .ota = s_ota.phase, .ota_pct = s_ota.pct, .ota_version = s_ota.version,
         .hap_on = s_hap_on, .hap_paired = s_hap_paired, .hap_running = s_hap_on && s_hap_run,
-        .hap_window = s_hap_on && s_hap_run && s_hap_win, .fahrenheit = s_hap_f,
+        .hap_window = s_hap_on && s_hap_run && s_hap_win, .fahrenheit = s_hap_f, .key_lock = s_key_lock,
         .clock = { .trust = trust(), .sntp = s_sntp, .min = lt.set ? (int16_t)lt.min : -1,
                    .tz = sh_tz_list[s_tz].name, .tz_confirmed = s_tz_ok, .peak = s_peak.peak },
         .history = s_hist_on,
@@ -663,6 +666,10 @@ static void sim_set(const char *query)
     }
     if ((p = strstr(query, "hkwin=")) && sscanf(p + 6, "%d", &v) == 1 && !v) {
         s_hap_win = sh_hap_window(s_hap_win, SH_HAP_EVT_TIMED_OUT, s_hap_paired);
+    }
+    if ((p = strstr(query, "klock=")) && sscanf(p + 6, "%d", &v) == 1 && sh_hap_lock_change(&s_key_lock, v != 0)) {
+        printf("keyboard %s (the buttons / Apple Home): the display shows %s\n", v ? "locked" : "unlocked",
+               v ? "LoC" : "UnL");
     }
     if ((p = strstr(query, "hkf=")) && sscanf(p + 4, "%d", &v) == 1) {
         s_hap_f = v != 0;
@@ -873,6 +880,14 @@ static void handle(int fd, const char *page, size_t page_len)
             s_hap_on = on;                              /* stored; HAP starts (or not) after the "restart" */
             s_hap_win = on && s_hap_run && sh_hap_window(false, SH_HAP_EVT_STARTED, s_hap_paired);
             printf("Apple HomeKit %s: the controller restarts\n", on ? "on" : "off");
+        }
+        reply_res(fd, res);
+    } else if (post && strcmp(path, "/api/lock") == 0) {
+        bool on = false;
+        const sh_web_res_t res = sh_web_lock(body, CODE, &on);
+        if (res == SH_WEB_OK && sh_hap_lock_change(&s_key_lock, on)) {
+            printf("keyboard %s (the web interface): the display shows %s, HomeKit is notified\n",
+                   on ? "locked" : "unlocked", on ? "LoC" : "UnL");
         }
         reply_res(fd, res);
     } else if (post && strcmp(path, "/api/auth") == 0) {

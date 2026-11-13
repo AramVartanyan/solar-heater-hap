@@ -57,7 +57,7 @@ CONFIG_CAPTIVE_WIFI_PORTAL_IDLE_MIN=15
 CONFIG_CAPTIVE_WIFI_AP_ONLY=y
 
 # HomeKit SDK (sh_hap): with Apple HomeKit on, the web interface is served by the HTTP server of
-# HAP — room for its 17 handlers next to the 8 HAP URIs, and for the connections of a browser
+# HAP — room for its 18 handlers next to the 8 HAP URIs, and for the connections of a browser
 # (Safari opens up to 6) next to those of the HomeKit controllers (the server needs 3 more sockets
 # of CONFIG_LWIP_MAX_SOCKETS, and one TCP connection of CONFIG_LWIP_MAX_ACTIVE_TCP stays for the
 # firmware update)

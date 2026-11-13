@@ -53,7 +53,7 @@ typedef struct {
     bool    wifi_connected;
     bool    wifi_portal;        /* captive-wifi setup portal active */
     bool    hap_pair_window;    /* HomeKit pairing window open */
-    bool    hap_lock;           /* HomeKit Lock Physical Controls: the child lock of the buttons */
+    bool    hap_lock;           /* the keyboard is locked (HomeKit Lock Physical Controls; sh_hap) */
     bool    hap_fahrenheit;     /* HomeKit Temperature Display Units: the display shows °F */
     bool    vacation;
     bool    net_ap;             /* network mode AP: the own access point is on (sh_net) */

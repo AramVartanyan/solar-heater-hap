@@ -22,7 +22,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-/* The stored setting, the display units and the child lock; the task. After nvs_flash_init() and
+/* The stored setting, the display units and the keyboard lock; the task. After nvs_flash_init() and
  * sh_state_init(), before sh_net_init(). */
 esp_err_t sh_hap_init(void);
 
@@ -47,6 +47,12 @@ void sh_hap_start(void);
 /* Changes the setting: stores it and restarts the controller 1 s later. ESP_ERR_INVALID_STATE: off
  * is refused while a controller is paired. Nothing happens if it is the same. */
 esp_err_t sh_hap_set_enabled(bool on);
+
+/* The keyboard lock — the Lock Physical Controls of HomeKit, one variable for the buttons ("+" and
+ * "-" held 3 s, the menu position LoC), Apple Home and the web interface; kept in NVS, also with
+ * HAP off. A change is stored, shown on the display ("LoC" / "UnL") and notified to HomeKit.
+ * `source`: for the log. Any task. */
+void sh_hap_set_lock(bool on, const char *source);
 
 /* Erases the pairings (the controller restarts). ESP_ERR_INVALID_STATE: HAP is not running. */
 esp_err_t sh_hap_reset_pairings(void);

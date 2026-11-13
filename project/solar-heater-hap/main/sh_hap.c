@@ -16,6 +16,7 @@
 #include "sh_reset.h"
 #include "sh_net.h"
 #include "sh_web.h"
+#include "sh_buttons.h"
 #include "sh_hap_rules.h"
 #include "sh_hap.h"
 
@@ -80,6 +81,19 @@ static void store(const char *key, bool value)
 static void publish(void)
 {
     sh_state_set_hap(s_window, s_lock_on, s_fahrenheit);
+}
+
+/* The keyboard lock from any source: stored, published, shown on the display; the notification to
+ * HomeKit follows from push() (or from the write of the controller itself). s_lock held. */
+static void lock_set(bool on, const char *source)
+{
+    if (!sh_hap_lock_change(&s_lock_on, on)) {
+        return;
+    }
+    ESP_LOGI(TAG, "keyboard %s (%s)", on ? "locked" : "unlocked", source);
+    store(KEY_LOCK, on);
+    publish();
+    sh_buttons_lock_changed(on);
 }
 
 /* ---- the values ------------------------------------------------------------------------- */
@@ -167,7 +181,7 @@ static int temp_read(hap_char_t *hc, hap_status_t *status, void *serv_priv, void
     return HAP_SUCCESS;
 }
 
-/* A controller writes: Active (the vacation), Tmax, the display units, the child lock. */
+/* A controller writes: Active (the vacation), Tmax, the display units, the keyboard lock. */
 static int heater_write(hap_write_data_t write_data[], int count, void *serv_priv, void *write_priv)
 {
     (void)serv_priv;
@@ -204,13 +218,8 @@ static int heater_write(hap_write_data_t write_data[], int count, void *serv_pri
             }
         } else if (w->hc == c_lock) {
             ok = sh_hap_write_lock((int)w->val.u, &flag);
-            if (ok && flag != s_lock_on) {
-                ESP_LOGI(TAG, "HomeKit: child lock %s", flag ? "on" : "off");
-                s_lock_on = flag;
-                store(KEY_LOCK, flag);
-                publish();
-            }
             if (ok) {
+                lock_set(flag, "Apple Home");
                 s_sent.lock = flag;
             }
         }
@@ -483,6 +492,13 @@ esp_err_t sh_hap_set_enabled(bool on)
     }
 }
 
+void sh_hap_set_lock(bool on, const char *source)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    lock_set(on, source);
+    xSemaphoreGive(s_lock);
+}
+
 esp_err_t sh_hap_reset_pairings(void)
 {
     if (s_phase != HAP_RUNNING || hap_reset_pairings() != HAP_SUCCESS) {
@@ -528,9 +544,9 @@ esp_err_t sh_hap_init(void)
     }
     s_phase = s_on ? HAP_IDLE : HAP_OFF;
     publish();
-    ESP_LOGI(TAG, "Apple HomeKit %s%s, display units °%c, child lock %s", s_on ? "on" : "off",
+    ESP_LOGI(TAG, "Apple HomeKit %s%s, display units °%c, keyboard %s", s_on ? "on" : "off",
              s_on ? (s_paired ? " (paired)" : " (not paired)") : "", s_fahrenheit ? 'F' : 'C',
-             s_lock_on ? "on" : "off");
+             s_lock_on ? "locked" : "unlocked");
     /* the stack: hap_init() / hap_start() (mppt-1k starts them in a task of 6144 bytes), with a margin */
     if (xTaskCreate(hap_task, "sh_hap", 8192, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE(TAG, "HomeKit task not created");

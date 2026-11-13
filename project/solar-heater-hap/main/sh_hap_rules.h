@@ -15,9 +15,10 @@
  *                                 and the web interface — is shown in °F; everything inside stays
  *                                 in °C / K: the measurements, the logic, the settings in NVS, the
  *                                 history and its CSV, and the values sent to HomeKit
- *     Lock Physical Controls      the child lock: no menu and no pump test from the buttons ("LoC"
- *                                 for 1 s, sh_menu); the resets by holding "menu" and the web
- *                                 interface are not locked
+ *     Lock Physical Controls      the keyboard lock: one variable, changed by the buttons ("+" and
+ *                                 "-" held 3 s, the menu position LoC), by Apple Home and by the
+ *                                 web interface — each undoes the others; kept in NVS. Locked, no
+ *                                 button does anything (sh_menu); the web interface is not locked
  *   "Collector" / "Tank"          Temperature Sensor with Status Fault: Collector — E1, E5 (-40 ...
  *                                 200 °C), Tank — E2, E4 (0 ... 100 °C)
  * In the pulse mode the temperatures are the last reliable values (the caller passes them).
@@ -61,7 +62,7 @@ typedef struct {
     bool pump_on;
     sh_pump_reason_t reason;
     uint8_t alarms;             /* SH_ALARM_BIT() of sh_alarm_t */
-    bool lock;                  /* the child lock */
+    bool lock;                  /* the keyboard is locked */
 } sh_hap_in_t;
 
 /* The characteristics that are notified when they change. */
@@ -97,6 +98,11 @@ bool sh_hap_write_target(int v);                        /* Heat only */
 bool sh_hap_write_threshold(float v, int16_t *tmax);    /* rounded to 1 °C, 30 ... 85 */
 bool sh_hap_write_units(int v, bool *fahrenheit);       /* 0 °C, 1 °F */
 bool sh_hap_write_lock(int v, bool *lock);              /* 0 / 1 */
+
+/* The keyboard lock is set from a source (the buttons, Apple Home, the web interface — all the
+ * same). True if it changed: then it is stored, "LoC" / "UnL" is shown and HomeKit is notified
+ * (sh_hap_changed(): SH_HAP_CH_LOCK). */
+bool sh_hap_lock_change(bool *lock, bool want);
 
 /* ---- the display units: converted only where a value is shown or entered ------------------ */
 

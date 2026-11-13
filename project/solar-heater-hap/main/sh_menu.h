@@ -5,7 +5,7 @@
  *   normal screen   "+" pump test (during the test +60 s), "-" during the test -60 s,
  *                   "menu" -> the list at SSn (during the test: stops the test; during the air
  *                   venting: stops it, and "+" does not start a test)
- *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, End; "+" / "-" next / previous item,
+ *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC, End; "+" / "-" next / previous item,
  *                   round (after End -> SSn); C.Lo, d.on and d.oF are those of the current season;
  *                   "menu" on a setting -> its value blinks; on End -> normal screen
  *   value (blinks)  "+" / "-" one step within the range (no wrap), held > 1 s: repeated;
@@ -23,9 +23,18 @@
  *   10 s without a key in the list or on a value -> normal screen, an unconfirmed value is lost.
  * While "FUp" is offered on the normal screen (a newer firmware, 5 s) a short "menu" confirms the
  * update instead of anything else.
- * Child lock (Lock Physical Controls of HomeKit): on the normal screen every short press — the
- * way into the menu, the pump test and whatever else the keys do there — only shows "LoC" for 1 s.
- * The resets by holding "menu" are not keys of the menu and stay.
+ *   LoC             the keyboard lock: always opens with "oFF" blinking; only "on" + "menu" locks
+ *                   (the menu closes then); "oFF" + "menu" changes nothing
+ * The keyboard lock (one variable — the Lock Physical Controls of HomeKit; kept by sh_hap) is
+ * changed from three places, each undoing the others: "+" and "-" held together for 3 s, Apple
+ * Home, the web interface. Locked: no button does anything — the menu, the pump test and its time,
+ * the stop of the air venting, the confirmation of "FUp", the resets by holding "menu" (5 s / 9 s);
+ * a press shows "LoC" for 1 s. Only "+" and "-" held for 3 s still act: they unlock, whatever is
+ * shown. Unlocked, the same hold locks — from the normal screen only; in the menu and during the
+ * pump test (or the air venting) it does nothing. A press of both buttons never counts as a "+" or
+ * a "-": it starts no pump test and changes no value.
+ * Every change, from any source, shows "LoC" (locked) or "UnL" (unlocked) for 1 s over whatever is
+ * shown, which then goes on; a lock closes an open menu at once (an unconfirmed value is lost).
  * Times in ms of a monotonic clock. */
 #pragma once
 
@@ -44,18 +53,20 @@ typedef enum {
     SH_MENU_TST,
     SH_MENU_NET,                /* network mode: CP / AP (not a setting of sh_settings) */
     SH_MENU_HAP,                /* Apple HomeKit: on / oFF (kept by sh_hap; a change restarts) */
+    SH_MENU_LOC,                /* keyboard lock: opens with oFF; on locks and closes the menu */
     SH_MENU_END,                /* the item after the settings */
     SH_MENU_ITEMS
 } sh_menu_item_t;
 
-/* The setting behind an item (not for SH_MENU_NET, SH_MENU_HAP and SH_MENU_END); `winter`: the
- * current season. */
+/* The setting behind an item (not for SH_MENU_NET, SH_MENU_HAP, SH_MENU_LOC and SH_MENU_END);
+ * `winter`: the current season. */
 sh_setting_t sh_menu_setting(uint8_t pos, bool winter);
 #define SH_MENU_TIMEOUT_MS      10000u
 #define SH_MENU_SAVED_MS        1000u
 #define SH_MENU_BLINK_MS        500u                /* on 0.5 s, off 0.5 s */
 #define SH_MENU_CODE_MS         2000u               /* nEt -> AP: each half of the access code */
-#define SH_MENU_LOCKED_MS       1000u               /* "LoC" after a key with the child lock on */
+#define SH_MENU_NOTICE_MS       1000u               /* "LoC" / "UnL": a change of the lock, a locked key */
+#define SH_MENU_CHORD_MS        3000u               /* "+" and "-" held together: locks / unlocks */
 
 /* Pump test screen: "tSt" for 3 s, then the seconds left, "tSt" again for 1 s every 7 s. */
 #define SH_MENU_TEST_LABEL_S    3u
@@ -95,7 +106,16 @@ typedef enum {
     SH_MENU_ACT_NET,            /* network mode chosen: `value` 0 CP / 1 AP */
     SH_MENU_ACT_FUP,            /* the offered firmware update is confirmed */
     SH_MENU_ACT_HAP,            /* Apple HomeKit switched: `value` 0 off / 1 on (store, restart) */
+    SH_MENU_ACT_LOCK,           /* lock the keyboard (the menu position LoC, the hold of "+" and "-") */
+    SH_MENU_ACT_UNLOCK,         /* unlock it (the hold of "+" and "-") */
 } sh_menu_act_t;
+
+/* What is shown for 1 s over everything else. */
+typedef enum {
+    SH_MENU_NOTICE_NONE = 0,
+    SH_MENU_NOTICE_LOC,         /* "LoC": locked now, or a locked button was pressed */
+    SH_MENU_NOTICE_UNL,         /* "UnL": unlocked now */
+} sh_menu_notice_t;
 
 typedef struct {
     sh_menu_mode_t mode;
@@ -104,8 +124,8 @@ typedef struct {
     int16_t value;              /* value being edited / just saved */
     uint32_t key_ms;            /* last key (the 10 s timeout) */
     uint32_t mark_ms;           /* start of the blinking / of the 1 s steady value */
-    bool locked;                /* "LoC" is shown (a key met the child lock) ... */
-    uint32_t locked_ms;         /* ... since */
+    uint8_t notice;             /* sh_menu_notice_t: "LoC" / "UnL" is shown ... */
+    uint32_t notice_ms;         /* ... since */
 } sh_menu_t;
 
 typedef struct {
@@ -114,7 +134,7 @@ typedef struct {
     int16_t value;
     bool value_visible;         /* false in the "off" half of the blinking */
     uint8_t code_part;          /* nEt -> AP confirmed: 1 / 2 the half of the access code, 0 none */
-    bool locked;                /* normal screen: "LoC" instead of everything else */
+    sh_menu_notice_t notice;    /* "LoC" / "UnL" instead of everything else (1 s) */
 } sh_menu_view_t;
 
 /* The timeouts up to `now_ms` (1 s steady value -> list, 10 s without a key -> normal screen, 1 s
@@ -131,12 +151,45 @@ typedef struct {
     bool fup_offer;             /* "FUp" is offered on the display */
     bool hap_on;                /* the setting "Apple HomeKit" */
     bool hap_paired;            /* a HomeKit controller is paired: HAP cannot be switched off */
-    bool locked;                /* the child lock is on */
+    bool locked;                /* the keyboard is locked */
 } sh_menu_ctx_t;
 
-/* One key. `s`: the current settings. */
+/* One key. `s`: the current settings. With the keyboard locked: nothing but "LoC" for 1 s. */
 sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_menu_ctx_t *ctx,
                           const sh_settings_t *s);
+
+/* "+" and "-" have been held together for 3 s: locked -> SH_MENU_ACT_UNLOCK, always; unlocked ->
+ * SH_MENU_ACT_LOCK from the normal screen only (not in the menu, not during the pump test or the
+ * air venting: nothing then). */
+sh_menu_act_t sh_menu_chord(const sh_menu_t *m, const sh_menu_ctx_t *ctx);
+
+/* "menu" is held for a reset (Wi-Fi 5 s, factory 9 s): true = allowed; with the keyboard locked
+ * false, and "LoC" for 1 s. */
+bool sh_menu_hold(sh_menu_t *m, uint32_t now_ms, const sh_menu_ctx_t *ctx);
+
+/* The lock has changed (from the buttons, Apple Home or the web interface): "LoC" / "UnL" for 1 s;
+ * a lock closes an open menu at once. */
+void sh_menu_lock_changed(sh_menu_t *m, bool locked, uint32_t now_ms);
+
+/* "+" and "-" pressed together. Fed with every press and release of the two buttons. */
+typedef struct {
+    bool plus, minus;           /* down now */
+    bool plus_chord, minus_chord;   /* the current (or last) press of the button met the other one */
+    bool fired;                 /* the 3 s of this hold have been reported */
+    uint32_t both_ms;           /* both down since */
+} sh_chord_t;
+
+/* A press (`down`) or a release of "+" (`plus`) or "-". */
+void sh_chord_button(sh_chord_t *c, bool plus, bool down, uint32_t now_ms);
+
+/* Both are held now (the caller then calls sh_chord_step() often enough). */
+bool sh_chord_holding(const sh_chord_t *c);
+
+/* True once, when both have been down for SH_MENU_CHORD_MS without a break. */
+bool sh_chord_step(sh_chord_t *c, uint32_t now_ms);
+
+/* The tap or the repetition of this button belongs to a press of both: it is not a key. */
+bool sh_chord_swallow(const sh_chord_t *c, bool plus);
 
 /* What the display shows (call sh_menu_update() first). */
 void sh_menu_view(const sh_menu_t *m, uint32_t now_ms, sh_menu_view_t *out);

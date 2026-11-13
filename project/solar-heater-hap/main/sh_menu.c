@@ -12,9 +12,15 @@ void sh_menu_update(sh_menu_t *m, uint32_t now_ms)
     if (m->mode != SH_MENU_NORMAL && now_ms - m->key_ms >= SH_MENU_TIMEOUT_MS) {
         m->mode = SH_MENU_NORMAL;       /* an unconfirmed value is dropped */
     }
-    if (m->locked && now_ms - m->locked_ms >= SH_MENU_LOCKED_MS) {
-        m->locked = false;
+    if (m->notice != SH_MENU_NOTICE_NONE && now_ms - m->notice_ms >= SH_MENU_NOTICE_MS) {
+        m->notice = SH_MENU_NOTICE_NONE;
     }
+}
+
+static void notice(sh_menu_t *m, sh_menu_notice_t n, uint32_t now_ms)
+{
+    m->notice = (uint8_t)n;
+    m->notice_ms = now_ms;
 }
 
 sh_setting_t sh_menu_setting(uint8_t pos, bool winter)
@@ -34,15 +40,14 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
     const bool repeat = key == SH_KEY_PLUS_REPEAT || key == SH_KEY_MINUS_REPEAT;
     const int dir = key == SH_KEY_PLUS || key == SH_KEY_PLUS_REPEAT ? 1 : -1;
 
+    if (ctx->locked) {                  /* the keyboard lock: no button does anything */
+        m->mode = SH_MENU_NORMAL;       /* (a lock closes the menu: it is closed already) */
+        notice(m, SH_MENU_NOTICE_LOC, now_ms);
+        return SH_MENU_ACT_NONE;
+    }
+
     switch (m->mode) {
     case SH_MENU_NORMAL:
-        if (ctx->locked) {              /* the child lock: no menu, no pump test */
-            if (!repeat) {
-                m->locked = true;
-                m->locked_ms = now_ms;
-            }
-            return SH_MENU_ACT_NONE;
-        }
         if (key == SH_KEY_MENU) {
             if (ctx->fup_offer) {
                 return SH_MENU_ACT_FUP;
@@ -79,6 +84,10 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
                 m->mode = SH_MENU_EDIT;
                 m->value = ctx->hap_on;         /* the current setting */
                 m->mark_ms = now_ms;
+            } else if (m->pos == SH_MENU_LOC) {
+                m->mode = SH_MENU_EDIT;
+                m->value = 0;                   /* always "oFF": opened by chance, nothing locks */
+                m->mark_ms = now_ms;
             } else {
                 m->mode = SH_MENU_EDIT;
                 m->id = (uint8_t)sh_menu_setting(m->pos, ctx->winter);
@@ -102,6 +111,13 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
                 }
                 return SH_MENU_ACT_NET;
             }
+            if (m->pos == SH_MENU_LOC) {
+                if (m->value == 0) {
+                    return SH_MENU_ACT_NONE;    /* "oFF" steady for 1 s, then the list */
+                }
+                m->mode = SH_MENU_NORMAL;       /* locked: the menu closes, "LoC" follows */
+                return SH_MENU_ACT_LOCK;
+            }
             if (m->pos == SH_MENU_HAP) {
                 if ((m->value != 0) == ctx->hap_on) {
                     return SH_MENU_ACT_NONE;
@@ -114,7 +130,7 @@ sh_menu_act_t sh_menu_key(sh_menu_t *m, sh_key_t key, uint32_t now_ms, const sh_
             }
             return m->value != s->v[m->id] ? SH_MENU_ACT_SAVE : SH_MENU_ACT_NONE;
         }
-        if (m->pos == SH_MENU_NET || m->pos == SH_MENU_HAP) {
+        if (m->pos == SH_MENU_NET || m->pos == SH_MENU_HAP || m->pos == SH_MENU_LOC) {
             m->value = dir > 0;                 /* "+" AP / on, "-" CP / oFF, no wrap */
         } else {
             m->value = sh_settings_step(s, (sh_setting_t)m->id, m->value, dir);
@@ -136,10 +152,79 @@ void sh_menu_view(const sh_menu_t *m, uint32_t now_ms, sh_menu_view_t *out)
     out->value_visible = m->mode != SH_MENU_EDIT ||
                          (now_ms - m->mark_ms) % (2 * SH_MENU_BLINK_MS) < SH_MENU_BLINK_MS;
     out->code_part = 0;
-    out->locked = m->mode == SH_MENU_NORMAL && m->locked && now_ms - m->locked_ms < SH_MENU_LOCKED_MS;
+    out->notice = now_ms - m->notice_ms < SH_MENU_NOTICE_MS ? (sh_menu_notice_t)m->notice : SH_MENU_NOTICE_NONE;
     if (m->mode == SH_MENU_SAVED && m->pos == SH_MENU_NET && m->value != 0) {
         out->code_part = now_ms - m->mark_ms < SH_MENU_CODE_MS ? 1 : 2;
     }
+}
+
+sh_menu_act_t sh_menu_chord(const sh_menu_t *m, const sh_menu_ctx_t *ctx)
+{
+    if (ctx->locked) {
+        return SH_MENU_ACT_UNLOCK;      /* the one thing a locked keyboard does */
+    }
+    if (m->mode != SH_MENU_NORMAL || ctx->test_running || ctx->air_running) {
+        return SH_MENU_ACT_NONE;
+    }
+    return SH_MENU_ACT_LOCK;
+}
+
+bool sh_menu_hold(sh_menu_t *m, uint32_t now_ms, const sh_menu_ctx_t *ctx)
+{
+    if (!ctx->locked) {
+        return true;
+    }
+    notice(m, SH_MENU_NOTICE_LOC, now_ms);
+    return false;
+}
+
+void sh_menu_lock_changed(sh_menu_t *m, bool locked, uint32_t now_ms)
+{
+    if (locked) {
+        m->mode = SH_MENU_NORMAL;       /* an unconfirmed value is dropped */
+    }
+    notice(m, locked ? SH_MENU_NOTICE_LOC : SH_MENU_NOTICE_UNL, now_ms);
+}
+
+void sh_chord_button(sh_chord_t *c, bool plus, bool down, uint32_t now_ms)
+{
+    if (plus) {
+        c->plus = down;
+    } else {
+        c->minus = down;
+    }
+    if (!down) {
+        return;                         /* the mark stays for the tap that follows the release */
+    }
+    if (plus) {
+        c->plus_chord = false;          /* a new press */
+    } else {
+        c->minus_chord = false;
+    }
+    if (c->plus && c->minus) {
+        c->plus_chord = c->minus_chord = true;
+        c->fired = false;
+        c->both_ms = now_ms;
+    }
+}
+
+bool sh_chord_holding(const sh_chord_t *c)
+{
+    return c->plus && c->minus;
+}
+
+bool sh_chord_step(sh_chord_t *c, uint32_t now_ms)
+{
+    if (!c->plus || !c->minus || c->fired || now_ms - c->both_ms < SH_MENU_CHORD_MS) {
+        return false;
+    }
+    c->fired = true;
+    return true;
+}
+
+bool sh_chord_swallow(const sh_chord_t *c, bool plus)
+{
+    return plus ? c->plus_chord : c->minus_chord;
 }
 
 bool sh_menu_test_label(uint32_t elapsed_s)

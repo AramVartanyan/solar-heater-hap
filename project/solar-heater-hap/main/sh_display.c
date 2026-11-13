@@ -36,8 +36,9 @@ static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
 static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
 static const uint8_t s_fup[DIGITS]  = { 0x71 /* F */, 0x3E /* U */, 0x73 /* P */ };
-/* A key with the child lock on (HomeKit Lock Physical Controls) */
+/* The keyboard lock: locked (also a press of a locked button, and the menu position) / unlocked */
 static const uint8_t s_loc[DIGITS]  = { 0x38 /* L */, 0x5C /* o */, 0x39 /* C */ };
+static const uint8_t s_unl[DIGITS]  = { 0x3E /* U */, 0x54 /* n */, 0x38 /* L */ };
 /* Values of nEt (CP, AP); " AP" is also the label of the own access point */
 static const uint8_t s_net[2][DIGITS] = {
     { 0, 0x39 /* C */, 0x73 /* P */ },
@@ -49,7 +50,7 @@ static const uint8_t s_hex[6] = { 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71 };
 static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
 static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
 static const uint8_t s_pau[DIGITS]  = { 0x73 /* P */, 0x77 /* A */, 0x1C /* u */ };
-/* Values of SSn (in the order of sh_season_mode_t) and of HoL and HAP (off, on) */
+/* Values of SSn (in the order of sh_season_mode_t) and of HoL, HAP and LoC (off, on) */
 static const uint8_t s_seasons[SH_SEASON_MODES][DIGITS] = {
     [SH_SEASON_SUMMER] = { 0x6D /* S */, 0x1C /* u */, 0x54 /* n */ },
     [SH_SEASON_WINTER] = { 0x39 /* C */, 0x38 /* L */, 0x5E /* d */ },
@@ -83,6 +84,7 @@ static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
     [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
     [SH_MENU_NET] = { 0x54 /* n */, 0x79 /* E */, 0x78 /* t */ },
     [SH_MENU_HAP] = { 0x76 /* H */, 0x77 /* A */, 0x73 /* P */ },
+    [SH_MENU_LOC] = { 0x38 /* L */, 0x5C /* o */, 0x39 /* C */ },
     [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
@@ -176,7 +178,7 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v, const sh_state_t *
         set_seg(s, s_net[v->value != 0]);
     } else if (v->pos == SH_MENU_SSN) {
         set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
-    } else if (v->pos == SH_MENU_HOL || v->pos == SH_MENU_HAP) {
+    } else if (v->pos == SH_MENU_HOL || v->pos == SH_MENU_HAP || v->pos == SH_MENU_LOC) {
         set_seg(s, s_on_off[v->value != 0]);
     } else {
         /* tbo, C.Lo, d.on, d.oF in °F if chosen (the stored value and its step stay °C / K) */
@@ -284,9 +286,7 @@ static void display_task(void *arg)
             if (!was_normal || (was_test && !special)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
-            if (view.locked) {
-                set_seg(&scr, s_loc);   /* a key with the child lock on: 1 s */
-            } else if (st.fup_offer) {
+            if (st.fup_offer) {
                 set_seg(&scr, s_fup);   /* a newer firmware: short "menu" confirms */
             } else if (st.test_on) {
                 test_screen(&scr, &st, now_s);
@@ -299,6 +299,11 @@ static void display_task(void *arg)
             was_test = special;
         }
         was_normal = normal;
+        if (view.notice != SH_MENU_NOTICE_NONE) {
+            /* the keyboard was locked / unlocked, or a locked button pressed: 1 s over whatever is
+             * shown, which then goes on */
+            set_seg(&scr, view.notice == SH_MENU_NOTICE_UNL ? s_unl : s_loc);
+        }
 
         if (!written || !same(&scr, &shown)) {
             show(&scr);
