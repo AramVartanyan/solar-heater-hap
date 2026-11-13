@@ -44,9 +44,6 @@ CONFIG_LWIP_SNTP_UPDATE_DELAY=43200000
 
 # OTA (general-ota); server certificates come from the mbedTLS bundle below
 CONFIG_GENERAL_OTA_URL="https://raw.githubusercontent.com/AramVartanyan/otafw/master/solheat1.bin"
-# a new version that does not reach the end of app_main() is rolled back to the previous one
-# (the bootloader does it: this takes effect after flashing over USB)
-CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # mbedTLS (certificate bundle is required by general-ota)
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y

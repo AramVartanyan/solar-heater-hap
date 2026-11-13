@@ -8,14 +8,11 @@
  *   5. the network (sh_net: captive-wifi in the mode CP, the name solar-xxxxxx, mDNS, firmware
  *      update), SNTP (at every connection to the router) and the web interface (on the router or on
  *      the own access point); HomeKit follows in a later phase
- *   6. the running firmware is marked valid: a new version that does not get this far is rolled
- *      back by the bootloader (CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE)
  */
 
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include "esp_app_desc.h"
-#include "esp_ota_ops.h"
 #include "nvs_flash.h"
 
 #include "sh_config.h"
@@ -66,6 +63,4 @@ void app_main(void)
     sh_clock_start();
     ESP_ERROR_CHECK(sh_web_init());
     ESP_ERROR_CHECK(sh_net_start());
-
-    esp_ota_mark_app_valid_cancel_rollback();       /* 6. this version works */
 }
