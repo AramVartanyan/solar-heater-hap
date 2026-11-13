@@ -1,6 +1,6 @@
 /* Onboard WS2812 status LED (doc/led-indication.md): a colour and a pattern from sh_ind. The
  * patterns run on one periodic esp_timer (10 ms); the LED is written only when what it shows
- * changes. Brightness: CONFIG_SH_LED_BRIGHTNESS. */
+ * changes (the breathing: when its level changes). Brightness: CONFIG_SH_LED_BRIGHTNESS. */
 #pragma once
 
 #include "esp_err.h"

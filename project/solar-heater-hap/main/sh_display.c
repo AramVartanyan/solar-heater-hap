@@ -11,6 +11,7 @@
 #include "sh_menu.h"
 #include "sh_pump_ctl.h"
 #include "sh_buttons.h"
+#include "sh_net.h"
 #include "sh_display.h"
 
 static const char *TAG = "sh_display";
@@ -33,6 +34,14 @@ static const uint8_t s_boil[DIGITS] = { 0x7C /* b */, 0x5C /* o */, 0x16 /* il *
 static const uint8_t s_col[DIGITS]  = { 0x39 /* C */, 0x5C /* o */, 0x30 /* l */ };
 static const uint8_t s_tst[DIGITS]  = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ };
 static const uint8_t s_hol[DIGITS]  = { 0x76 /* H */, 0x5C /* o */, 0x38 /* L */ };
+static const uint8_t s_fup[DIGITS]  = { 0x71 /* F */, 0x3E /* U */, 0x73 /* P */ };
+/* Values of nEt (CP, AP); " AP" is also the label of the own access point */
+static const uint8_t s_net[2][DIGITS] = {
+    { 0, 0x39 /* C */, 0x73 /* P */ },
+    { 0, 0x77 /* A */, 0x73 /* P */ },
+};
+/* The characters of the access code (hex): A b C d E F */
+static const uint8_t s_hex[6] = { 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71 };
 /* Air venting: "AIr", then the phase "run" / "PAu" and the minutes left */
 static const uint8_t s_air[DIGITS]  = { 0x77 /* A */, 0x06 /* I */, 0x50 /* r */ };
 static const uint8_t s_run[DIGITS]  = { 0x50 /* r */, 0x1C /* u */, 0x54 /* n */ };
@@ -69,6 +78,7 @@ static const uint8_t s_items[SH_MENU_ITEMS][DIGITS] = {
     [SH_MENU_DON] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x54 /* n */ },
     [SH_MENU_DOF] = { 0x5E | SEG_DP /* d. */, 0x5C /* o */, 0x71 /* F */ },
     [SH_MENU_TST] = { 0x78 /* t */, 0x6D /* S */, 0x78 /* t */ },
+    [SH_MENU_NET] = { 0x54 /* n */, 0x79 /* E */, 0x78 /* t */ },
     [SH_MENU_END] = { 0x79 /* E */, 0x54 /* n */, 0x5E /* d */ },
 };
 
@@ -135,6 +145,18 @@ static bool same(const screen_t *a, const screen_t *b)
     return a->is_temp ? a->temp == b->temp : memcmp(a->seg, b->seg, DIGITS) == 0;
 }
 
+/* One half of the access code ("810841": part 1 "810", part 2 "841"). */
+static void code_screen(screen_t *s, uint8_t part)
+{
+    const char *code = sh_net_access_code() + (part - 1) * DIGITS;
+    uint8_t seg[DIGITS] = { 0 };
+    for (int i = 0; i < DIGITS && code[i]; i++) {
+        const char c = code[i];
+        seg[i] = c >= '0' && c <= '9' ? s_digit[c - '0'] : c >= 'A' && c <= 'F' ? s_hex[c - 'A'] : 0;
+    }
+    set_seg(s, seg);
+}
+
 static void menu_screen(screen_t *s, const sh_menu_view_t *v)
 {
     if (v->mode == SH_MENU_LIST) {
@@ -142,6 +164,10 @@ static void menu_screen(screen_t *s, const sh_menu_view_t *v)
     } else if (!v->value_visible) {
         const uint8_t blank[DIGITS] = { 0 };
         set_seg(s, blank);
+    } else if (v->code_part) {
+        code_screen(s, v->code_part);
+    } else if (v->pos == SH_MENU_NET) {
+        set_seg(s, s_net[v->value != 0]);
     } else if (v->pos == SH_MENU_SSN) {
         set_seg(s, s_seasons[v->value >= 0 && v->value < SH_SEASON_MODES ? v->value : SH_SEASON_AUTO]);
     } else if (v->pos == SH_MENU_HOL) {
@@ -182,16 +208,30 @@ static void test_screen(screen_t *s, const sh_state_t *st, uint32_t now_s)
 }
 
 /* Normal screen, `ms` after the start of the cycle: Boil, tank, Col, collector, then the active
- * codes and "HoL" in the vacation (1 s each). Returns false when the cycle is over (the caller starts it again). */
+ * codes and the labels "HoL" (vacation), " AP" (own access point), "FUp" (update waiting or running),
+ * 1 s each. Returns false when the cycle is over (the caller starts it again). */
 static bool normal_screen(screen_t *s, const sh_state_t *st, uint32_t ms)
 {
     if (ms >= CYCLE_MS) {
         const sh_alarm_t code = sh_alarm_code_at(st->alarms, ms - CYCLE_MS);
         if (code != SH_ALARM_COUNT) {
             set_seg(s, s_codes[code]);
-        } else if (st->vacation && (ms - CYCLE_MS) / SH_ALARM_CODE_MS == sh_alarm_count(st->alarms)) {
-            set_seg(s, s_hol);          /* vacation: after the codes */
-        } else {
+            return true;
+        }
+        /* the labels: after the codes */
+        switch (sh_menu_label_at(st->vacation, st->net_ap, st->fup,
+                                 (ms - CYCLE_MS) / SH_ALARM_CODE_MS - sh_alarm_count(st->alarms))) {
+        case SH_MENU_LABEL_HOL:
+            set_seg(s, s_hol);
+            break;
+        case SH_MENU_LABEL_AP:
+            set_seg(s, s_net[1]);
+            break;
+        case SH_MENU_LABEL_FUP:
+            set_seg(s, s_fup);
+            break;
+        case SH_MENU_LABEL_NONE:
+        default:
             return false;
         }
     } else if (ms < LABEL_MS) {
@@ -231,11 +271,14 @@ static void display_task(void *arg)
         if (!normal) {
             menu_screen(&scr, &view);   /* no alarms or test in the menu */
         } else {
-            const bool special = st.test_on || st.modes.air_on;
+            /* the offered update, the test or the air venting instead of the cycle */
+            const bool special = st.fup_offer || st.test_on || st.modes.air_on;
             if (!was_normal || (was_test && !special)) {
                 cycle_ms = now_ms;      /* back to the normal screen: from "Boil" */
             }
-            if (st.test_on) {
+            if (st.fup_offer) {
+                set_seg(&scr, s_fup);   /* a newer firmware: short "menu" confirms */
+            } else if (st.test_on) {
                 test_screen(&scr, &st, now_s);
             } else if (st.modes.air_on) {
                 air_screen(&scr, &st, now_s);

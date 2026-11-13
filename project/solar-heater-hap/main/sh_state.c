@@ -66,6 +66,16 @@ void sh_state_set_wifi(bool connected, bool portal)
     xSemaphoreGive(s_lock);
 }
 
+void sh_state_set_net(bool ap, bool ota_running, bool fup_offer, bool fup)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_state.net_ap = ap;
+    s_state.ota_running = ota_running;
+    s_state.fup_offer = fup_offer;
+    s_state.fup = fup;
+    xSemaphoreGive(s_lock);
+}
+
 void sh_state_set_alarms(uint8_t alarms)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);

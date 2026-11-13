@@ -20,6 +20,8 @@
  *              time   t=<s since 1970, UTC>: the time of the browser (no code; sh_clock decides
  *                     whether it is taken)
  *              tz     tz=<index in sh_tz_list>: the installer confirms a time zone (with the code)
+ *              net    mode=cp | ap: the network mode, as nEt of the menu (with the code)
+ *              ota    cmd=check | update: the firmware update (with the code)
  *            the access code ("code") is the last 6 characters of the setup network name
  *   chart    the day in RAM (sh_day): the 10-min intervals of today / of the last 24 h
  *   days     the last daily summaries (sh_hist), newest first
@@ -36,6 +38,8 @@
 #include "sh_clock_rules.h"
 #include "sh_day.h"
 #include "sh_hist.h"
+#include "sh_net_rules.h"
+#include "sh_ota.h"
 
 #define SH_WEB_CODE_LEN         6
 #define SH_WEB_STATUS_MAX       3072    /* a buffer of this size always holds the status */
@@ -73,6 +77,15 @@ typedef struct {
     const char *ssid;           /* network name, IP address, signal (dBm) */
     const char *ip;
     int rssi;
+    /* the network mode and the name (group E) */
+    bool ap;                    /* the own access point is on: `ip` is its address, no `ssid` */
+    bool ap_pending;            /* AP chosen during an update: it starts after it */
+    const char *host;           /* the name in the network: "solar-810841" (mDNS: + ".local") */
+    const char *ap_ssid;        /* the name of the own access point: "SOLAR-810841" */
+    /* the firmware update (group E) */
+    sh_ota_phase_t ota;
+    int8_t ota_pct;
+    const char *ota_version;    /* the newer version, "" / NULL: none */
     sh_web_clock_t clock;
     uint32_t run_s[SH_RUN_KINDS];   /* run time today by kind (sh_day_run_today) */
     bool history;               /* the history partition is there */
@@ -179,6 +192,16 @@ sh_web_res_t sh_web_time(const char *body, int64_t *epoch_s);
 
 /* "tz": a time zone of sh_tz_list by its index; needs the access code. */
 sh_web_res_t sh_web_tz(const char *body, const char *code, int *tz);
+
+/* "net": the network mode; needs the access code. */
+sh_web_res_t sh_web_net(const char *body, const char *code, sh_net_mode_t *mode);
+
+/* "ota": check for a newer firmware, or install the found one; needs the access code. */
+sh_web_res_t sh_web_ota(const char *body, const char *code, sh_ota_cmd_t *cmd);
+
+/* Key of the firmware update state for the page (it holds the texts): "ap" (no internet: own
+ * access point) instead of everything that needs the server, "noconn" for a failed check. */
+const char *sh_web_ota_key(sh_ota_phase_t phase, bool ap);
 
 /* Key of a pump reason for the page (it holds the texts). */
 const char *sh_web_reason_key(sh_pump_reason_t reason);

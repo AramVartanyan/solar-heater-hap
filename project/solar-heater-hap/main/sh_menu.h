@@ -5,13 +5,19 @@
  *   normal screen   "+" pump test (during the test +60 s), "-" during the test -60 s,
  *                   "menu" -> the list at SSn (during the test: stops the test; during the air
  *                   venting: stops it, and "+" does not start a test)
- *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, End; "+" / "-" next / previous item,
+ *   list            SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, End; "+" / "-" next / previous item,
  *                   round (after End -> SSn); C.Lo, d.on and d.oF are those of the current season;
  *                   "menu" on a setting -> its value blinks; on End -> normal screen
  *   value (blinks)  "+" / "-" one step within the range (no wrap), held > 1 s: repeated;
  *                   "menu" confirms: saved only if different, the value shown steady for 1 s,
  *                   then the list at the same item
+ *   nEt             the network mode (group E): the value is the current mode, "CP" / "AP" ("+" AP,
+ *                   "-" CP); "menu" confirms — always passed on (CP switches a radio that is off on
+ *                   again); after AP the access code is shown in two parts, 2 s each ("810", "841"),
+ *                   instead of the steady value; the mode is not a stored setting
  *   10 s without a key in the list or on a value -> normal screen, an unconfirmed value is lost.
+ * While "FUp" is offered on the normal screen (a newer firmware, 5 s) a short "menu" confirms the
+ * update instead of anything else.
  * Times in ms of a monotonic clock. */
 #pragma once
 
@@ -28,15 +34,17 @@ typedef enum {
     SH_MENU_DON,
     SH_MENU_DOF,
     SH_MENU_TST,
+    SH_MENU_NET,                /* network mode: CP / AP (not a setting of sh_settings) */
     SH_MENU_END,                /* the item after the settings */
     SH_MENU_ITEMS
 } sh_menu_item_t;
 
-/* The setting behind an item (not for SH_MENU_END); `winter`: the current season. */
+/* The setting behind an item (not for SH_MENU_NET and SH_MENU_END); `winter`: the current season. */
 sh_setting_t sh_menu_setting(uint8_t pos, bool winter);
 #define SH_MENU_TIMEOUT_MS      10000u
 #define SH_MENU_SAVED_MS        1000u
 #define SH_MENU_BLINK_MS        500u                /* on 0.5 s, off 0.5 s */
+#define SH_MENU_CODE_MS         2000u               /* nEt -> AP: each half of the access code */
 
 /* Pump test screen: "tSt" for 3 s, then the seconds left, "tSt" again for 1 s every 7 s. */
 #define SH_MENU_TEST_LABEL_S    3u
@@ -73,6 +81,8 @@ typedef enum {
     SH_MENU_ACT_STOP,           /* pump test: stop */
     SH_MENU_ACT_SAVE,           /* store `value` as setting `id` */
     SH_MENU_ACT_AIR_STOP,       /* air venting: stop */
+    SH_MENU_ACT_NET,            /* network mode chosen: `value` 0 CP / 1 AP */
+    SH_MENU_ACT_FUP,            /* the offered firmware update is confirmed */
 } sh_menu_act_t;
 
 typedef struct {
@@ -89,6 +99,7 @@ typedef struct {
     uint8_t pos;
     int16_t value;
     bool value_visible;         /* false in the "off" half of the blinking */
+    uint8_t code_part;          /* nEt -> AP confirmed: 1 / 2 the half of the access code, 0 none */
 } sh_menu_view_t;
 
 /* The timeouts up to `now_ms` (1 s steady value -> list, 10 s without a key -> normal screen). */
@@ -99,6 +110,8 @@ typedef struct {
     bool test_running;          /* the pump test is on */
     bool air_running;           /* the air venting is on */
     bool winter;                /* the current season */
+    bool net_ap;                /* the network mode is AP */
+    bool fup_offer;             /* "FUp" is offered on the display */
 } sh_menu_ctx_t;
 
 /* One key. `s`: the current settings. */
@@ -110,3 +123,15 @@ void sh_menu_view(const sh_menu_t *m, uint32_t now_ms, sh_menu_view_t *out);
 
 /* Pump test screen, `elapsed_s` after the start of the test: true = "tSt", false = seconds left. */
 bool sh_menu_test_label(uint32_t elapsed_s);
+
+/* The labels of the normal screen after the alarm and information codes, 1 s each, in this order:
+ * "HoL" in the vacation, "AP" while the own access point is on, "FUp" while a confirmed firmware
+ * update waits or runs. `idx`: 0 for the first second after the codes; SH_MENU_LABEL_NONE when the
+ * labels are over (the cycle starts again). */
+typedef enum {
+    SH_MENU_LABEL_NONE = 0,
+    SH_MENU_LABEL_HOL,
+    SH_MENU_LABEL_AP,
+    SH_MENU_LABEL_FUP,
+} sh_menu_label_t;
+sh_menu_label_t sh_menu_label_at(bool vacation, bool ap, bool fup, uint32_t idx);

@@ -34,13 +34,17 @@ idf_component_register(
         "sh_heater.c"
         "sh_e8.c"
         "sh_pulse.c"
+        "sh_net_rules.c"
+        "sh_ota.c"
+        "sh_net.c"
     INCLUDE_DIRS "."
     # the page of the web interface (sh_web), served as it is
     EMBED_FILES "web/index.html" "web/favicon.svg"
     REQUIRES
         # ESP-IDF
         driver esp_timer nvs_flash esp_wifi esp_event esp_netif esp_app_format esp_http_server esp_partition
+        app_update
         # project/common (git submodules)
         button outputwrite captive-wifi container_nvs general-ota esp_tm1637 ds18b20
         # managed components (idf_component.yml)
-        led_strip)
+        led_strip mdns)

@@ -1,8 +1,8 @@
 /* Web interface (doc/web-interface.md; doc/tasks/step6-installer-web.md 3.4): one page embedded
- * in the firmware and a small JSON API, on an own esp_http_server (port 80). The server runs only
- * while the device is connected to the router and the Wi-Fi setup portal is closed — the portal
- * has its own server on the same port. With HomeKit the handlers move to the server of
- * esp-homekit-sdk.
+ * in the firmware and a small JSON API, on an own esp_http_server (port 80). The server runs while
+ * the device is connected to the router (CP) or its own access point is on (AP, http://192.168.4.1),
+ * and never together with the Wi-Fi setup portal — the portal has its own server on the same port.
+ * With HomeKit the handlers move to the server of esp-homekit-sdk.
  *
  *   GET  /            the page
  *   GET  /api/state   status (sh_web_api: JSON)
@@ -17,6 +17,8 @@
  *   GET  /api/tz      the supported time zones
  *   POST /api/time    the time of the browser (no code; taken only without SNTP in the last 24 h)
  *   POST /api/tz      the time zone, by its index — with the access code
+ *   POST /api/net     the network mode: CP / AP (as nEt of the menu) — with the access code
+ *   POST /api/ota     firmware update: check, update — with the access code
  * Answers of the POSTs: 200, 400 (bad request, nothing changed), 403 (access code).
  * The access code: the last 6 characters of the setup network name ("SOLAR-810841" -> 810841). */
 #pragma once
@@ -24,7 +26,10 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-esp_err_t sh_web_init(void);        /* after captive_wifi_init() */
+esp_err_t sh_web_init(void);        /* after sh_net_init() (captive_wifi_init()) */
 
 /* Start / stop the server; from the Wi-Fi events (any task: the work is done by the web task). */
 void sh_web_enable(bool on);
+
+/* Stop the server and wait until it is down (before the setup portal may start its own). */
+void sh_web_stop_wait(void);

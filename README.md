@@ -32,8 +32,8 @@ _Тази секция се попълва постепенно, докато с
 ## Софтуер
 
 - **Платформа:** ESP-IDF **5.5.x**, target `esp32s3`; HomeKit — [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk) (в следваща фаза)
-- **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `solar-heater-hap.bin`, hostname `solar-heater`,
-  точка за достъп за настройка на Wi-Fi `SOLAR-XXXXXX`
+- **Фърмуер:** `project/solar-heater-hap/` — изпълним файл `solar-heater-hap.bin`, име в мрежата `solar-xxxxxx`
+  (и `solar-xxxxxx.local` по mDNS), точка за достъп `SOLAR-XXXXXX` (за настройка на Wi-Fi и за режим `AP`)
 - Драйвер за WS2812 светодиода: `espressif/led_strip` (RMT, минимална конфигурация) — виж [doc/firmware.md](doc/firmware.md)
 - Изводи: T_COL → GP1, T_TANK → GP2, реле → GP4, TM1637 → GP5/GP6, бутони → GP7/GP8/GP9, светодиод → GP21
 
@@ -69,7 +69,7 @@ idf.py build flash monitor
 При външен `HOMEKIT_PATH` папката `components/` на това хранилище се добавя последна, така че собственият `button`
 има предимство пред този от SDK-то.
 
-Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`; предстои `mdns`.
+Управлявани компоненти (`main/idf_component.yml`): `espressif/led_strip`, `espressif/mdns`.
 
 ### Референции
 
