@@ -1,5 +1,5 @@
-/* Host test of the alarm and information codes (main/sh_alarm.c; doc/tasks/step5-alarms-indication.md
- * 3.1, 3.2): E1, E2, E4, E5 and Hot from the real pump control (sh_pump_ctl), E6 with scripted
+/* Host test of the alarm and information codes (main/sh_alarm.c; doc/operating-modes.md
+ * 5.2): E1, E2, E4, E5 and Hot from the real pump control (sh_pump_ctl), E6 with scripted
  * temperatures, the order of the codes on the display. 1 s clock; temperatures in tenths of °C. */
 
 #include <string.h>

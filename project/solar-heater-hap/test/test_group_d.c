@@ -1,4 +1,5 @@
-/* Host test of group D (doc/tasks/step12-heater-leak-e8.md 3.1 - 3.4): the heater power in the
+/* Host test of the heater, its leak and E8 (doc/operating-modes.md 4.4, 5.2): the heater
+ * power in the
  * installer data (sh_installer); the heater sign and its threshold, the detection with "0 kW", the
  * probes with a faulty collector sensor on the same threshold (sh_heater, sh_pump_ctl); the
  * guaranteed daylight, the schedule of the leak checks, their result, the stop and the new start

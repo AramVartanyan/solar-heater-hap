@@ -1,5 +1,5 @@
-/* The network (group E; doc/tasks/step7-network-ota.md): Wi-Fi through captive-wifi 0.4.0, the mode
- * CP / AP of the menu position nEt, the name in the network and the firmware update. One task,
+/* The network (doc/operating-modes.md 6.2, doc/web-interface.md 5): Wi-Fi through captive-wifi
+ * 0.4.0, the mode CP / AP of the menu position nEt, the name in the network and the firmware update. One task,
  * "sh_net", takes the events of captive-wifi and of general-ota, the choices of the menu and of
  * the web interface, and does what the rules say (sh_net_rules, sh_ota — plain C, host test):
  *
@@ -14,7 +14,7 @@
  * is not stored: CP at every boot. One name everywhere — captive_wifi_ap_ssid(), built from the base
  * MAC ("Solar-810840"): the network of the portal / AP, the DHCP hostname and mDNS; its last 6
  * characters are the access code, the base MAC in capitals is the serial number.
- * Apple HomeKit (group F, sh_hap): with the setting on, HAP is started on the first connection to the
+ * Apple HomeKit (sh_hap): with the setting on, HAP is started on the first connection to the
  * router; from then on its HTTP server (port 80) serves the web interface and its mDNS carries the
  * name — mDNS is then started by HAP and only afterwards given the name and the web service. With
  * the setting off (and on the own access point before HAP was started) the own server and, on the

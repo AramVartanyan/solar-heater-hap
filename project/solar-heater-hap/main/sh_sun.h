@@ -1,5 +1,5 @@
-/* Sunrise and sunset seen by the collector (doc/operating-modes.md 2.1, "Нощно охлаждане (т. 7)" —
- * изгрев и залез; doc/tasks/step10-cooling-vacation-seasons.md 3.2) — plain C, no ESP-IDF /
+/* Sunrise and sunset seen by the collector (doc/operating-modes.md 2.4,
+ * "Изгрев и залез") — plain C, no ESP-IDF /
  * FreeRTOS, compiled into the host test too.
  *
  *   sunrise  with the pump stopped the collector rises >= 2 K in 10 min (one sample a minute, all

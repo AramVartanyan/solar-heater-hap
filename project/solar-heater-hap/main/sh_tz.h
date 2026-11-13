@@ -1,4 +1,4 @@
-/* Supported time zones (doc/tasks/step9-clock-history.md 3.1) — plain C, compiled into the host
+/* Supported time zones (doc/operating-modes.md 7) — plain C, compiled into the host
  * test too. The list lives in the firmware (nothing is loaded from outside): the IANA name the
  * browser reports (Intl ... timeZone) and its POSIX TZ rule with the daylight saving time. The page
  * gets the names (GET /api/tz) and sends back the index of the chosen one. */

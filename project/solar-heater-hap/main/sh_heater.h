@@ -1,5 +1,5 @@
 /* The heater in the tank: its sign, the guaranteed daylight and the leak checks of the heater
- * (doc/operating-modes.md 2.1, "Нагревател (т. 17)"; doc/tasks/step12-heater-leak-e8.md 3.1 - 3.3) —
+ * (doc/operating-modes.md 4.4, "Нагревател и „порочен кръг“ (т. 17)") —
  * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too.
  *
  *   sign       with the pump stopped the tank rose, over the last 10 min, by at least half of what

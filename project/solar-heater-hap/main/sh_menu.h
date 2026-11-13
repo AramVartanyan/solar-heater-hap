@@ -1,5 +1,5 @@
-/* User menu on the buttons and the display (doc/operating-modes.md 2.5;
- * doc/tasks/step2-settings-menu-pump-sensors.md 3.2) — the transitions in plain C, compiled into the
+/* User menu on the buttons and the display (doc/operating-modes.md 6.1) —
+ * the transitions in plain C, compiled into the
  * host test too. sh_buttons feeds the keys, sh_display shows the view.
  *
  *   normal screen   "+" pump test (during the test +60 s), "-" during the test -60 s,
@@ -11,12 +11,12 @@
  *   value (blinks)  "+" / "-" one step within the range (no wrap), held > 1 s: repeated;
  *                   "menu" confirms: saved only if different, the value shown steady for 1 s,
  *                   then the list at the same item
- *   nEt             the network mode (group E): the value is the current mode, "CP" / "AP" ("+" AP,
+ *   nEt             the network mode: the value is the current mode, "CP" / "AP" ("+" AP,
  *                   "-" CP); "menu" confirms — always passed on (CP switches a radio that is off on
  *                   again); after AP the access code is shown in two parts, 2 s each ("810", "840"),
  *                   instead of the steady value; AP while the device is connected to the router is
  *                   refused: "CP" steady for 1 s, nothing is passed on; the mode is not stored
- *   HAP             the setting "Apple HomeKit" (group F): "on" / "oFF" ("+" on, "-" oFF); "menu"
+ *   HAP             the setting "Apple HomeKit": "on" / "oFF" ("+" on, "-" oFF); "menu"
  *                   confirms: a different value is passed on (it is stored and the controller
  *                   restarts); oFF while a controller is paired is refused: "on" steady for 1 s,
  *                   nothing is passed on

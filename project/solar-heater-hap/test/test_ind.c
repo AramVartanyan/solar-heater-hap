@@ -1,4 +1,4 @@
-/* Host test of the status LED indication (main/sh_ind.c; doc/tasks/step5-alarms-indication.md 3.3):
+/* Host test of the status LED indication (main/sh_ind.c; doc/led-indication.md):
  * the colour priority, the white / yellow thresholds with their return zones, the pattern choice
  * and the pattern times. Temperatures in tenths of °C, times in ms. */
 

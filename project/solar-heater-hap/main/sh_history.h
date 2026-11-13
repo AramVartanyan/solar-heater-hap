@@ -1,4 +1,4 @@
-/* History (doc/web-interface.md 4, 4.1; doc/tasks/step9-clock-history.md 3.2, 3.3): a task of its
+/* History (doc/web-interface.md 4, 4.1): a task of its
  * own, once a second, feeds the day in RAM (sh_day: the chart, the summary of the day) from the
  * published state (sh_state) and the clock (sh_clock). At local midnight, with a set clock, the
  * summary of the day is written to the "history" partition (sh_hist: 32 B records in a ring) and

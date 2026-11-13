@@ -1,6 +1,6 @@
-/* Firmware update — when it is checked, offered and started (doc/web-interface.md 5;
- * doc/tasks/step7-network-ota.md 3.3) — plain C, no ESP-IDF / FreeRTOS, compiled into the host test
- * too. sh_net runs general-ota as these rules ask and feeds its results back.
+/* Firmware update — when it is checked, offered and started (doc/web-interface.md 5) —
+ * plain C, no ESP-IDF / FreeRTOS, compiled into the host test too. sh_net runs general-ota as these
+ * rules ask and feeds its results back.
  *
  *   - one automatic check after boot: 1 min after boot if the device is on the router (CP) then;
  *     if the connection comes later (a slow router after a power cut, a return from AP) — 1 min

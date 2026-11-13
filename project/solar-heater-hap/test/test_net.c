@@ -1,4 +1,5 @@
-/* Host test of group E (doc/tasks/step7-network-ota.md): the network mode CP / AP and its times
+/* Host test of the network and the firmware update (doc/operating-modes.md 6.2,
+ * doc/web-interface.md 5): the network mode CP / AP and its times
  * (main/sh_net_rules.c), the menu position nEt with the access code and the labels of the display
  * (main/sh_menu.c), the indication of the access point and of the update (main/sh_ind.c), the
  * firmware update rules (main/sh_ota.c) and what the web interface gets and sends
@@ -48,7 +49,7 @@ static ui_t at_net(bool ap)
     ui_t u = { .now = 1000, .ctx = { .net_ap = ap } };
     key(&u, SH_KEY_MENU, 0);
     key(&u, SH_KEY_MINUS, 100);                                 /* SSn -> End */
-    key(&u, SH_KEY_MINUS, 100);                                 /* End -> LoC (group F) */
+    key(&u, SH_KEY_MINUS, 100);                                 /* End -> LoC */
     key(&u, SH_KEY_MINUS, 100);                                 /* LoC -> HAP */
     key(&u, SH_KEY_MINUS, 100);                                 /* HAP -> nEt */
     return u;
@@ -56,7 +57,7 @@ static ui_t at_net(bool ap)
 
 static void test_menu_net(void)
 {
-    /* nEt is after tSt: SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC (group F), End */
+    /* nEt is after tSt: SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC, End */
     CHECK_EQ(SH_MENU_NET, SH_MENU_TST + 1);
     CHECK_EQ(SH_MENU_END, SH_MENU_NET + 3);
     CHECK_EQ(SH_MENU_ITEMS, 11);

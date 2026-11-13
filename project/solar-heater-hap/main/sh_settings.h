@@ -1,4 +1,4 @@
-/* User settings (the button menu, doc/operating-modes.md 2.5; the seasons, 2.1.2): table, ranges
+/* User settings (the button menu, doc/operating-modes.md 6.1; the seasons, 2.2): table, ranges
  * and checks — plain C, compiled into the host test too. Storage in NVS: sh_settings_store.
  *
  * Whole units, as shown on the display: °C, K, s. The switch-off difference is always below the

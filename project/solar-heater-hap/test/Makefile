@@ -1,7 +1,7 @@
 # Host tests of the plain-C logic in main/ (no ESP-IDF): gcc only.
 #   make -C project/solar-heater-hap/test
 #
-#   test_pump_logic   normal mode (sh_pump_logic, step 1)
+#   test_pump_logic   normal mode (sh_pump_logic)
 #   test_pump_ctl     pump test, anti-seize, sensor faults (sh_pump_ctl + sh_pump_logic)
 #   test_meas         sensor reading checks and fault (sh_meas)
 #   test_settings     menu values: ranges, steps, checks (sh_settings)
@@ -20,11 +20,11 @@
 #   test_pulse        pulse mode (sensors on the pipes): when a pulse is due, the reliable values and
 #                     the decisions by them (sh_pulse, sh_pump_ctl, sh_pump_logic, sh_cool, sh_sun,
 #                     sh_heater, sh_e8, sh_installer, sh_alarm, sh_day)
-#   test_net          group E: the network mode CP / AP and its times, nEt and the access code, the
+#   test_net          the network mode CP / AP and its times, nEt and the access code, the
 #                     labels of the display, the indication of AP and of the update, the firmware
 #                     update rules, the web interface (sh_net_rules, sh_ota, sh_menu, sh_ind,
 #                     sh_web_api)
-#   test_hap          group F, Apple HomeKit: the characteristics from the logic and back (Active and
+#   test_hap          Apple HomeKit: the characteristics from the logic and back (Active and
 #                     the vacation, Tmax, Current State, units (°F), keyboard lock, Status Fault), when a
 #                     notification goes out, when HAP starts and which web server is used, the
 #                     setting and its refusal while paired, the pairing window and the breathing LED,

@@ -1,4 +1,4 @@
-/* The day in RAM (doc/web-interface.md 4, 4.1; doc/tasks/step9-clock-history.md 3.2, 3.3) — plain C,
+/* The day in RAM (doc/web-interface.md 4, 4.1) — plain C,
  * no ESP-IDF / FreeRTOS, compiled into the host test too. Fed once a second by sh_history.
  *
  *   chart    144 intervals of 10 min: the collector and tank temperatures at the end of the
@@ -13,7 +13,7 @@
  *   summary  the day by the local time, only with a set clock: maximum / minimum of the collector
  *            and of the tank (faulty sensor: not taken), run time by kind, the alarm codes of the
  *            day, the minute of the collector maximum (the first one), the time with the heater
- *            sign active (group D). At the first step of the next day (a normal midnight: the
+ *            sign active. At the first step of the next day (a normal midnight: the
  *            next date, before 01:00) the day is handed over to be written; it is full when it was
  *            collected with a set clock from midnight to midnight, otherwise partial. Any other
  *            change of the date (the clock was set to another day) drops the collected day; so
@@ -59,7 +59,7 @@ typedef struct {
     sh_pump_reason_t reason;
     uint16_t alarms;            /* SH_ALARM_BIT() of the active codes */
     uint16_t sunrises, sunsets; /* how many were detected since boot (sh_sun, counted by sh_control) */
-    bool heater;                /* the heater sign is active (group D) */
+    bool heater;                /* the heater sign is active */
 } sh_day_in_t;
 
 /* One finished interval. */
@@ -83,7 +83,7 @@ typedef struct {
     uint32_t run_s[SH_RUN_KINDS];
     uint16_t alarms;
     int16_t sunrise, sunset;    /* local minutes of the detected ones (the last sunset), -1: none */
-    uint32_t heater_s;          /* the heater sign was active, s (group D) */
+    uint32_t heater_s;          /* the heater sign was active, s */
 } sh_day_sum_t;
 
 typedef struct {

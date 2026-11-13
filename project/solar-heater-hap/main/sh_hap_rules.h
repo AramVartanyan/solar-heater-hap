@@ -1,5 +1,5 @@
-/* Apple HomeKit: what the accessory shows and takes (doc/operating-modes.md 3;
- * doc/tasks/step14-homekit.md) — plain C, no ESP-IDF / FreeRTOS / esp-homekit-sdk, compiled into the
+/* Apple HomeKit: what the accessory shows and takes (doc/operating-modes.md 8)
+ * — plain C, no ESP-IDF / FreeRTOS / esp-homekit-sdk, compiled into the
  * host test too. sh_hap builds the accessory with esp-homekit-sdk and feeds these rules.
  *
  *   Heater Cooler (primary)

@@ -1,5 +1,5 @@
 /* Host test of the sensor reading checks and the sensor fault (main/sh_meas.c;
- * doc/tasks/step2-settings-menu-pump-sensors.md 3.5). Temperatures in tenths of °C. */
+ * doc/operating-modes.md 5.1). Temperatures in tenths of °C. */
 
 #include "test_util.h"
 #include "sh_state.h"

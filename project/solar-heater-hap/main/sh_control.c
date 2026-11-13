@@ -162,7 +162,7 @@ static void control_step(sh_pump_ctl_t *pump, const sh_control_cmd_t *cmd)
     const int16_t v_tank = pulse ? (rel && !st.tank_fault ? pump->rel.tank : SH_TEMP_INVALID) : t_tank;
 
     /* sunrise and sunset, seen by the collector with the pump as the last step left it; in the pulse
-     * mode the sunset also by the values of a pulse after 30 s (doc/operating-modes.md, D2) */
+     * mode the sunset also by the values of a pulse after 30 s (doc/operating-modes.md 4.5) */
     const uint8_t sun = sh_sun_step_flow(&s_sun, t_col, t_tank, pump->on, pulse && pump->rel.fresh, &ci.lt,
                                          reliable, now);
     if (sun & SH_SUN_EVT_RISE) {

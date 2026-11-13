@@ -1,13 +1,13 @@
 /* Control loop: every second takes the last published measurement from sh_state and the current
  * settings (sh_settings_store), lets sh_pump_ctl decide (pump test, anti-seize, sensor faults,
- * normal mode — doc/operating-modes.md 2.1), drives the relay, publishes the pump state with its
+ * normal mode — doc/operating-modes.md 2 - 4), drives the relay, publishes the pump state with its
  * reason and the pump test, and logs every change of the pump or the reason, the start / end of
  * the test and of the anti-seize run. Then the alarm and information codes (sh_alarm): published,
  * every appearance and clearing logged; and the status LED (sh_ind -> sh_led), computed when its
  * inputs change. Fixed parameters: Kconfig "Device Settings" -> "Control"; the boiling point, the
  * ceiling of the collector protection and the frost threshold come from the installer data
  * (sh_installer_store) and are logged at boot and when they change.
- * Group C (doc/tasks/step10-cooling-vacation-seasons.md): before the pump decision — sunrise and
+ * Before the pump decision: sunrise and
  * sunset (sh_sun), the season (sh_season; the seasonal values of sh_settings), the night cooling
  * sessions (sh_cool) and the vacation (collector protection at the vacation limit, no charging);
  * the air venting is a command like the pump test. The learned values are kept by sh_learn_store. */

@@ -1,5 +1,5 @@
-/* Seasons: the automatic choice between summer and winter (doc/operating-modes.md 2.1.2;
- * doc/tasks/step10-cooling-vacation-seasons.md 3.4) — plain C, no ESP-IDF / FreeRTOS, compiled into
+/* Seasons: the automatic choice between summer and winter (doc/operating-modes.md 2.2)
+ * — plain C, no ESP-IDF / FreeRTOS, compiled into
  * the host test too. The seasonal values themselves are in sh_settings.
  *
  *   Sun / Cld   the season set by hand, never changed

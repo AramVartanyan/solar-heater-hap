@@ -1,5 +1,5 @@
-/* Host test of the menu transitions (main/sh_menu.c; doc/tasks/step2-settings-menu-pump-sensors.md
- * 3.2; doc/tasks/step10-cooling-vacation-seasons.md 3.3 - 3.6) and of the pump test and air
+/* Host test of the menu transitions (main/sh_menu.c; doc/operating-modes.md
+ * 6.1) and of the pump test and air
  * venting screens. Times in ms. */
 
 #include "test_util.h"
@@ -69,7 +69,7 @@ static void test_list_order_and_wrap(void)
 {
     ui_t u = ui();
     key(&u, SH_KEY_MENU, 0);
-    /* SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC, End (doc/operating-modes.md 2.5, 3) */
+    /* SSn, HoL, tbo, C.Lo, d.on, d.oF, tSt, nEt, HAP, LoC, End (doc/operating-modes.md 6.1, 8) */
     const uint8_t order[] = { SH_MENU_HOL, SH_MENU_TBO, SH_MENU_CLO, SH_MENU_DON, SH_MENU_DOF, SH_MENU_TST,
                               SH_MENU_NET, SH_MENU_HAP, SH_MENU_LOC, SH_MENU_END, SH_MENU_SSN };
     for (unsigned i = 0; i < sizeof(order); i++) {

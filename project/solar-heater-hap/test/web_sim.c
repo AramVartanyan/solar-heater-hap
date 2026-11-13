@@ -1,8 +1,8 @@
 /* Stand-in for the firmware, to try the page of the web interface in a browser on the computer
- * (doc/tasks/step6-installer-web.md 3.5, step9-clock-history.md 3.4): serves main/web/index.html
+ * (doc/web-interface.md): serves main/web/index.html
  * and the API of main/sh_web.c with the same plain-C code (sh_web_api, sh_installer, sh_settings,
- * sh_pump_ctl, sh_alarm; sh_clock_rules, sh_tz, sh_day, sh_hist; sh_sun, sh_season, sh_cool —
- * doc/tasks/step10-cooling-vacation-seasons.md 3.6). Nothing is stored; the values
+ * sh_pump_ctl, sh_alarm; sh_clock_rules, sh_tz, sh_day, sh_hist; sh_sun, sh_season, sh_cool).
+ * Nothing is stored; the values
  * start at the Kconfig defaults. The clock is the one of the computer (set "by SNTP", zone
  * Europe/Sofia confirmed); the chart starts with a made-up day and the history with 40 made-up
  * days (in a RAM "flash").
@@ -26,18 +26,18 @@
  *   http://localhost:8080/sim?leak=1                 a leak check of the heater starts now (5 min);
  *                                                    leak=2: the leak is stopped; leak=0: idle
  *   http://localhost:8080/sim?e8=1                   E8 (3 nights with the reverse thermosiphon sign)
- * The pulse mode (group D2, doc/tasks/step13-pulse-mode.md 3.6): "Service" -> "Sensor mounting" ->
+ * The pulse mode: "Service" -> "Sensor mounting" ->
  * "On the pipes". /sim?col=...&tank=... are then the pipes: the page shows the values taken 30 s
  * after a pulse started ("measured at the pulse at ..."), the pump waits for the next pulse ("in ...
  * min"); a pulse with the collector at the boiling point - 10 K stops the pulses (the warning).
  * The control runs at every request of the page (every 5 s), so a pulse lasts 30 - 35 s here.
- * The heater (group D, doc/tasks/step12-heater-leak-e8.md 3.5): the sign follows the tank with the
+ * The heater: the sign follows the tank with the
  * pump stopped (/sim?tank=... rising by the threshold in 10 min), the leak checks run as in the
  * firmware (outside 09:00 - 16:00 / the learned daylight), E8 is judged at the end of the night.
  * Night cooling in the browser: /sim?col=150&tank=720 and /sim?hhmm=0400 (tank above Tmax), or
  * /sim?e4=1 and /sim?hhmm=0300; the vacation at night: switch it on and /sim?hhmm=2300 (the learned
  * sunset is 16:50); the season follows the daylight saving time of the zone (Aut) or the choice.
- * The network and the firmware update (group E, doc/tasks/step7-network-ota.md 3.4) run on the
+ * The network and the firmware update run on the
  * rules of the firmware (sh_net_rules, sh_ota) with a made-up update server:
  *   http://localhost:8080/sim?ap=1       nEt -> AP while the router does not answer: the own access
  *                                        point (the page stays on localhost; the browser counts
@@ -49,7 +49,7 @@
  *                                        comes 1 min after the start; the console says when)
  * A check answers after 2 s, an update takes 30 s and "restarts" into the new version; with the pump
  * running (/sim?col=900&tank=400) a confirmed update waits.
- * Apple HomeKit (group F, doc/tasks/step14-homekit.md): the setting and its refusal while paired are
+ * Apple HomeKit: the setting and its refusal while paired are
  * the rules of the firmware (sh_hap_rules); HAP "runs" from the start, not paired, the pairing
  * window open:
  *   http://localhost:8080/sim?hkpair=1   a controller is paired (the switch becomes inactive, with

@@ -1,5 +1,5 @@
-/* Pulse mode: the sensors on the pipes (doc/operating-modes.md 2.1, "Датчици на тръбите — импулсен
- * режим (т. 16)"; doc/tasks/step13-pulse-mode.md 3.2, 3.3) — when the next pulse is due. Plain C, no
+/* Pulse mode: the sensors on the pipes (doc/operating-modes.md 4.5, "Импулсен режим — датчици
+ * на тръбите (т. 16)") — when the next pulse is due. Plain C, no
  * ESP-IDF / FreeRTOS, compiled into the host test too. The pulse itself, the reliable values and the
  * decisions by them are in sh_pump_ctl (sh_pump_params_t.pulse / pulse_due).
  *
