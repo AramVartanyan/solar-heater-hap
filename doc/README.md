@@ -25,6 +25,8 @@
 | [`img/ESP32-S3-Zero-pinout.webp`](img/ESP32-S3-Zero-pinout.webp) | Извеждания (pinout) на платката Waveshare ESP32-S3-Zero | Waveshare |
 | [`XL-0807RGBC-WS2812B.pdf`](XL-0807RGBC-WS2812B.pdf) | Datasheet на вградения RGB светодиод XINGLIGHT XL-0807RGBC-WS2812B | [Waveshare wiki](https://files.waveshare.com/wiki/ESP32-C3-Zero/XL-0807RGBC-WS2812B.pdf) |
 | [`DS18B20.pdf`](DS18B20.pdf) | Datasheet на температурния датчик DS18B20 | [Analog Devices](https://www.analog.com/media/en/technical-documentation/data-sheets/ds18b20.pdf) |
+| [`ADS1120.pdf`](ADS1120.pdf) | Datasheet на АЦП ADS1120 (Pt1000 / NTC на колектора) | [Texas Instruments](https://www.ti.com/product/ADS1120) |
+| [`ADS1220.pdf`](ADS1220.pdf) | Datasheet на АЦП ADS1220 (алтернатива на ADS1120, съвместим по изводи) | [Texas Instruments](https://www.ti.com/product/ADS1220) |
 | [`img/HLK-PM01.webp`](img/HLK-PM01.webp) | Захранващ модул Hi-Link HLK-PM01 (5 V / 0.6 A) | Hi-Link |
 
 ## Фърмуер
