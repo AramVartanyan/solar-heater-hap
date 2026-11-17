@@ -27,6 +27,7 @@
 | [`DS18B20.pdf`](DS18B20.pdf) | Datasheet на температурния датчик DS18B20 | [Analog Devices](https://www.analog.com/media/en/technical-documentation/data-sheets/ds18b20.pdf) |
 | [`ADS1120.pdf`](ADS1120.pdf) | Datasheet на АЦП ADS1120 (Pt1000 / NTC на колектора) | [Texas Instruments](https://www.ti.com/product/ADS1120) |
 | [`ADS1220.pdf`](ADS1220.pdf) | Datasheet на АЦП ADS1220 (алтернатива на ADS1120, съвместим по изводи) | [Texas Instruments](https://www.ti.com/product/ADS1220) |
+| [`TMUX1101.pdf`](TMUX1101.pdf) | Datasheet на аналоговия ключ TMUX1101 (S1 / S2 на входа на колектора) | [Texas Instruments](https://www.ti.com/product/TMUX1101) |
 | [`img/HLK-PM01.webp`](img/HLK-PM01.webp) | Захранващ модул Hi-Link HLK-PM01 (5 V / 0.6 A) | Hi-Link |
 
 ## Фърмуер
